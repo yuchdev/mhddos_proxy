@@ -53,16 +53,16 @@ class Stats:
         self._lock = Lock()
 
     def get(self) -> Tuple[int, int]:
-        with self._lock:
-            return self._requests, self._bytes
+        #with self._lock:
+        return self._requests, self._bytes
 
     def track(self, rs: int, bs: int) -> None:
-        with self._lock:
-            self._requests += rs
-            self._bytes += bs
+        #with self._lock:
+        self._requests += rs
+        self._bytes += bs
 
     def reset(self) -> Tuple[int, int]:
-        with self._lock:
-            current = self._requests, self._bytes
-            self._requests, self._bytes = 0, 0
+        #with self._lock:
+        current = self._requests, self._bytes
+        self._requests, self._bytes = 0, 0
         return current

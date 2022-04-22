@@ -1,4 +1,6 @@
-from PyRoxy import ProxyUtiles
+from aiosocks import Socks4Addr, Socks5Addr
+
+from PyRoxy import ProxyUtiles, ProxyType
 from .core import logger, cl, PROXIES_URL
 from .system import read_or_fetch, fetch
 
@@ -9,6 +11,14 @@ _globals_before = set(globals().keys()).union({'_globals_before'})
 from .load_proxies import *
 decrypt_proxies = globals()[set(globals().keys()).difference(_globals_before).pop()]
 # @formatter:on
+
+
+def wrap_async(proxies):
+    for proxy in proxies:
+        if proxy.type == ProxyType.SOCKS4:
+            yield Socks4Addr(proxy.host, proxy.port)
+        elif proxy.type == ProxyType.SOCKS5:
+            yield Socks5Addr(proxy.host, proxy.port)
 
 
 def update_proxies(proxies_file, previous_proxies):

