@@ -903,7 +903,6 @@ class AsyncHttpFlood(HttpFlood):
     async def run(self) -> int:
         return await self.SENT_FLOOD()
 
-    # XXX: timeout as it was before sock.settimeout(SOCK_TIMEOUT)
     # note that TCP_NODELAY is set by default since Python3.6+
     async def open_connection(self) -> socket:
         is_tls = self._target.scheme.lower() == "https" or self._target.port == 443
@@ -921,7 +920,7 @@ class AsyncHttpFlood(HttpFlood):
                 host=self._target.host, port=self._target.port, ssl=is_tls) 
         return reader, writer
 
-
+    # XXX: config for timeouts
     async def GET(self) -> int:
         payload: bytes = self.generate_payload()
         packets: int = 0

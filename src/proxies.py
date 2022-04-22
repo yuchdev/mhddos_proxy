@@ -13,6 +13,8 @@ decrypt_proxies = globals()[set(globals().keys()).difference(_globals_before).po
 # @formatter:on
 
 
+# XXX: support HTTP as well
+# XXX: do we support auth?
 def wrap_async(proxies):
     for proxy in proxies:
         if proxy.type == ProxyType.SOCKS4:

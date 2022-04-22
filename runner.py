@@ -117,8 +117,6 @@ async def async_flooder(runnables):
 async def run_async_ddos(
     proxies,
     targets,
-    tcp_flooders,
-    udp_flooders,
     period,
     rpc,
     http_methods,
@@ -261,8 +259,6 @@ async def start(args):
         await run_async_ddos(
             proxies,
             targets,
-            None, 
-            None,
             period,
             args.rpc,
             args.http_methods,
