@@ -70,7 +70,6 @@ def show_statistic(
 
 
 def print_progress(period, passed, proxies_cnt):
-    logger.info(f'{cl.YELLOW}Новий цикл через: {cl.BLUE}{round(period - passed)} секунд{cl.RESET}')
     if proxies_cnt:
         logger.info(f'{cl.YELLOW}Кількість проксі: {cl.BLUE}{proxies_cnt}{cl.RESET}')
     else:

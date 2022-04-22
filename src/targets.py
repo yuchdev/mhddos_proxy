@@ -1,7 +1,7 @@
 from .core import logger, cl
-from .system import read_or_fetch
+from .system import async_read_or_fetch
 
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from dns import inet
 from yarl import URL
@@ -66,31 +66,35 @@ class Target:
         return hash(id(self))
 
 
-class Targets:
+# XXX: track hash for previously loaded
+class TargetsLoader:
+
     def __init__(self, targets, config):
-        self.targets = targets
-        self.config = config
-        self.config_targets = []
+        self._targets = [Target.from_string(t) for t in targets]
+        self._config = config
 
-    def __iter__(self):
-        self.load_config()
-        for target in self.targets + self.config_targets:
-            yield Target.from_string(target)
+    async def load(self) -> List[Target]:
+        config_targets = await self._load_config()
+        if config_targets:
+            logger.info(
+                f"{cl.YELLOW}Завантажено конфіг {self._config} "
+                f"на {cl.BLUE}{len(config_targets)} цілей{cl.RESET}")
+        return self._targets + (config_targets or [])
 
-    def load_config(self):
-        if not self.config:
-            return
+    async def _load_config(self) -> List[Target]:
+        if not self._config: return None
 
-        config_content = read_or_fetch(self.config)
+        config_content = await async_read_or_fetch(self._config)
         if config_content is None:
-            logger.warning(f'{cl.MAGENTA}Не вдалося (пере)завантажити конфіг{cl.RESET}')
-            return
+            # XXX: move logging out
+            # logger.warning(f'{cl.MAGENTA}Не вдалося (пере)завантажити конфіг{cl.RESET}')
+            raise RuntimeError("Failed to load configuration")
 
-        config_targets = []
+        targets = []
         for row in config_content.splitlines():
             target = row.strip()
             if target and not target.startswith('#'):
-                config_targets.append(target)
+                targets.append(Target.from_string(target))
 
-        logger.info(f'{cl.YELLOW}Завантажено конфіг {self.config} на {cl.BLUE}{len(config_targets)} цілей{cl.RESET}')
-        self.config_targets = config_targets
+        return targets
+
