@@ -54,7 +54,7 @@ class AsyncFlooder:
 async def run_async_ddos(
     proxies: Optional[ProxySet],
     targets_loader,
-    period,
+    reload_after,
     rpc,
     http_methods,
     vpn_mode,
@@ -146,7 +146,15 @@ async def run_async_ddos(
             passed = time.time() - ts
             ts = time.time()
             num_proxies = 0 if proxies is None else len(proxies)
-            show_statistic(statistics, refresh_rate, table, vpn_mode, num_proxies, period, passed)
+            show_statistic(
+                statistics,
+                refresh_rate,
+                table,
+                vpn_mode,
+                num_proxies,
+                reload_after,
+                passed
+            )
 
     # setup coroutine to print stats
     tasks.append(asyncio.ensure_future(stats_printer()))
@@ -169,7 +177,7 @@ async def run_async_ddos(
             )
   
     # setup coroutine to reload targets
-    tasks.append(asyncio.ensure_future(reload_targets(delay_seconds=30)))
+    tasks.append(asyncio.ensure_future(reload_targets(delay_seconds=reload_after)))
 
     async def reload_proxies(delay_seconds: int = 30):
         while True:
@@ -185,8 +193,7 @@ async def run_async_ddos(
 
     # setup coroutine to reload proxies
     if proxies is not None:
-        # XXX: should the delya be lower?
-        tasks.append(asyncio.ensure_future(reload_proxies(delay_seconds=300)))
+        tasks.append(asyncio.ensure_future(reload_proxies(delay_seconds=reload_after)))
 
     await asyncio.gather(*tasks)
 
@@ -232,11 +239,11 @@ async def start(args):
 
     # XXX: with the current implementation there's no need to
     # have 2 separate functions to setups params for launching flooders
-    period = 300 # XXX: why do we need this?
+    reload_after = 300
     await run_async_ddos(
         proxies,
         targets_loader,
-        period,
+        reload_after,
         args.rpc,
         args.http_methods,
         args.vpn_mode,
