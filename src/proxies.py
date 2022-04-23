@@ -1,8 +1,11 @@
-from aiosocks import Socks4Addr, Socks5Addr
+from random import choice
+from typing import List, Optional
 
+from aiosocks import SocksAddr, Socks4Addr, Socks5Addr
 from PyRoxy import ProxyUtiles, ProxyType
+
 from .core import logger, cl, PROXIES_URL
-from .system import read_or_fetch, fetch
+from .system import async_read_or_fetch, async_fetch
 
 
 # @formatter:off
@@ -11,6 +14,30 @@ _globals_before = set(globals().keys()).union({'_globals_before'})
 from .load_proxies import *
 decrypt_proxies = globals()[set(globals().keys()).difference(_globals_before).pop()]
 # @formatter:on
+
+class ProxySet:
+
+    def __init__(self, proxies_file: Optional[str] = None):
+        self._proxies_file = proxies_file
+        self._loaded_proxies = []
+    
+    async def reload(self) -> List[SocksAddr]:
+        if self._proxies_file:
+            proxies = await load_provided_proxies(self._proxies_file)
+        else:
+            proxies = await load_system_proxies()
+
+        if proxies:
+            self._loaded_proxies = list(wrap_async(proxies))
+            return len(self._loaded_proxies)
+        else:
+            return 0
+
+    def pick_random(self) -> SocksAddr:
+        return choice(self._loaded_proxies)
+    
+    def __len__(self) -> int:
+        return len(self._loaded_proxies)
 
 
 # XXX: support HTTP as well
@@ -23,6 +50,7 @@ def wrap_async(proxies):
             yield Socks5Addr(proxy.host, proxy.port)
 
 
+# XXX: this function is no longer needed
 def update_proxies(proxies_file, previous_proxies):
     if proxies_file:
         proxies = load_provided_proxies(proxies_file)
@@ -40,13 +68,14 @@ def update_proxies(proxies_file, previous_proxies):
     return proxies
 
 
-def load_provided_proxies(proxies_file):
-    content = read_or_fetch(proxies_file)
+# XXX: move logging to the runner
+async def load_provided_proxies(proxies_file: str) -> Optional[List[SocksAddr]]:
+    content = await async_read_or_fetch(proxies_file)
     if content is None:
         logger.warning(f'{cl.RED}Не вдалося зчитати проксі з {proxies_file}{cl.RESET}')
         return None
 
-    proxies = ProxyUtiles.parseAll([prox for prox in content.split()])
+    proxies = ProxyUtiles.parseAll(content.split())
     if not proxies:
         logger.warning(f'{cl.RED}У {proxies_file} не знайдено проксі - перевірте формат{cl.RESET}')
     else:
@@ -54,8 +83,8 @@ def load_provided_proxies(proxies_file):
     return proxies
 
 
-def load_system_proxies():
-    raw = fetch(PROXIES_URL)
+async def load_system_proxies():
+    raw = await async_fetch(PROXIES_URL)
     try:
         proxies = ProxyUtiles.parseAll(decrypt_proxies(raw))
     except Exception:

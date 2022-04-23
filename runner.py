@@ -9,7 +9,7 @@ from queue import SimpleQueue
 import random
 import time
 from threading import Event, Thread
-from typing import Any, Generator, Iterator, List
+from typing import Any, Generator, Iterator, List, Optional
 
 from src.cli import init_argparse
 from src.concurrency import DaemonThreadPool
@@ -20,7 +20,7 @@ from src.core import (
 from src.dns_utils import resolve_all_targets
 from src.mhddos import main as mhddos_main, async_main as mhddos_async_main
 from src.output import show_statistic, print_banner, print_progress
-from src.proxies import update_proxies, wrap_async
+from src.proxies import ProxySet
 from src.system import fix_ulimits, is_latest_version
 from src.targets import TargetsLoader
 
@@ -52,7 +52,7 @@ class AsyncFlooder:
 
 # XXX: UDP
 async def run_async_ddos(
-    proxies,
+    proxies: Optional[ProxySet],
     targets_loader,
     period,
     rpc,
@@ -65,7 +65,14 @@ async def run_async_ddos(
     dns_executor,
 ):
     statistics, event = {}, Event()
-    proxies_cnt = len(proxies)
+
+    # initial set of proxies
+    if proxies is not None:
+        num_proxies = await proxies.reload()
+        if num_proxies == 0:
+            logger.error(f"{cl.RED}Не знайдено робочих проксі - зупиняємо атаку{cl.RESET}")
+            exit()
+
 
     def register_params(params, container):
         thread_statistics = Stats()
@@ -86,15 +93,6 @@ async def run_async_ddos(
                 % (params.target.url.host, params.target.url.port, params.method)
             )
 
-    async def stats_printer():
-        refresh_rate = 5
-        ts = time.time()
-        while True:
-            await asyncio.sleep(refresh_rate)
-            passed = time.time() - ts
-            ts = time.time()
-            show_statistic(statistics, refresh_rate, table, vpn_mode, proxies_cnt, period, passed)
-    
     logger.info(f'{cl.GREEN}Запускаємо атаку...{cl.RESET}')
     if not (table or debug):
         # Keep the docs/info on-screen for some time before outputting the logger.info above
@@ -139,6 +137,18 @@ async def run_async_ddos(
     install_targets(initial_targets)
 
     tasks = [asyncio.ensure_future(f.loop()) for f in flooders]
+
+    async def stats_printer():
+        refresh_rate = 5
+        ts = time.time()
+        while True:
+            await asyncio.sleep(refresh_rate)
+            passed = time.time() - ts
+            ts = time.time()
+            num_proxies = 0 if proxies is None else len(proxies)
+            show_statistic(statistics, refresh_rate, table, vpn_mode, num_proxies, period, passed)
+
+    # setup coroutine to print stats
     tasks.append(asyncio.ensure_future(stats_printer()))
 
     async def reload_targets(delay_seconds: int = 30):
@@ -147,14 +157,36 @@ async def run_async_ddos(
             targets = await load_targets()
             if targets:
                 install_targets(targets)
-                logger.info(
-                    f"{cl.YELLOW}Оновлення цілей через: {cl.BLUE}{delay_seconds} секунд{cl.RESET}")
             else:
                 logger.warning(
-                    "{cl.RED}Не знайдено жодної доступної цілі - "
-                    f"чекаємо {delay_seconds} сек до наступної перевірки{cl.RESET}")
-   
+                    f"{cl.RED}Не знайдено жодної доступної цілі - "
+                    f"чекаємо {delay_seconds} сек до наступної перевірки{cl.RESET}"
+                )
+            # XXX: this message might be somewhat misleading
+            logger.info(
+                f"{cl.YELLOW}Оновлення цілей через: "
+                f"{cl.BLUE}{delay_seconds} секунд{cl.RESET}"
+            )
+  
+    # setup coroutine to reload targets
     tasks.append(asyncio.ensure_future(reload_targets(delay_seconds=30)))
+
+    async def reload_proxies(delay_seconds: int = 30):
+        while True:
+            await asyncio.sleep(delay_seconds)
+            num_proxies = await proxies.reload()
+            if num_proxies == 0:
+                logger.warning(f'{cl.MAGENTA}Буде використано попередній список проксі{cl.RESET}')
+            # XXX: this message might be somewhat misleading
+            logger.info(
+                f"{cl.YELLOW}Оновлення проксей через: "
+                f"{cl.BLUE}{delay_seconds} секунд{cl.RESET}"
+            )
+
+    # setup coroutine to reload proxies
+    if proxies is not None:
+        # XXX: should the delya be lower?
+        tasks.append(asyncio.ensure_future(reload_proxies(delay_seconds=300)))
 
     await asyncio.gather(*tasks)
 
@@ -181,13 +213,11 @@ async def start(args):
 
     is_old_version = not is_latest_version()
     if is_old_version:
-        print(
-            f'{cl.RED}! ЗАПУЩЕНА НЕ ОСТАННЯ ВЕРСІЯ - ОНОВІТЬСЯ{cl.RESET}: https://telegra.ph/Onovlennya-mhddos-proxy-04-16\n')
+        logger.warning(
+            f"{cl.RED}! ЗАПУЩЕНА НЕ ОСТАННЯ ВЕРСІЯ - ОНОВІТЬСЯ{cl.RESET}: "
+            "https://telegra.ph/Onovlennya-mhddos-proxy-04-16\n"
+        )
     
-    # padding threads are necessary to create a "safety buffer" for the
-    # system that hit resources limitation when running main pools.
-    # it will be deallocated as soon as all other threads are up and running.
-    #padding_threads = DaemonThreadPool(PADDING_THREADS).start_all()
     dns_executor = DaemonThreadPool(DNS_WORKERS).start_all()
 
     if args.itarmy:
@@ -197,20 +227,14 @@ async def start(args):
 
     # XXX: periodic updates
     # XXX: fix for UDP targets
-    proxies = []
     no_proxies = args.vpn_mode # or all(target.is_udp for target in targets)
-    if no_proxies:
-        proxies = []
-    else:
-        proxies = list(update_proxies(args.proxies, proxies))
+    proxy_set = None if no_proxies else ProxySet(args.proxies)
 
-    proxies = list(wrap_async(proxies))
-
-    period = 300
     # XXX: with the current implementation there's no need to
     # have 2 separate functions to setups params for launching flooders
+    period = 300 # XXX: why do we need this?
     await run_async_ddos(
-        proxies,
+        proxy_set,
         targets_loader,
         period,
         args.rpc,

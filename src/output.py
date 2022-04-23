@@ -16,7 +16,7 @@ def show_statistic(
     refresh_rate,
     table,
     vpn_mode,
-    proxies_cnt,
+    num_proxies,
     period,
     passed
 ):
@@ -66,12 +66,13 @@ def show_statistic(
             )
         )
 
-    print_progress(period, passed, proxies_cnt)
+    print_progress(period, passed, num_proxies)
 
 
-def print_progress(period, passed, proxies_cnt):
-    if proxies_cnt:
-        logger.info(f'{cl.YELLOW}Кількість проксі: {cl.BLUE}{proxies_cnt}{cl.RESET}')
+def print_progress(period, passed, num_proxies):
+    logger.info(f'{cl.YELLOW}Оновлення цілей через: {cl.BLUE}{round(period - passed)} секунд{cl.RESET}')
+    if num_proxies:
+        logger.info(f'{cl.YELLOW}Кількість проксі: {cl.BLUE}{num_proxies}{cl.RESET}')
     else:
         logger.info(f'{cl.YELLOW}Атака без проксі - переконайтеся що ви анонімні{cl.RESET}')
 
