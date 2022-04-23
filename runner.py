@@ -228,13 +228,13 @@ async def start(args):
     # XXX: periodic updates
     # XXX: fix for UDP targets
     no_proxies = args.vpn_mode # or all(target.is_udp for target in targets)
-    proxy_set = None if no_proxies else ProxySet(args.proxies)
+    proxies = None if no_proxies else ProxySet(args.proxies)
 
     # XXX: with the current implementation there's no need to
     # have 2 separate functions to setups params for launching flooders
     period = 300 # XXX: why do we need this?
     await run_async_ddos(
-        proxy_set,
+        proxies,
         targets_loader,
         period,
         args.rpc,

