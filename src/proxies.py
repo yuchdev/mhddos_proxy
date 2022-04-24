@@ -1,7 +1,6 @@
 from random import choice
 from typing import List, Optional
 
-from aiosocks import SocksAddr, Socks4Addr, Socks5Addr
 from PyRoxy import ProxyUtiles, ProxyType
 
 from .core import logger, cl, PROXIES_URL
@@ -20,20 +19,22 @@ class ProxySet:
     def __init__(self, proxies_file: Optional[str] = None):
         self._proxies_file = proxies_file
         self._loaded_proxies = []
-    
-    async def reload(self) -> List[SocksAddr]:
+
+    # XXX: we can optimize here a little bit by switching to lower-level interface
+    #      with python_socks.async_.asyncio.Proxy object
+    async def reload(self) -> List[str]:
         if self._proxies_file:
             proxies = await load_provided_proxies(self._proxies_file)
         else:
             proxies = await load_system_proxies()
 
         if proxies:
-            self._loaded_proxies = list(wrap_async(proxies))
+            self._loaded_proxies = list(proxies)
             return len(self._loaded_proxies)
         else:
             return 0
 
-    def pick_random(self) -> SocksAddr:
+    def pick_random(self) -> str:
         return choice(self._loaded_proxies)
     
     def __len__(self) -> int:
@@ -69,11 +70,14 @@ def update_proxies(proxies_file, previous_proxies):
 
 
 # XXX: move logging to the runner
-async def load_provided_proxies(proxies_file: str) -> Optional[List[SocksAddr]]:
+async def load_provided_proxies(proxies_file: str) -> Optional[List[str]]:
     content = await async_read_or_fetch(proxies_file)
     if content is None:
         logger.warning(f'{cl.RED}Не вдалося зчитати проксі з {proxies_file}{cl.RESET}')
         return None
+
+    # XXX: logging
+    return content.split()
 
     proxies = ProxyUtiles.parseAll(content.split())
     if not proxies:
@@ -85,6 +89,8 @@ async def load_provided_proxies(proxies_file: str) -> Optional[List[SocksAddr]]:
 
 async def load_system_proxies():
     raw = await async_fetch(PROXIES_URL)
+    # XXX: logging
+    return decrypt_proxies(raw)
     try:
         proxies = ProxyUtiles.parseAll(decrypt_proxies(raw))
     except Exception:

