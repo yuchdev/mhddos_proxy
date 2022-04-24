@@ -181,7 +181,7 @@ async def run_ddos(
                     )
                 elif not changed:
                     logger.warning(
-                        f"{cl.RED}Перелік цілей не змінився - "
+                        f"{cl.YELLOW}Перелік цілей не змінився - "
                         f"чекаємо {delay_seconds} сек до наступної перевірки{cl.RESET}"
                     )
                 else:
