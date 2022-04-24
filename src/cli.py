@@ -2,7 +2,7 @@ import argparse
 import random
 from multiprocessing import cpu_count
 
-from .core import THREADS_PER_CORE, MAX_DEFAULT_THREADS, UDP_THREADS, WORK_STEALING_DISABLED
+from .core import THREADS_PER_CORE, MAX_DEFAULT_THREADS, UDP_THREADS
 from .mhddos import Methods
 
 
@@ -81,7 +81,6 @@ def init_argparse() -> argparse.ArgumentParser:
             "Advanced setting. Make sure to test performance when setting non-default value. "
             "Defines how many cycles each threads executes over specific target before "
             "switching to another one. "
-            f"Set to {WORK_STEALING_DISABLED} to disable switching (old mode)"
         ),
     )
 
