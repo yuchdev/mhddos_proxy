@@ -1,5 +1,5 @@
 from asyncio import gather, ensure_future
-from functools import lru_cache
+from asyncstdlib.functools import lru_cache
 from typing import List, Optional
 
 from dns.asyncresolver import Resolver

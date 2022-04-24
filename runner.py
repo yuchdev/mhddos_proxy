@@ -24,12 +24,8 @@ from src.system import fix_ulimits, is_latest_version
 from src.targets import TargetsLoader
 
 
-# XXX: we need to stick to working targets here the same way we did
-#      for wokring stealing algo. otherwise we might be spending too
-#      much time cycling over non-working targets. as we all operation
-#      one the same thread and we don't really need any sort of sync,
-#      we can also do something like prioority queue to reduce priority
-#      for dead targets
+# XXX: having everything on the same thread means that we can create
+#      priority queue for target (decreasing priority for "dead" targets)
 class AsyncFlooder:
 
     def __init__(self, switch_after: int = 100):
@@ -42,19 +38,19 @@ class AsyncFlooder:
         if self._current_task is not None:
             self._current_task.cancel()
    
-    # XXX: setup current task properly
     async def loop(self):
         assert self._runnables is not None
         while True:
             runnable = next(self._runnables)
-            try:
-                for _ in range(self._switch_after):
-                    if not (await runnable.run()):
+            for _ in range(self._switch_after):
+                try:
+                    self._current_task = asyncio.ensure_future(runnable.run())
+                    if not (await self._current_task):
                         break
-            except asyncio.CancelledError:
-                return
-            except Exception:
-                pass
+                except asyncio.CancelledError:
+                    break
+                except Exception:
+                    break
 
 
 # XXX: UDP
@@ -176,41 +172,51 @@ async def run_async_ddos(
 
     async def reload_targets(delay_seconds: int = 30):
         while True:
-            await asyncio.sleep(delay_seconds)
-            targets = await load_targets()
-            if targets:
-                install_targets(targets)
-            else:
-                logger.warning(
-                    f"{cl.RED}Не знайдено жодної доступної цілі - "
-                    f"чекаємо {delay_seconds} сек до наступної перевірки{cl.RESET}"
+            try:
+                await asyncio.sleep(delay_seconds)
+                targets = await load_targets()
+                if targets:
+                    install_targets(targets)
+                else:
+                    logger.warning(
+                        f"{cl.RED}Не знайдено жодної доступної цілі - "
+                        f"чекаємо {delay_seconds} сек до наступної перевірки{cl.RESET}"
+                    )
+                logger.info(
+                    f"{cl.YELLOW}Оновлення цілей через: "
+                    f"{cl.BLUE}{delay_seconds} секунд{cl.RESET}"
                 )
-            # XXX: this message might be somewhat misleading
-            logger.info(
-                f"{cl.YELLOW}Оновлення цілей через: "
-                f"{cl.BLUE}{delay_seconds} секунд{cl.RESET}"
-            )
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                # XXX: there should be a way to collect errors
+                pass
   
     # setup coroutine to reload targets
-    tasks.append(asyncio.ensure_future(reload_targets(delay_seconds=reload_after)))
+    tasks.append(asyncio.ensure_future(reload_targets(delay_seconds=5)))
 
     async def reload_proxies(delay_seconds: int = 30):
         while True:
-            await asyncio.sleep(delay_seconds)
-            num_proxies = await proxies.reload()
-            if num_proxies == 0:
-                logger.warning(f'{cl.MAGENTA}Буде використано попередній список проксі{cl.RESET}')
-            # XXX: this message might be somewhat misleading
-            logger.info(
-                f"{cl.YELLOW}Оновлення проксей через: "
-                f"{cl.BLUE}{delay_seconds} секунд{cl.RESET}"
-            )
+            try:
+                await asyncio.sleep(delay_seconds)
+                num_proxies = await proxies.reload()
+                if num_proxies == 0:
+                    logger.warning(
+                        f"{cl.MAGENTA}Буде використано попередній список проксі{cl.RESET}")
+                logger.info(
+                    f"{cl.YELLOW}Оновлення проксей через: "
+                    f"{cl.BLUE}{delay_seconds} секунд{cl.RESET}"
+                )
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                pass
 
     # setup coroutine to reload proxies
     if proxies is not None:
         tasks.append(asyncio.ensure_future(reload_proxies(delay_seconds=reload_after)))
 
-    await asyncio.gather(*tasks)
+    await asyncio.gather(*tasks, return_exceptions=True)
 
 
 async def start(args, shutdown_event: Event):
