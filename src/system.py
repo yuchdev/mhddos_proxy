@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import suppress
 import os.path
 import time
@@ -5,7 +6,7 @@ from typing import Optional
 
 from aiohttp import ClientSession
 
-from src.core import VERSION_URL
+from src.core import CONFIG_FETCH_RETRIES, CONFIG_FETCH_TIMEOUT, VERSION_URL
 
 
 def fix_ulimits():
@@ -27,11 +28,16 @@ async def read_or_fetch(path_or_url: str) -> Optional[str]:
     return await fetch(path_or_url)
 
 
-# XXX: errors and retries
 async def fetch(url: str) -> Optional[str]:
     async with ClientSession(raise_for_status=True) as session:
-        async with session.get(url, timeout=10) as response:
-           return await response.text() 
+        for _ in range(CONFIG_FETCH_RETRIES):
+            try:
+                async with session.get(url, timeout=CONFIG_FETCH_TIMEOUT) as response:
+                    return await response.text()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                pass
 
 
 async def is_latest_version():
