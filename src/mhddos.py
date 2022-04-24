@@ -974,12 +974,11 @@ class AsyncLayer4(Layer4):
     ) -> socket:
         is_tls = self._target.scheme.lower() == "https" or self._target.port == 443
         if self._proxies:
-            proxy: str = self._proxies.pick_random()
+            proxy_url: str = self._proxies.pick_random()
             reader, writer = await aiohttp_socks.open_connection(
-                proxy=proxy,
-                proxy_auth=None,
-                dst=self._raw_target,
-                remote_resolve=False,
+                proxy_url=proxy_url,
+                host=self._target.host,
+                port=self._target.port,
                 ssl=ctx if is_tls else None
             )
         else:
