@@ -45,9 +45,13 @@ class AsyncFlooder:
         assert self._runnables is not None
         while True:
             runnable = next(self._runnables)
-            with suppress(Exception):
+            try:
                 for _ in range(self._switch_after):
                     await runnable.run()
+            except asyncio.CancelledError:
+                return
+            except Exception:
+                pass
 
 
 # XXX: UDP
