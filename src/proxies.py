@@ -1,6 +1,7 @@
 from random import choice
 from typing import List, Optional
 
+from aiohttp_socks import ProxyConnector
 from PyRoxy import ProxyUtiles, ProxyType
 
 from .core import logger, cl, PROXIES_URL
@@ -36,6 +37,9 @@ class ProxySet:
 
     def pick_random(self) -> str:
         return choice(self._loaded_proxies)
+
+    def pick_random_connector(self) -> ProxyConnector:
+        return ProxyConnector.from_url(self.pick_random())
     
     def __len__(self) -> int:
         return len(self._loaded_proxies)

