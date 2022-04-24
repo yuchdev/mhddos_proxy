@@ -67,7 +67,6 @@ async def run_async_ddos(
     total_threads,
     udp_threads,
     switch_after,
-    dns_executor,
 ):
     statistics, event = {}, Event()
 
@@ -110,7 +109,7 @@ async def run_async_ddos(
     async def load_targets():
         targets = await targets_loader.load()
         # XXX: use async DNS resolver or offload properly
-        targets = resolve_all_targets(targets, dns_executor)
+        targets = await resolve_all_targets(targets)
         return [target for target in targets if target.is_resolved]
 
     def install_targets(targets):
@@ -238,8 +237,6 @@ async def start(args):
             "https://telegra.ph/Onovlennya-mhddos-proxy-04-16\n"
         )
     
-    dns_executor = DaemonThreadPool(DNS_WORKERS).start_all()
-
     if args.itarmy:
         targets_loader = TargetsLoader([], IT_ARMY_CONFIG_URL)
     else:
@@ -265,7 +262,6 @@ async def start(args):
         args.threads,
         0, # XXX: get back to this functionality later args.udp_threads,
         args.switch_after,
-        dns_executor,
     )
 
 
