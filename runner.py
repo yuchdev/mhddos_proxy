@@ -102,10 +102,10 @@ async def run_ddos(
 
     # XXX: might throw an exception
     async def load_targets():
-        targets = await targets_loader.load()
+        targets, changed = await targets_loader.load()
         # XXX: use async DNS resolver or offload properly
         targets = await resolve_all_targets(targets)
-        return [target for target in targets if target.is_resolved]
+        return [target for target in targets if target.is_resolved], changed
 
     def install_targets(targets):
         kwargs_list, udp_kwargs_list = [], []
@@ -137,7 +137,7 @@ async def run_ddos(
                 flooder.update_targets(udp_runnables_iter)
 
 
-    initial_targets = await load_targets()
+    initial_targets, _ = await load_targets()
     if not initial_targets:
         logger.error(f'{cl.RED}Не вказано жодної цілі для атаки{cl.RESET}')
         exit()
@@ -173,26 +173,32 @@ async def run_ddos(
         while True:
             try:
                 await asyncio.sleep(delay_seconds)
-                targets = await load_targets()
-                if targets:
-                    install_targets(targets)
-                else:
+                targets, changed = await load_targets()
+                if not targets:
                     logger.warning(
                         f"{cl.RED}Не знайдено жодної доступної цілі - "
                         f"чекаємо {delay_seconds} сек до наступної перевірки{cl.RESET}"
                     )
+                elif not changed:
+                    logger.warning(
+                        f"{cl.RED}Перелік цілей не змінився - "
+                        f"чекаємо {delay_seconds} сек до наступної перевірки{cl.RESET}"
+                    )
+                else:
+                    install_targets(targets)
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                logger.warning(f"{cl.MAGENTA}Не вдалося (пере)завантажити конфіг цілей{cl.RESET}")
+            finally:
                 logger.info(
                     f"{cl.YELLOW}Оновлення цілей через: "
                     f"{cl.BLUE}{delay_seconds} секунд{cl.RESET}"
                 )
-            except asyncio.CancelledError:
-                raise
-            except Exception as exc:
-                # XXX: there should be a way to collect errors
-                pass
   
-    # setup coroutine to reload targets
-    tasks.append(asyncio.ensure_future(reload_targets(delay_seconds=reload_after)))
+    # setup coroutine to reload targets (if configuration file is given)
+    if targets_loader.dynamic:
+        tasks.append(asyncio.ensure_future(reload_targets(delay_seconds=reload_after)))
 
     async def reload_proxies(delay_seconds: int = 30):
         while True:
@@ -202,14 +208,15 @@ async def run_ddos(
                 if num_proxies == 0:
                     logger.warning(
                         f"{cl.MAGENTA}Буде використано попередній список проксі{cl.RESET}")
-                logger.info(
-                    f"{cl.YELLOW}Оновлення проксей через: "
-                    f"{cl.BLUE}{delay_seconds} секунд{cl.RESET}"
-                )
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
                 pass
+            finally:
+                logger.info(
+                    f"{cl.YELLOW}Оновлення проксей через: "
+                    f"{cl.BLUE}{delay_seconds} секунд{cl.RESET}"
+                )
 
     # setup coroutine to reload proxies
     if proxies is not None:
@@ -238,7 +245,7 @@ async def start(args, shutdown_event: Event):
             f'через збільшення кількості перепідключень{cl.RESET}'
         )
 
-    is_old_version = not is_latest_version()
+    is_old_version = not await is_latest_version()
     if is_old_version:
         logger.warning(
             f"{cl.RED}! ЗАПУЩЕНА НЕ ОСТАННЯ ВЕРСІЯ - ОНОВІТЬСЯ{cl.RESET}: "

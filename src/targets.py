@@ -1,10 +1,11 @@
-from .core import logger, cl
-from .system import async_read_or_fetch
-
-from typing import Dict, List, Optional
+from hashlib import md5
+from typing import Dict, List, Optional, Tuple
 
 from dns import inet
 from yarl import URL
+
+from .core import logger, cl
+from .system import read_or_fetch
 
 
 Options = Dict[str, str]
@@ -66,29 +67,35 @@ class Target:
         return hash(id(self))
 
 
-# XXX: track hash for previously loaded
 class TargetsLoader:
 
     def __init__(self, targets, config):
         self._targets = [Target.from_string(t) for t in targets]
         self._config = config
+        self._tag: Optional[str] = None
 
-    async def load(self) -> List[Target]:
-        config_targets = await self._load_config()
+    @property
+    def dynamic(self):
+        return self._config is not None
+
+    async def load(self) -> Tuple[List[Target], bool]:
+        config_targets, changed = await self._load_config()
         if config_targets:
             logger.info(
                 f"{cl.YELLOW}Завантажено конфіг {self._config} "
                 f"на {cl.BLUE}{len(config_targets)} цілей{cl.RESET}")
-        return self._targets + (config_targets or [])
+        return self._targets + (config_targets or []), changed
 
-    async def _load_config(self) -> List[Target]:
-        if not self._config: return None
+    async def _load_config(self) -> Tuple[List[Target], bool]:
+        if not self._config: return None, False
 
-        config_content = await async_read_or_fetch(self._config)
+        config_content = await read_or_fetch(self._config)
         if config_content is None:
-            # XXX: move logging out
-            # logger.warning(f'{cl.MAGENTA}Не вдалося (пере)завантажити конфіг{cl.RESET}')
             raise RuntimeError("Failed to load configuration")
+
+        etag = md5(config_content.encode()).hexdigest()
+        changed = self._tag is None or self._tag != etag
+        self._tag = etag
 
         targets = []
         for row in config_content.splitlines():
@@ -96,5 +103,5 @@ class TargetsLoader:
             if target and not target.startswith('#'):
                 targets.append(Target.from_string(target))
 
-        return targets
+        return targets, changed
 

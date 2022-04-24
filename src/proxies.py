@@ -4,7 +4,7 @@ from typing import List, Optional
 from aiohttp_socks import ProxyConnector
 
 from .core import logger, cl, PROXIES_URL
-from .system import async_read_or_fetch, async_fetch
+from .system import read_or_fetch, fetch
 
 
 # @formatter:off
@@ -46,7 +46,7 @@ class ProxySet:
 
 # XXX: move logging to the runner?
 async def load_provided_proxies(proxies_file: str) -> Optional[List[str]]:
-    content = await async_read_or_fetch(proxies_file)
+    content = await read_or_fetch(proxies_file)
     if content is None:
         logger.warning(f'{cl.RED}Не вдалося зчитати проксі з {proxies_file}{cl.RESET}')
         return None
@@ -60,7 +60,7 @@ async def load_provided_proxies(proxies_file: str) -> Optional[List[str]]:
 
 
 async def load_system_proxies():
-    raw = await async_fetch(PROXIES_URL)
+    raw = await fetch(PROXIES_URL)
     try:
         proxies = decrypt_proxies(raw)
     except Exception:
