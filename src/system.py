@@ -40,7 +40,6 @@ def fetch(url):
     for attempt in range(attempts):
         try:
             response = requests.get(url, timeout=10)
-            # XXX: should we raise for status here?
             return response.text
         except requests.RequestException:
             if attempt != attempts - 1:
@@ -49,7 +48,7 @@ def fetch(url):
 
 # XXX: errors and retries
 async def async_fetch(url: str) -> Optional[str]:
-    async with ClientSession() as session:
+    async with ClientSession(raise_for_status=True) as session:
         async with session.get(url, timeout=10) as response:
            return await response.text() 
 
