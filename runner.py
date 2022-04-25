@@ -220,7 +220,7 @@ async def run_ddos(
   
     # setup coroutine to reload targets (if configuration file is given)
     if targets_loader.dynamic:
-        tasks.append(asyncio.ensure_future(reload_targets(delay_seconds=10)))
+        tasks.append(asyncio.ensure_future(reload_targets(delay_seconds=reload_after)))
 
     async def reload_proxies(delay_seconds: int = 30):
         while True:

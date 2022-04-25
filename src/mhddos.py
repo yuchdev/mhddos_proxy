@@ -1208,6 +1208,7 @@ class AsyncLayer4(Layer4):
                 packet = randbytes(packet_size)
                 await asyncio.wait_for(loop.sock_sendall(sock, packet), timeout=1)
                 # let switch to happen, e.g. on cancellation
+                # XXX: hack that needs to be fixed
                 await asyncio.sleep(0.001)
                 self._stats.track(1, packet_size)
                 packets_sent += 1
