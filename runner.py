@@ -15,7 +15,7 @@ from src.concurrency import DaemonThreadPool
 from src.core import logger, cl, LOW_RPC, IT_ARMY_CONFIG_URL, Params, Stats
 from src.dns_utils import resolve_all_targets
 from src.mhddos import async_main as mhddos_async_main, AsyncLayer4, AsyncHttpFlood
-from src.output import show_statistic, print_banner, print_progress
+from src.output import show_statistic, print_banner
 from src.proxies import ProxySet
 from src.system import fix_ulimits, is_latest_version
 from src.targets import TargetsLoader

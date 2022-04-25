@@ -70,6 +70,7 @@ def show_statistic(
 
 
 def print_progress(period, passed, num_proxies):
+    # XXX: this message needs to be fixed
     logger.info(f'{cl.YELLOW}Оновлення цілей через: {cl.BLUE}{round(period - passed)} секунд{cl.RESET}')
     if num_proxies:
         logger.info(f'{cl.YELLOW}Кількість проксі: {cl.BLUE}{num_proxies}{cl.RESET}')
