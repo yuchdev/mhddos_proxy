@@ -909,6 +909,7 @@ class AsyncHttpFlood(HttpFlood):
         is_tls = self._target.scheme.lower() == "https" or self._target.port == 443
         if self._proxies:
             proxy_url: str = self._proxies.pick_random()
+            # XXX: use sendall directly to avoid streams overhead (at least 2x)
             reader, writer = await aiohttp_socks.open_connection(
                 proxy_url=proxy_url,
                 host=self._target.host,
