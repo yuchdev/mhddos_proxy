@@ -280,8 +280,15 @@ async def start(args, shutdown_event: Event):
     shutdown_event.set()
 
 
-# XXX: try uvloop when available
 if __name__ == '__main__':
+    try:
+        __import__("uvloop").install()
+        logger.info(
+            f"{cl.GREEN}uvloop{cl.RESET} успішно активований "
+            "(підвищенна ефективність роботи з мережею)")
+    except Exception:
+        pass
+
     args = init_argparse().parse_args()
     shutdown_event = Event()
     try:
