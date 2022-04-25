@@ -64,7 +64,7 @@ class Target:
         return self.options.get(key, default)
 
     def __hash__(self):
-        return hash(id(self))
+        return hash(self.url)
 
 
 class TargetsLoader:

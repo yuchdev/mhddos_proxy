@@ -1197,6 +1197,7 @@ class AsyncLayer4(Layer4):
         await asyncio.wait_for(writer.wait_closed(), timeout=1)
         return packets_sent
 
+    # XXX: have to process "no buffer OSError Errno=55 manually
     async def UDP(self) -> int:
         packets_sent, packet_size = 0, 1024
         # XXX: this is not going to work as well, need to pass as params
@@ -1206,6 +1207,8 @@ class AsyncLayer4(Layer4):
             while True:
                 packet = randbytes(packet_size)
                 await asyncio.wait_for(loop.sock_sendall(sock, packet), timeout=1)
+                # let switch to happen, e.g. on cancellation
+                await asyncio.sleep(0.001)
                 self._stats.track(1, packet_size)
                 packets_sent += 1
         return packets_sent
