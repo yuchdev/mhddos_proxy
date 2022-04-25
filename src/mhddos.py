@@ -1187,14 +1187,16 @@ class AsyncLayer4(Layer4):
     async def TCP(self) -> int:
         packets_sent, packet_size = 0, 1024
         reader, writer = await asyncio.wait_for(self.open_connection(), timeout=8)
-        for _ in range(self._rpc):
-            payload: bytes = randbytes(packet_size)
-            writer.write(payload)
-            await asyncio.wait_for(writer.drain(), timeout=1)
-            self._stats.track(1, packet_size)
-            packets_sent += 1
-        writer.close()
-        await asyncio.wait_for(writer.wait_closed(), timeout=1)
+        try:
+            for _ in range(self._rpc):
+                payload: bytes = randbytes(packet_size)
+                writer.write(payload)
+                await asyncio.wait_for(writer.drain(), timeout=1)
+                self._stats.track(1, packet_size)
+                packets_sent += 1
+        finally:
+            writer.close()
+            await asyncio.wait_for(writer.wait_closed(), timeout=1)
         return packets_sent
 
     # XXX: have to process "no buffer OSError Errno=55 manually
