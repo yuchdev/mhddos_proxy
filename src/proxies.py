@@ -22,7 +22,7 @@ class ProxySet:
 
     # XXX: we can optimize here a little bit by switching to lower-level interface
     #      with python_socks.async_.asyncio.Proxy object
-    async def reload(self) -> List[str]:
+    async def reload(self) -> int:
         if self._proxies_file:
             proxies = await load_provided_proxies(self._proxies_file)
         else:

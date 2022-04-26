@@ -73,16 +73,6 @@ def init_argparse() -> argparse.ArgumentParser:
         action='store_true',
         default=False,
     )
-    parser.add_argument(
-        '--switch-after',
-        type=int,
-        default=100,
-        help=(
-            "Advanced setting. Make sure to test performance when setting non-default value. "
-            "Defines how many cycles each threads executes over specific target before "
-            "switching to another one. "
-        ),
-    )
 
     parser.add_argument('-p', '--period', type=int, help='DEPRECATED')
     parser.add_argument('--proxy-timeout', type=float, help='DEPRECATED')

@@ -87,7 +87,8 @@ class TargetsLoader:
         return self._targets + (config_targets or []), changed
 
     async def _load_config(self) -> Tuple[List[Target], bool]:
-        if not self._config: return None, False
+        if not self._config:
+            return [], False
 
         config_content = await read_or_fetch(self._config)
         if config_content is None:

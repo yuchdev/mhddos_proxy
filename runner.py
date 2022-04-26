@@ -1,13 +1,10 @@
-import asyncio
-from contextlib import suppress
 # @formatter:off
 import colorama; colorama.init()
 # @formatter:on
-from itertools import cycle
-import random
+import asyncio
 import time
 from threading import Event, Thread
-from typing import Any, Generator, Iterator, List, Optional, Union
+from typing import Optional, Union
 
 from src.cli import init_argparse
 from src.concurrency import safe_run
@@ -30,7 +27,7 @@ class FloodTask:
         self._runnable = runnable
         self._scale = scale
         # XXX: move to constants, add to configuration
-        self._failure_budget = scale*3 # roughly: 3 attempts per proxy
+        self._failure_budget = scale * 3  # roughly: 3 attempts per proxy
         self._failure_budget_delay = 1
 
     def _launch_task(self):
@@ -39,6 +36,7 @@ class FloodTask:
             # XXX: change API to return "succesful or not"
             #      it would be cool if we can represent result as union not as an expcetion
             return result is not None and result > 0
+
         return asyncio.create_task(_safe_run())
 
     async def loop(self):
@@ -65,7 +63,6 @@ async def run_ddos(
     debug,
     table,
     total_threads,
-    switch_after,
 ):
     statistics = {}
 
@@ -117,9 +114,7 @@ async def run_ddos(
                 task.cancel()
             flooders = []
 
-        # XXX: looks like a hack
-        for k in list(statistics):
-            del statistics[k]
+        statistics.clear()
 
         kwargs_list = []
         for target in targets:
@@ -152,7 +147,7 @@ async def run_ddos(
     try:
         initial_targets, _ = await load_targets()
     except Exception as exc:
-        logger.error(f"{cl.READ}Завнтаження цілей завершилося помилкою: {exc}{cl.RESET}")
+        logger.error(f"{cl.RED}Завнтаження цілей завершилося помилкою: {exc}{cl.RESET}")
         initial_targets = []
 
     if not initial_targets:
@@ -213,7 +208,7 @@ async def run_ddos(
                     f"{cl.YELLOW}Оновлення цілей через: "
                     f"{cl.BLUE}{delay_seconds} секунд{cl.RESET}"
                 )
-  
+
     # setup coroutine to reload targets (if configuration file is given)
     if targets_loader.dynamic:
         tasks.append(asyncio.ensure_future(reload_targets(delay_seconds=reload_after)))
@@ -269,7 +264,7 @@ async def start(args, shutdown_event: Event):
             f"{cl.RED}! ЗАПУЩЕНА НЕ ОСТАННЯ ВЕРСІЯ - ОНОВІТЬСЯ{cl.RESET}: "
             "https://telegra.ph/Onovlennya-mhddos-proxy-04-16\n"
         )
-    
+
     if args.itarmy:
         targets_loader = TargetsLoader([], IT_ARMY_CONFIG_URL)
     else:
@@ -293,7 +288,6 @@ async def start(args, shutdown_event: Event):
         args.debug,
         args.table,
         args.threads,
-        args.switch_after,
     )
     shutdown_event.set()
 

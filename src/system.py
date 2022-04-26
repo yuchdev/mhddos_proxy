@@ -1,7 +1,6 @@
 import asyncio
 from contextlib import suppress
 import os.path
-import time
 from typing import Optional
 
 from aiohttp import ClientSession
