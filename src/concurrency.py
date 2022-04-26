@@ -20,7 +20,7 @@ def scale_attack(factor: int):
 
     def _wrapper(f):
         @wraps(f)
-        async def _inner(*args, **kwargs):
+        async def _inner(*args, **kwargs) -> bool:
             tasks = [asyncio.create_task(f(*args, **kwargs)) for _ in range(factor)]
             done, _ = await asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED)
             for fut in done:

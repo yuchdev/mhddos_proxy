@@ -30,13 +30,7 @@ class FloodTask:
         self._failure_budget_delay = FAILURE_DELAY_SECONDS
 
     def _launch_task(self):
-        async def _safe_run() -> bool:
-            result = await safe_run(self._runnable.run)
-            # XXX: change API to return "succesful or not"
-            #      it would be cool if we can represent result as union not as an expcetion
-            return result is not None and result > 0
-
-        return asyncio.create_task(_safe_run())
+        return asyncio.create_task(safe_run(self._runnable.run))
 
     async def loop(self):
         tasks = set(self._launch_task() for _ in range(self._scale))
