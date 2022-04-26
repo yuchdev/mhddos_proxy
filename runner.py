@@ -4,7 +4,7 @@ import colorama; colorama.init()
 import asyncio
 import time
 from threading import Event, Thread
-from typing import Optional, Union
+from typing import List, Optional, Union
 
 from src.cli import init_argparse
 from src.concurrency import safe_run
@@ -29,10 +29,10 @@ class FloodTask:
         self._failure_budget = scale * FAILURE_BUDGET_FACTOR
         self._failure_budget_delay = FAILURE_DELAY_SECONDS
 
-    def _launch_task(self):
+    def _launch_task(self) -> asyncio.Task:
         return asyncio.create_task(safe_run(self._runnable.run))
 
-    async def loop(self):
+    async def loop(self) -> None:
         tasks = set(self._launch_task() for _ in range(self._scale))
         num_failures = 0
         while tasks:
@@ -48,14 +48,14 @@ class FloodTask:
 
 async def run_ddos(
     proxies: Optional[ProxySet],
-    targets_loader,
-    reload_after,
-    rpc,
-    http_methods,
-    vpn_mode,
-    debug,
-    table,
-    total_threads,
+    targets_loader: TargetsLoader,
+    reload_after: int,
+    rpc: int,
+    http_methods: List[str],
+    vpn_mode: bool,
+    debug: bool,
+    table: bool,
+    total_threads: int,
 ):
     statistics = {}
 
