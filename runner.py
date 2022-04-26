@@ -23,13 +23,6 @@ from src.targets import TargetsLoader
 UVLOOP_SUPPORT = False
 
 
-async def safe_run_flooder(runnable) -> bool:
-    result = await safe_run(runnable.run)
-    # XXX: change API to return "succesful or not"
-    #      it would be cool if we can represent result as union not as an expcetion
-    return result is not None and result > 0
-
-
 class FloodTask:
 
     # XXX: the fact we use Union here is a symptom of a larger problem
@@ -40,8 +33,16 @@ class FloodTask:
         self._failure_budget = scale*3 # roughly: 3 attempts per proxy
         self._failure_budget_delay = 1
 
+    def _launch_task(self):
+        async def _safe_run() -> bool:
+            result = await safe_run(self._runnable.run)
+            # XXX: change API to return "succesful or not"
+            #      it would be cool if we can represent result as union not as an expcetion
+            return result is not None and result > 0
+        return asyncio.create_task(_safe_run())
+
     async def loop(self):
-        tasks = set(asyncio.create_task(safe_run_flooder(self._runnable)) for _ in range(self._scale))
+        tasks = set(self._launch_task() for _ in range(self._scale))
         num_failures = 0
         while tasks:
             done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
@@ -50,7 +51,7 @@ class FloodTask:
                 if num_failures >= self._failure_budget:
                     await asyncio.sleep(self._failure_budget_delay)
                     num_failures = 0
-                pending.add(asyncio.create_task(safe_run_flooder(self._runnable)))
+                pending.add(self._launch_task())
             tasks = pending
 
 
