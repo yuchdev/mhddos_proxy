@@ -9,6 +9,7 @@ async def safe_run(f) -> Optional[Any]:
     except asyncio.CancelledError:
         raise
     except Exception as e:
+        print(e)
         # XXX: there should be an option to see error
         #      e.g. TRACE level of logging or something
         return None

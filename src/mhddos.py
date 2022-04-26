@@ -39,6 +39,7 @@ REFERERS = list(set(a.strip() for a in REFERERS))
 
 ctx: SSLContext = create_default_context()
 ctx.check_hostname = False
+ctx.server_hostname = ""
 ctx.verify_mode = CERT_NONE
 ctx.set_ciphers("DEFAULT")
 
@@ -908,17 +909,22 @@ class AsyncTcpFlood(HttpFlood):
     # note that TCP_NODELAY is set by default since Python3.6+
     async def open_connection(self) -> Tuple[asyncio.StreamReader, asyncio.StreamWriter]:
         is_tls = self._target.scheme.lower() == "https" or self._target.port == 443
+        ssl_ctx = ctx if is_tls else None
+        # setting hostname to an empty string due to https://bugs.python.org/issue27391
+        server_hostname = "" if is_tls else None
         if self._proxies:
             proxy_url: str = self._proxies.pick_random()
             reader, writer = await aiohttp_socks.open_connection(
                 proxy_url=proxy_url,
                 host=self._target.host,
                 port=self._target.port,
-                ssl=ctx if is_tls else None
+                ssl=ssl_ctx,
+                server_hostname=server_hostname,
             )
         else:
             reader, writer = await asyncio.open_connection(
-                host=self._target.host, port=self._target.port, ssl=is_tls)
+                host=self._target.host, port=self._target.port, ssl=ssl_ctx,
+                server_hostname=server_hostname)
         return reader, writer
 
     # XXX: config for timeouts
