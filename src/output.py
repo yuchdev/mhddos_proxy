@@ -21,11 +21,12 @@ def show_statistic(
     passed
 ):
     tabulate_text = []
-    total_pps, total_bps = 0, 0
+    total_pps, total_bps, total_in_flight = 0, 0, 0
     for params, stats in statistics.items():
-        rs, bs = stats.reset()
+        rs, bs, in_flight_conn = stats.reset()
         pps = int(rs / refresh_rate)
         total_pps += pps
+        total_in_flight += in_flight_conn
         bps = int(8 * bs / refresh_rate)
         total_bps += bps
         if table:
@@ -35,15 +36,14 @@ def show_statistic(
             ))
         else:
             logger.info(
-                f'{cl.YELLOW}Ціль:{cl.BLUE} %s,{cl.YELLOW} Порт:{cl.BLUE} %s,{cl.YELLOW} Метод:{cl.BLUE} %s,'
-                f'{cl.YELLOW} Запити:{cl.BLUE} %s/s,{cl.YELLOW} Трафік:{cl.BLUE} %s/s{cl.RESET}' %
-                (
-                    params.target.url.host,
-                    params.target.url.port,
-                    params.method,
-                    Tools.humanformat(pps),
-                    Tools.humanbits(bps),
-                )
+                f"{cl.YELLOW}Ціль:{cl.BLUE} {params.target.url.host}, "
+                f"{cl.YELLOW}Порт:{cl.BLUE} {params.target.url.port}, "
+                f"{cl.YELLOW}Метод:{cl.BLUE} {params.method}, "
+                # XXX: add in flight connections to the table
+                f"{cl.YELLOW}Зʼєднань:{cl.BLUE} {Tools.humanformat(in_flight_conn)}, "
+                f"{cl.YELLOW}Запити:{cl.BLUE} {Tools.humanformat(pps)}/s, "
+                f"{cl.YELLOW}Трафік:{cl.BLUE} {Tools.humanbits(bps)}/s"
+                f"{cl.RESET}"
             )
 
     if table:
@@ -59,11 +59,10 @@ def show_statistic(
         print_banner(vpn_mode)
     else:
         logger.info(
-            f'{cl.GREEN}Усього:{cl.YELLOW} Запити:{cl.GREEN} %s/s,{cl.YELLOW} Трафік:{cl.GREEN} %s/s{cl.RESET}' %
-            (
-                Tools.humanformat(total_pps),
-                Tools.humanbits(total_bps),
-            )
+            f"{cl.GREEN}Усього: "
+            f"{cl.YELLOW}Зʼєднань:{cl.GREEN} {Tools.humanformat(total_in_flight)}, "
+            f"{cl.YELLOW}Запити:{cl.GREEN} {Tools.humanformat(total_pps)}/s, "
+            f"{cl.YELLOW}Трафік:{cl.GREEN} {Tools.humanbits(total_bps)}/s{cl.RESET}"
         )
 
     print_progress(period, passed, num_proxies)

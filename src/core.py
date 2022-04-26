@@ -2,7 +2,6 @@ import logging
 import random
 from collections import namedtuple
 from pathlib import Path
-from threading import Lock
 from typing import Tuple
 
 from colorama import Fore
@@ -47,19 +46,22 @@ class Stats:
     def __init__(self):
         self._requests: int = 0
         self._bytes: int = 0
-        self._lock = Lock()
+        self._conns: int = 0
 
     def get(self) -> Tuple[int, int]:
-        #with self._lock:
         return self._requests, self._bytes
 
     def track(self, rs: int, bs: int) -> None:
-        #with self._lock:
         self._requests += rs
         self._bytes += bs
 
-    def reset(self) -> Tuple[int, int]:
-        #with self._lock:
-        current = self._requests, self._bytes
+    def track_open_connection(self) -> None:
+        self._conns += 1
+
+    def track_close_connection(self) -> None:
+        self._conns -= 1
+
+    def reset(self) -> Tuple[int, int, int]:
+        current = self._requests, self._bytes, self._conns
         self._requests, self._bytes = 0, 0
         return current
