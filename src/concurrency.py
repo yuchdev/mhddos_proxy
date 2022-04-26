@@ -6,10 +6,9 @@ from typing import Any, Optional
 async def safe_run(f) -> Optional[Any]:
     try:
         return await f()
-    except asyncio.CancelledError:
-        raise
+    except asyncio.CancelledError as e:
+        raise e
     except Exception as e:
-        print(e)
         # XXX: there should be an option to see error
         #      e.g. TRACE level of logging or something
         return None

@@ -190,8 +190,8 @@ async def run_ddos(
                     )
                 else:
                     await install_targets(targets)
-            except asyncio.CancelledError:
-                raise
+            except asyncio.CancelledError as e:
+                raise e
             except Exception as exc:
                 logger.warning(
                     f"{cl.MAGENTA}Не вдалося (пере)завантажити конфіг цілей: {exc}{cl.RESET}")
@@ -213,8 +213,8 @@ async def run_ddos(
                 if num_proxies == 0:
                     logger.warning(
                         f"{cl.MAGENTA}Буде використано попередній список проксі{cl.RESET}")
-            except asyncio.CancelledError:
-                raise
+            except asyncio.CancelledError as e:
+                raise e
             except Exception:
                 pass
             finally:
