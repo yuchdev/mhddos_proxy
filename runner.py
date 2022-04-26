@@ -10,6 +10,7 @@ from threading import Event, Thread
 from typing import Any, Generator, Iterator, List, Optional, Union
 
 from src.cli import init_argparse
+from src.concurrency import safe_run
 from src.core import logger, cl, LOW_RPC, IT_ARMY_CONFIG_URL, Params, Stats
 from src.dns_utils import resolve_all_targets
 from src.mhddos import async_main as mhddos_async_main, AsyncLayer4, AsyncHttpFlood
@@ -22,14 +23,11 @@ from src.targets import TargetsLoader
 UVLOOP_SUPPORT = False
 
 
-async def safe_run(runnable) -> bool:
-    try:
-        packets_sent = await runnable.run()
-        return packets_sent > 0 # XXX: change API to return "succesful or not"
-    except asyncio.CancelledError:
-        raise
-    except Exception as e:
-        return False
+async def safe_run_flooder(runnable) -> bool:
+    result = await safe_run(runnable.run)
+    # XXX: change API to return "succesful or not"
+    #      it would be cool if we can represent result as union not as an expcetion
+    return result is not None and result > 0
 
 
 class FloodTask:
@@ -43,7 +41,7 @@ class FloodTask:
         self._failure_budget_delay = 1
 
     async def loop(self):
-        tasks = set(asyncio.create_task(safe_run(self._runnable)) for _ in range(self._scale))
+        tasks = set(asyncio.create_task(safe_run_flooder(self._runnable)) for _ in range(self._scale))
         num_failures = 0
         while tasks:
             done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
@@ -52,7 +50,7 @@ class FloodTask:
                 if num_failures >= self._failure_budget:
                     await asyncio.sleep(self._failure_budget_delay)
                     num_failures = 0
-                pending.add(asyncio.create_task(safe_run(self._runnable)))
+                pending.add(asyncio.create_task(safe_run_flooder(self._runnable)))
             tasks = pending
 
 

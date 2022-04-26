@@ -1,11 +1,47 @@
+import asyncio
 from concurrent.futures import Future, Executor
 from concurrent.futures.thread import _WorkItem
+from functools import wraps
 import queue
 from threading import Thread
+from typing import Any, Optional
 
 from src.core import logger, cl
 
+
 TERMINATE = object()
+
+
+async def safe_run(f) -> Optional[Any]:
+    try:
+        return await f()
+    except asyncio.CancelledError:
+        raise
+    except Exception as e:
+        print(e)
+        return None
+
+
+def scale_attack(factor: int):
+    """Runs a given task multiple times"""
+    assert factor > 0
+    def _wrapper(f):
+        @wraps(f)
+        async def _inner(*args, **kwargs):
+            tasks = [asyncio.create_task(f(*args, **kwargs)) for _ in range(factor)]
+            done, _ = await asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED)
+            for fut in done:
+                try:
+                    if fut.result():
+                        return fut.result()
+                except asyncio.CancelledError as e:
+                    raise e
+                except:
+                    pass
+            return False
+        return _inner
+    return _wrapper
+
 
 class DaemonThreadPool(Executor):
 

