@@ -7,7 +7,7 @@ from itertools import cycle
 import random
 import time
 from threading import Event, Thread
-from typing import Any, Generator, Iterator, List, Optional
+from typing import Any, Generator, Iterator, List, Optional, Union
 
 from src.cli import init_argparse
 from src.core import logger, cl, LOW_RPC, IT_ARMY_CONFIG_URL, Params, Stats
@@ -32,9 +32,11 @@ async def safe_run(runnable) -> bool:
 
 class FloodTask:
 
-    def __init__(self, runnable: AsyncHttpFlood, scale: int = 1):
+    # XXX: the fact we use Union here is a symptom of a larger problem
+    def __init__(self, runnable: Union[AsyncHttpFlood, AsyncLayer4], scale: int = 1):
         self._runnable = runnable
         self._scale = scale
+        # XXX: move to constants
         self._failure_budget = scale*3 # roughly: 3 attempts per proxy
         self._failure_budget_delay = 1
 
@@ -188,31 +190,17 @@ async def run_ddos(
             else:
                 logger.error(f"Unsupported scheme given: {target.url.scheme}")
 
-        scale = total_threads // len(kwargs_list)
+        scale = max(1, total_threads // len(kwargs_list) if kwargs_list else 0)
 
         for kwargs in kwargs_list:
             task = asyncio.create_task(FloodTask(mhddos_async_main(**kwargs), scale).loop())
             # XXX: add stats for running/cancelled tasks with add_done_callback
             flooders.append(task)
 
-        return
-
-        if kwargs_list:
-            runnables_iter = cycle(mhddos_async_main(**kwargs) for kwargs in kwargs_list)
-        else:
-            # This will cancel running tasks and pause loop before getting new runnables
-            runnables_iter = None
-        for flooder in flooders:
-            flooder.update_targets(runnables_iter)
-        if udp_kwargs_list:
-            if udp_tasks:
-                for task in udp_tasks:
-                    task.cancel()
-                await asyncio.wait(udp_tasks)
-            # XXX: re-write having multiple tasks into having a single task, sending
-            #      into a random list of targets based on the configuration
-            udp_runnables = [mhddos_async_main(**kwargs) for kwargs in udp_kwargs_list]
-            udp_tasks = [asyncio.create_task(udp_flooder(run)) for run in udp_runnables]
+        # XXX: can do this with previous "scale" approach :)
+        for kwargs in udp_kwargs_list:
+            task = asyncio.create_task(FloodTask(mhddos_async_main(**kwargs)).loop())
+            flooders.append(task)
 
     try:
         initial_targets, _ = await load_targets()
