@@ -8,7 +8,11 @@ from typing import Optional, Union
 
 from src.cli import init_argparse
 from src.concurrency import safe_run
-from src.core import logger, cl, LOW_RPC, IT_ARMY_CONFIG_URL, Params, Stats
+from src.core import (
+    logger, cl, Params, Stats,
+    LOW_RPC, IT_ARMY_CONFIG_URL, REFRESH_RATE, UVLOOP_SUPPORT,
+    FAILURE_BUDGET_FACTOR, FAILURE_DELAY_SECONDS,
+)
 from src.dns_utils import resolve_all_targets
 from src.mhddos import main as mhddos_main, AsyncTcpFlood, AsyncUdpFlood
 from src.output import show_statistic, print_banner
@@ -17,17 +21,13 @@ from src.system import fix_ulimits, is_latest_version
 from src.targets import TargetsLoader
 
 
-UVLOOP_SUPPORT = False
-
-
 class FloodTask:
 
     def __init__(self, runnable: Union[AsyncTcpFlood, AsyncUdpFlood], scale: int = 1):
         self._runnable = runnable
         self._scale = scale
-        # XXX: move to constants, add to configuration
-        self._failure_budget = scale * 3  # roughly: 3 attempts per proxy
-        self._failure_budget_delay = 1
+        self._failure_budget = scale * FAILURE_BUDGET_FACTOR
+        self._failure_budget_delay = FAILURE_DELAY_SECONDS
 
     def _launch_task(self):
         async def _safe_run() -> bool:
@@ -157,24 +157,23 @@ async def run_ddos(
     tasks = []
 
     async def stats_printer():
-        refresh_rate = 5
         ts = time.time()
         while True:
-            await asyncio.sleep(refresh_rate)
+            await asyncio.sleep(REFRESH_RATE)
             try:
                 passed = time.time() - ts
                 ts = time.time()
                 num_proxies = 0 if proxies is None else len(proxies)
                 show_statistic(
                     statistics,
-                    refresh_rate,
+                    REFRESH_RATE,
                     table,
                     vpn_mode,
                     num_proxies,
                     reload_after,
                     passed
                 )
-            except Exception:
+            except:
                 ts = time.time()
 
     # setup coroutine to print stats

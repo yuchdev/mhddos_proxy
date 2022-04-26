@@ -22,12 +22,15 @@ IT_ARMY_CONFIG_URL = 'https://gist.githubusercontent.com/ddosukraine2022/f739250
 VERSION_URL = 'https://raw.githubusercontent.com/porthole-ascend-cinnamon/mhddos_proxy/main/version.txt'
 
 LOW_RPC = 1000
-
 THREADS_PER_CORE = 1000
 MAX_DEFAULT_THREADS = 4000
-
 CONFIG_FETCH_RETRIES = 3
 CONFIG_FETCH_TIMEOUT = 10
+REFRESH_RATE = 5
+UVLOOP_SUPPORT = False
+FAILURE_BUDGET_FACTOR = 4
+FAILURE_DELAY_SECONDS = 1
+
 
 class cl:
     MAGENTA = Fore.LIGHTMAGENTA_EX
