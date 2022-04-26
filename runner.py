@@ -164,7 +164,8 @@ async def run_ddos(
                     vpn_mode,
                     num_proxies,
                     reload_after,
-                    passed
+                    passed,
+                    reload_after-int(targets_loader.age or 0),
                 )
             except:
                 ts = time.time()

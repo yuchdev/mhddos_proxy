@@ -1,4 +1,5 @@
 from hashlib import md5
+import time
 from typing import Dict, List, Optional, Tuple
 
 from dns import inet
@@ -73,13 +74,20 @@ class TargetsLoader:
         self._targets = [Target.from_string(t) for t in targets]
         self._config = config
         self._tag: Optional[str] = None
+        self._last_loaded_at: Optional[float] = None
 
     @property
     def dynamic(self):
         return self._config is not None
 
+    @property
+    def age(self) -> Optional[float]:
+        if self._last_loaded_at is None: return None
+        return time.time() - self._last_loaded_at
+
     async def load(self) -> Tuple[List[Target], bool]:
         config_targets, changed = await self._load_config()
+        self._last_loaded_at = time.time()
         if config_targets:
             logger.info(
                 f"{cl.YELLOW}Завантажено конфіг {self._config} "

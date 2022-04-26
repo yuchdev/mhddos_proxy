@@ -19,7 +19,8 @@ def show_statistic(
     vpn_mode,
     num_proxies,
     period,
-    passed
+    passed,
+    next_targets_load,
 ):
     tabulate_text = []
     total_pps, total_bps, total_in_flight = 0, 0, 0
@@ -66,12 +67,12 @@ def show_statistic(
             f"{cl.YELLOW}Трафік:{cl.GREEN} {Tools.humanbits(total_bps)}/s{cl.RESET}"
         )
 
-    print_progress(period, passed, num_proxies)
+    print_progress(num_proxies, next_targets_load)
 
 
-def print_progress(period, passed, num_proxies):
-    # XXX: this message needs to be fixed
-    logger.info(f'{cl.YELLOW}Оновлення цілей через: {cl.BLUE}{round(period - passed)} секунд{cl.RESET}')
+def print_progress(num_proxies, next_targets_load):
+    logger.info(
+        f"{cl.YELLOW}Оновлення цілей через: {cl.BLUE}{next_targets_load} секунд{cl.RESET}")
     if num_proxies:
         logger.info(f'{cl.YELLOW}Кількість проксі: {cl.BLUE}{num_proxies}{cl.RESET}')
     else:
