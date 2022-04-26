@@ -1,6 +1,5 @@
 import logging
 import random
-from collections import namedtuple
 from pathlib import Path
 from typing import Tuple
 
@@ -39,9 +38,6 @@ class cl:
     YELLOW = Fore.LIGHTYELLOW_EX
     RED = Fore.LIGHTRED_EX
     RESET = Fore.RESET
-
-
-Params = namedtuple('Params', 'target, method')
 
 
 class Stats:

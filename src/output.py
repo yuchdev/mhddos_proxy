@@ -1,10 +1,11 @@
 import os
-from typing import Dict
+from typing import Dict, Tuple
 
 from tabulate import tabulate
 
-from .core import cl, logger, THREADS_PER_CORE, Params, Stats
+from .core import cl, logger, THREADS_PER_CORE, Stats
 from .mhddos import Tools
+from .targets import Target
 
 
 def cls():
@@ -12,7 +13,7 @@ def cls():
 
 
 def show_statistic(
-    statistics: Dict[Params, Stats],
+    statistics: Dict[Tuple[Target, str], Stats],
     refresh_rate,
     table,
     vpn_mode,
@@ -22,7 +23,7 @@ def show_statistic(
 ):
     tabulate_text = []
     total_pps, total_bps, total_in_flight = 0, 0, 0
-    for params, stats in statistics.items():
+    for (target, method), stats in statistics.items():
         rs, bs, in_flight_conn = stats.reset()
         pps = int(rs / refresh_rate)
         total_pps += pps
@@ -31,14 +32,14 @@ def show_statistic(
         total_bps += bps
         if table:
             tabulate_text.append((
-                f'{cl.YELLOW}%s' % params.target.url.host, params.target.url.port, params.method,
+                f'{cl.YELLOW}%s' % target.url.host, target.url.port, method,
                 Tools.humanformat(pps) + "/s", f'{Tools.humanbits(bps)}/s{cl.RESET}'
             ))
         else:
             logger.info(
-                f"{cl.YELLOW}Ціль:{cl.BLUE} {params.target.url.host}, "
-                f"{cl.YELLOW}Порт:{cl.BLUE} {params.target.url.port}, "
-                f"{cl.YELLOW}Метод:{cl.BLUE} {params.method}, "
+                f"{cl.YELLOW}Ціль:{cl.BLUE} {target.url.host}, "
+                f"{cl.YELLOW}Порт:{cl.BLUE} {target.url.port}, "
+                f"{cl.YELLOW}Метод:{cl.BLUE} {method}, "
                 # XXX: add in flight connections to the table
                 f"{cl.YELLOW}Зʼєднань:{cl.BLUE} {Tools.humanformat(in_flight_conn)}, "
                 f"{cl.YELLOW}Запити:{cl.BLUE} {Tools.humanformat(pps)}/s, "
