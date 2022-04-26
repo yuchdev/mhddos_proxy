@@ -10,7 +10,7 @@ from src.cli import init_argparse
 from src.concurrency import safe_run
 from src.core import logger, cl, LOW_RPC, IT_ARMY_CONFIG_URL, Params, Stats
 from src.dns_utils import resolve_all_targets
-from src.mhddos import async_main as mhddos_async_main, AsyncLayer4, AsyncHttpFlood
+from src.mhddos import main as mhddos_main, AsyncTcpFlood, AsyncUdpFlood
 from src.output import show_statistic, print_banner
 from src.proxies import ProxySet
 from src.system import fix_ulimits, is_latest_version
@@ -22,8 +22,7 @@ UVLOOP_SUPPORT = False
 
 class FloodTask:
 
-    # XXX: the fact we use Union here is a symptom of a larger problem
-    def __init__(self, runnable: Union[AsyncHttpFlood, AsyncLayer4], scale: int = 1):
+    def __init__(self, runnable: Union[AsyncTcpFlood, AsyncUdpFlood], scale: int = 1):
         self._runnable = runnable
         self._scale = scale
         # XXX: move to constants, add to configuration
@@ -139,7 +138,7 @@ async def run_ddos(
         scale = max(1, (total_threads // num_tcp_flooders) if num_tcp_flooders > 0 else 0)
 
         for kwargs, is_tcp in kwargs_list:
-            runnable = mhddos_async_main(**kwargs)
+            runnable = mhddos_main(**kwargs)
             task = asyncio.create_task(FloodTask(runnable, scale if is_tcp else 1).loop())
             # XXX: add stats for running/cancelled tasks with add_done_callback
             flooders.append(task)

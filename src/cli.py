@@ -2,7 +2,7 @@ import argparse
 import random
 from multiprocessing import cpu_count
 
-from .core import THREADS_PER_CORE, MAX_DEFAULT_THREADS, UDP_THREADS
+from .core import THREADS_PER_CORE, MAX_DEFAULT_THREADS
 from .mhddos import Methods
 
 
@@ -24,12 +24,6 @@ def init_argparse() -> argparse.ArgumentParser:
         type=int,
         default=min(THREADS_PER_CORE * cpu_count(), MAX_DEFAULT_THREADS),
         help=f'Total number of threads to run (default is CPU * {THREADS_PER_CORE})',
-    )
-    parser.add_argument(
-        '--udp-threads',
-        type=int,
-        default=UDP_THREADS,
-        help=f'Total number of threads to run for UDP sockets (defaults to {UDP_THREADS})',
     )
     parser.add_argument(
         '--rpc',
@@ -76,4 +70,5 @@ def init_argparse() -> argparse.ArgumentParser:
 
     parser.add_argument('-p', '--period', type=int, help='DEPRECATED')
     parser.add_argument('--proxy-timeout', type=float, help='DEPRECATED')
+    parser.add_argument('--udp-threads', type=int, help='DEPRECATED')
     return parser

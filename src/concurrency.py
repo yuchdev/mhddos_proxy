@@ -3,9 +3,6 @@ from functools import wraps
 from typing import Any, Optional
 
 
-TERMINATE = object()
-
-
 async def safe_run(f) -> Optional[Any]:
     try:
         return await f()
