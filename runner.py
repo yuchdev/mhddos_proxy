@@ -18,7 +18,9 @@ from src.proxies import ProxySet
 from src.system import fix_ulimits, is_latest_version
 from src.targets import TargetsLoader
 
+
 UVLOOP_SUPPORT = False
+
 
 async def safe_run(runnable) -> bool:
     try:
@@ -36,7 +38,7 @@ class FloodTask:
     def __init__(self, runnable: Union[AsyncHttpFlood, AsyncLayer4], scale: int = 1):
         self._runnable = runnable
         self._scale = scale
-        # XXX: move to constants
+        # XXX: move to constants, add to configuration
         self._failure_budget = scale*3 # roughly: 3 attempts per proxy
         self._failure_budget_delay = 1
 
@@ -52,58 +54,6 @@ class FloodTask:
                     num_failures = 0
                 pending.add(asyncio.create_task(safe_run(self._runnable)))
             tasks = pending
-
-
-# XXX: having everything on the same thread means that we can create
-#      priority queue for target (decreasing priority for "dead" targets)
-class Flooder:
-
-    def __init__(self, switch_after: int = 100):
-        self._switch_after = switch_after
-        self._runnables = None
-        self._current_task = None
-        self._ready = asyncio.Event()
-
-    def update_targets(self, runnables: Optional[Iterator[AsyncHttpFlood]]) -> None:
-        self._runnables = runnables
-        if self._current_task is not None:
-            # XXX: do I also need to await on the task to make sure it's
-            #      actually cancelled?
-            self._current_task.cancel()
-        if not self._runnables:
-            self._ready.clear()
-        else:
-            self._ready.set()
-
-    async def loop(self):
-        while True:
-            await self._ready.wait()
-            runnable = next(self._runnables)
-            for _ in range(self._switch_after):
-                try:
-                    self._current_task = asyncio.ensure_future(runnable.run())
-                    if not (await self._current_task):
-                        break
-                except asyncio.CancelledError:
-                    break
-                except Exception:
-                    break
-
-
-async def udp_flooder(runnable: AsyncLayer4) -> None:
-    backoff = 0.1
-    try:
-        while True:
-            try:
-                await runnable.run()
-            except asyncio.CancelledError:
-                return
-            except:
-                 # avoid costly cycles if fails immediately
-                await asyncio.sleep(backoff)
-                backoff = max(2, backoff*2)
-    except asyncio.CancelledError:
-        return
 
 
 async def run_ddos(
@@ -127,7 +77,8 @@ async def run_ddos(
             logger.error(f"{cl.RED}Не знайдено робочих проксі - зупиняємо атаку{cl.RESET}")
             exit()
 
-    def register_params(params, container):
+    # XXX: we don't need "params"
+    def prepare_params(params):
         thread_statistics = Stats()
         statistics[params] = thread_statistics
         kwargs = {
@@ -139,12 +90,12 @@ async def run_ddos(
             'stats': thread_statistics,
             'proxies': proxies,
         }
-        container.append(kwargs)
         if not (table or debug):
             logger.info(
                 f'{cl.YELLOW}Атакуємо ціль:{cl.BLUE} %s,{cl.YELLOW} Порт:{cl.BLUE} %s,{cl.YELLOW} Метод:{cl.BLUE} %s{cl.RESET}'
                 % (params.target.url.host, params.target.url.port, params.method)
             )
+        return kwargs
 
     logger.info(f'{cl.GREEN}Запускаємо атаку...{cl.RESET}')
     if not (table or debug):
@@ -171,35 +122,32 @@ async def run_ddos(
         for k in list(statistics):
             del statistics[k]
 
-        kwargs_list, udp_kwargs_list = [], []
+        kwargs_list = []
         for target in targets:
             assert target.is_resolved, "Unresolved target cannot be used for attack"
             # udp://, method defaults to "UDP"
             if target.is_udp:
-                register_params(Params(target, target.method or 'UDP'), udp_kwargs_list)
+                kwargs_list.append((prepare_params(Params(target, target.method or 'UDP')), 0))
             # Method is given explicitly
             elif target.method is not None:
-                register_params(Params(target, target.method), kwargs_list)
+                kwargs_list.append((prepare_params(Params(target, target.method)), 1))
             # tcp://
             elif target.url.scheme == "tcp":
-                register_params(Params(target, 'TCP'), kwargs_list)
+                kwargs_list.append((prepare_params(Params(target, 'TCP')), 1))
             # HTTP(S), methods from --http-methods
             elif target.url.scheme in {"http", "https"}:
                 for method in http_methods:
-                    register_params(Params(target, method), kwargs_list)
+                    kwargs_list.append((prepare_params(Params(target, method)), 1))
             else:
                 logger.error(f"Unsupported scheme given: {target.url.scheme}")
 
-        scale = max(1, total_threads // len(kwargs_list) if kwargs_list else 0)
+        num_tcp_flooders = sum(pair[1] for pair in kwargs_list)
+        scale = max(1, (total_threads // num_tcp_flooders) if num_tcp_flooders > 0 else 0)
 
-        for kwargs in kwargs_list:
-            task = asyncio.create_task(FloodTask(mhddos_async_main(**kwargs), scale).loop())
+        for kwargs, is_tcp in kwargs_list:
+            runnable = mhddos_async_main(**kwargs)
+            task = asyncio.create_task(FloodTask(runnable, scale if is_tcp else 1).loop())
             # XXX: add stats for running/cancelled tasks with add_done_callback
-            flooders.append(task)
-
-        # XXX: can do this with previous "scale" approach :)
-        for kwargs in udp_kwargs_list:
-            task = asyncio.create_task(FloodTask(mhddos_async_main(**kwargs)).loop())
             flooders.append(task)
 
     try:
