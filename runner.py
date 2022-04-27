@@ -165,9 +165,7 @@ async def run_ddos(
                     table,
                     vpn_mode,
                     num_proxies,
-                    reload_after,
-                    passed,
-                    reload_after-int(targets_loader.age or 0),
+                    None if targets_loader.age is None else reload_after-int(targets_loader.age),
                 )
             except:
                 ts = time.time()

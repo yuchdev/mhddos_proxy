@@ -1,5 +1,5 @@
 import os
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple
 
 from tabulate import tabulate
 
@@ -14,13 +14,11 @@ def cls():
 
 def show_statistic(
     statistics: Dict[Tuple[Target, str], Stats],
-    refresh_rate,
-    table,
-    vpn_mode,
-    num_proxies,
-    period,
-    passed,
-    next_targets_load,
+    refresh_rate: int,
+    table: bool,
+    vpn_mode: bool,
+    num_proxies: int,
+    next_targets_load: Optional[int],
 ):
     tabulate_text = []
     total_pps, total_bps, total_in_flight = 0, 0, 0
@@ -70,9 +68,10 @@ def show_statistic(
     print_progress(num_proxies, next_targets_load)
 
 
-def print_progress(num_proxies, next_targets_load):
-    logger.info(
-        f"{cl.YELLOW}Оновлення цілей через: {cl.BLUE}{next_targets_load} секунд{cl.RESET}")
+def print_progress(num_proxies: int, next_targets_load: Optional[int]):
+    if next_targets_load is not None:
+        logger.info(
+            f"{cl.YELLOW}Оновлення цілей через: {cl.BLUE}{next_targets_load} секунд{cl.RESET}")
     if num_proxies:
         logger.info(f'{cl.YELLOW}Кількість проксі: {cl.BLUE}{num_proxies}{cl.RESET}')
     else:

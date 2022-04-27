@@ -82,7 +82,8 @@ class TargetsLoader:
 
     @property
     def age(self) -> Optional[float]:
-        if self._last_loaded_at is None: return None
+        if not self._config: return None
+        if not self._last_loaded_at: return 0
         return time.time() - self._last_loaded_at
 
     async def load(self) -> Tuple[List[Target], bool]:
