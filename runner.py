@@ -57,6 +57,7 @@ async def run_ddos(
     table: bool,
     total_threads: int,
 ):
+    loop = asyncio.get_event_loop()
     statistics = {}
 
     # initial set of proxies
@@ -77,6 +78,7 @@ async def run_ddos(
             'event': None,
             'stats': thread_statistics,
             'proxies': proxies,
+            'loop': loop,
         }
         if not (table or debug):
             logger.info(

