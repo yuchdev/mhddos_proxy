@@ -28,7 +28,7 @@ from yarl import URL
 from PyRoxy import Tools as ProxyTools
 from .ImpactPacket import IP, TCP, UDP, Data
 from .core import cl, logger, ROOT_DIR, Stats
-from .proxies import NoProxySet
+from .proxies import ProxySet, NoProxySet
 
 from .concurrency import scale_attack
 from .referers import REFERERS
@@ -207,7 +207,7 @@ class Layer4:
         ref: List[str],
         method: str,
         event: Event,
-        get_proxy: callable,
+        proxies: ProxySet,
         stats: Stats,
     ):
         self._amp_payload = None
@@ -217,7 +217,7 @@ class Layer4:
         self._target = target
         self._event = event
         self._stats = stats
-        self._get_proxy = get_proxy
+        self._proxies = proxies
         self.select(self._method)
 
     def run(self) -> int:
@@ -415,7 +415,7 @@ class HttpFlood:
         event: Event,
         useragents: List[str],
         referers: List[str],
-        get_proxy: callable,
+        proxies: ProxySet,
         stats: Stats
     ) -> None:
         self.SENT_FLOOD = None
@@ -432,7 +432,7 @@ class HttpFlood:
 
         self._referers = referers
         self._useragents = useragents
-        self._get_proxy = get_proxy
+        self._proxies = proxies
         self._req_type = self.getMethodType(method)
         self._defaultpayload = "%s %s HTTP/%s\r\n" % (self._req_type,
                                                       target.raw_path_qs, randchoice(['1.1', '1.2']))
@@ -1196,7 +1196,7 @@ def main(url, ip, method, event, proxies, stats, rpc=None, refl_li_fn=None, loop
     if method not in Methods.ALL_METHODS:
         exit(f"Method {method} Not Found")
 
-    (url, ip), get_proxy = Tools.parse_params(url, ip, get_proxy)
+    (url, ip), proxies = Tools.parse_params(url, ip, proxies)
     if method in Methods.LAYER7_METHODS:
         return AsyncTcpFlood(
             url,

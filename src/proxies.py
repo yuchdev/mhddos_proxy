@@ -18,8 +18,8 @@ decrypt_proxies = globals()[set(globals().keys()).difference(_globals_before).po
 class ProxySet:
 
     def __init__(self, proxies_file: Optional[str] = None, skip_ratio: int = 0):
-        self._skip_ratio = skip_ratio
         self._proxies_file = proxies_file
+        self._skip_ratio = skip_ratio
         self._loaded_proxies = []
     
     @property
@@ -82,7 +82,7 @@ async def load_provided_proxies(proxies_file: str) -> Optional[List[str]]:
 
 
 async def load_system_proxies():
-    raw = await fetch(PROXIES_URLS)
+    raw = await fetch(choice(PROXIES_URLS))
     try:
         proxies = decrypt_proxies(raw)
     except Exception:
