@@ -37,7 +37,7 @@ def show_statistic(
             ))
         else:
             logger.info(
-                f"{cl.YELLOW}Ціль:{cl.BLUE} {target.url.host}, "
+                f"{cl.YELLOW}Ціль:{cl.BLUE} {target.human_repr()}, "
                 f"{cl.YELLOW}Порт:{cl.BLUE} {target.url.port}, "
                 f"{cl.YELLOW}Метод:{cl.BLUE} {method}, "
                 # XXX: add in flight connections to the table

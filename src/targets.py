@@ -64,6 +64,12 @@ class Target:
     def option(self, key: str, default: Optional[str] = None) -> Optional[str]:
         return self.options.get(key, default)
 
+    def human_repr(self) -> str:
+        if self.url.host != self.addr:
+            return f"{self.url.host} ({self.addr})"
+        else:
+            return self.url.host
+
     def __hash__(self):
         return hash(self.url)
 
