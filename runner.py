@@ -11,7 +11,7 @@ from src.concurrency import safe_run
 from src.core import (
     logger, cl, Stats,
     LOW_RPC, IT_ARMY_CONFIG_URL, REFRESH_RATE, UVLOOP_SUPPORT,
-    FAILURE_BUDGET_FACTOR, FAILURE_DELAY_SECONDS,
+    FAILURE_BUDGET_FACTOR, FAILURE_DELAY_SECONDS, ONLY_MY_IP,
 )
 from src.dns_utils import resolve_all_targets
 from src.mhddos import main as mhddos_main, AsyncTcpFlood, AsyncUdpFlood
@@ -52,16 +52,16 @@ async def run_ddos(
     reload_after: int,
     rpc: int,
     http_methods: List[str],
-    vpn_mode: bool,
     debug: bool,
     table: bool,
     total_threads: int,
+    use_my_ip: int,
 ):
     loop = asyncio.get_event_loop()
     statistics = {}
 
     # initial set of proxies
-    if proxies is not None:
+    if proxies is not None and proxies.has_proxies:
         num_proxies = await proxies.reload()
         if num_proxies == 0:
             logger.error(f"{cl.RED}Не знайдено робочих проксі - зупиняємо атаку{cl.RESET}")
@@ -163,12 +163,15 @@ async def run_ddos(
                     statistics,
                     REFRESH_RATE,
                     table,
-                    vpn_mode,
                     num_proxies,
                     None if targets_loader.age is None else reload_after-int(targets_loader.age),
+                    use_my_ip,
                 )
             except:
                 ts = time.time()
+
+    #cycle_start = time.perf_counter()
+    #    passed = time.perf_counter() - cycle_start
 
     # setup coroutine to print stats
     tasks.append(asyncio.ensure_future(stats_printer()))
@@ -231,7 +234,8 @@ async def run_ddos(
 
 
 async def start(args, shutdown_event: Event):
-    print_banner(args.vpn_mode)
+    use_my_ip = min(args.use_my_ip, ONLY_MY_IP)
+    print_banner(use_my_ip)
     fix_ulimits()
 
     if args.table:
@@ -239,16 +243,12 @@ async def start(args, shutdown_event: Event):
 
     for bypass in ('CFB', 'DGB'):
         if bypass in args.http_methods:
-            logger.warning(
-                f'{cl.RED}Робота методу {bypass} не гарантована - атака методами '
-                f'за замовчуванням може бути ефективніша{cl.RESET}'
-            )
+            logger.warning(f'{cl.RED}Робота методу {bypass} не гарантована{cl.RESET}')
 
     if args.rpc < LOW_RPC:
         logger.warning(
             f'{cl.YELLOW}RPC менше за {LOW_RPC}. Це може призвести до падіння продуктивності '
-            f'через збільшення кількості перепідключень{cl.RESET}'
-        )
+            f'через збільшення кількості перепідключень{cl.RESET}')
 
     is_old_version = not await is_latest_version()
     if is_old_version:
@@ -264,8 +264,7 @@ async def start(args, shutdown_event: Event):
 
     # we are going to fetch proxies even in case we have only UDP
     # targets because the list of targets might change at any point in time
-    no_proxies = args.vpn_mode
-    proxies = None if no_proxies else ProxySet(args.proxies)
+    proxies = ProxySet(args.proxies, use_my_ip)
 
     # XXX: with the current implementation there's no need to
     # have 2 separate functions to setups params for launching flooders
@@ -276,10 +275,10 @@ async def start(args, shutdown_event: Event):
         reload_after,
         args.rpc,
         args.http_methods,
-        args.vpn_mode,
         args.debug,
         args.table,
         args.threads,
+        use_my_ip,
     )
     shutdown_event.set()
 

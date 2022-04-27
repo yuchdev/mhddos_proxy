@@ -1,5 +1,6 @@
 import logging
 import random
+import time
 from pathlib import Path
 from typing import Tuple
 
@@ -12,11 +13,12 @@ logger.setLevel('INFO')
 
 ROOT_DIR = Path(__file__).parent.parent
 
-PROXIES_URL = random.choice((
+PROXIES_URLS = (
     'https://raw.githubusercontent.com/porthole-ascend-cinnamon/proxy_scraper/main/working_proxies.txt',
     'https://raw.githubusercontent.com/porthole-ascend-cinnamon/proxy_scraper/main/working_proxies2.txt',
     'https://raw.githubusercontent.com/porthole-ascend-cinnamon/proxy_scraper/main/working_proxies3.txt',
-))
+    'https://raw.githubusercontent.com/porthole-ascend-cinnamon/proxy_scraper/main/working_proxies4.txt',
+)
 IT_ARMY_CONFIG_URL = 'https://gist.githubusercontent.com/ddosukraine2022/f739250dba308a7a2215617b17114be9/raw/mhdos_targets_tcp_v2.txt'
 VERSION_URL = 'https://raw.githubusercontent.com/porthole-ascend-cinnamon/mhddos_proxy/main/version.txt'
 
@@ -29,6 +31,7 @@ REFRESH_RATE = 5
 UVLOOP_SUPPORT = False
 FAILURE_BUDGET_FACTOR = 4
 FAILURE_DELAY_SECONDS = 1
+ONLY_MY_IP = 100
 
 
 class cl:
@@ -45,6 +48,7 @@ class Stats:
         self._requests: int = 0
         self._bytes: int = 0
         self._conns: int = 0
+        self._reset_at = time.perf_counter()
 
     def get(self) -> Tuple[int, int]:
         return self._requests, self._bytes
@@ -60,6 +64,7 @@ class Stats:
         self._conns -= 1
 
     def reset(self) -> Tuple[int, int, int]:
-        current = self._requests, self._bytes, self._conns
-        self._requests, self._bytes = 0, 0
-        return current
+        sent_requests, sent_bytes, prev_reset_at = self._requests, self._bytes, self._reset_at
+        self._requests, self._bytes, self._reset_at = 0, 0, time.perf_counter()
+        interval = self._reset_at - prev_reset_at
+        return int(sent_requests / interval), int(8 * sent_bytes / interval), self._conns
