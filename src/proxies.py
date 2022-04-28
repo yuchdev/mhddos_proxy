@@ -2,6 +2,7 @@ from random import choice, random
 from typing import List, Optional
 
 from aiohttp_socks import ProxyConnector
+from yarl import URL
 
 from .core import logger, cl, ONLY_MY_IP, PROXIES_URLS
 from .system import read_or_fetch, fetch
@@ -13,6 +14,26 @@ _globals_before = set(globals().keys()).union({'_globals_before'})
 from .load_proxies import *
 decrypt_proxies = globals()[set(globals().keys()).difference(_globals_before).pop()]
 # @formatter:on
+
+
+INVALID_SCHEME_ERROR = "Invalid scheme component"
+INVALID_PORT_ERROR = "Invalid port component"
+
+
+def normalize_url(url: str) -> str:
+    try:
+        ProxyConnector.from_url(url)
+        return url
+    except ValueError as e:
+        if INVALID_SCHEME_ERROR in str(e):
+            return normalize_url(f"http://{url}")
+        elif INVALID_PORT_ERROR in str(e) and url.count(":") == 4:
+            parts = url.split(":")
+            username, password = parts[-2], parts[-1]
+            url = URL(":".join(parts[:-2])).with_user(username).with_password(password)
+            return url
+        else:
+            raise ValueError("Proxy config parsing failed") from e
 
 
 class ProxySet:
@@ -77,7 +98,7 @@ async def load_provided_proxies(proxies_file: str) -> Optional[List[str]]:
         logger.warning(f'{cl.RED}Не вдалося зчитати проксі з {proxies_file}{cl.RESET}')
         return None
 
-    proxies = content.split()
+    proxies = list(map(normalize_url, content.split()))
     if not proxies:
         logger.warning(
             f"{cl.RED}У {proxies_file} не знайдено проксі - перевірте формат{cl.RESET}")
@@ -92,6 +113,7 @@ async def load_system_proxies():
         proxies = decrypt_proxies(raw)
     except Exception:
         proxies = []
+    proxies = list(map(normalize_url, proxies))
     if proxies:
         logger.info(
             f'{cl.YELLOW}Отримано вибірку {cl.BLUE}{len(proxies):,}{cl.YELLOW} проксі '

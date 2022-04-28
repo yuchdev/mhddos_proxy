@@ -25,11 +25,11 @@ from cloudscraper import create_scraper
 from requests import Response, Session, cookies
 from yarl import URL
 
-from PyRoxy import Tools as ProxyTools
 from .ImpactPacket import IP, TCP, UDP, Data
 from .core import cl, logger, ROOT_DIR, Stats
 from .proxies import ProxySet, NoProxySet
 
+from . import proxy_tools as ProxyTools
 from .concurrency import scale_attack
 from .referers import REFERERS
 from .useragents import USERAGENTS
