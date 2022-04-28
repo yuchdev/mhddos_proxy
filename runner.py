@@ -75,10 +75,10 @@ async def run_ddos(
         sig = target.options_repr
         statistics[(target, method, sig)] = thread_statistics
         if target.has_options:
-            target_rpc = int(target.option("rpc", "0"))
+            target_rpc = int(target.option(Target.OPTION_RPC, "0"))
             settings = attack_settings.with_options(
                 requests_per_connection=target_rpc if target_rpc > 0 else None,
-                low_level_transport=(target.option("transport", "stream") == "sock")
+                transport=target.option(Target.OPTION_TRANSPORT, None)
             )
         else:
             settings = attack_settings
@@ -278,7 +278,7 @@ async def start(args, shutdown_event: Event):
 
     attack_settings = AttackSettings(
         requests_per_connection=args.rpc,
-        low_level_transport=False,
+        transport=AttackSettings.TRANSPORT_STREAM,
         drain_timeout_seconds=0.1,
     )
 

@@ -13,6 +13,9 @@ Options = Dict[str, str]
 
 
 class Target:
+    OPTION_RPC = "rpc"
+    OPTION_TRANSPORT = "transport"
+
     url: URL
     method: Optional[str]
     options: Options

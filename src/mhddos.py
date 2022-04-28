@@ -864,6 +864,9 @@ class HttpFlood:
 
 
 class AttackSettings:
+    TRANSPORT_STREAM = "stream"
+    TRANSPORT_SOCK = "sock"
+
     low_level_transport: bool
     connect_timeout_seconds: float
     drain_timeout_seconds: float
@@ -873,17 +876,21 @@ class AttackSettings:
     def __init__(
         self,
         *,
-        low_level_transport: bool = False,
+        transport: str = "stream",
         connect_timeout_seconds: float = SOCK_TIMEOUT,
         drain_timeout_seconds: float = 0.1,
         close_timeout_seconds: float = 1.0,
         requests_per_connection: int = 1024,
     ):
-        self.low_level_transport = low_level_transport
+        self.transport = transport
         self.connect_timeout_seconds = connect_timeout_seconds
         self.drain_timeout_seconds = drain_timeout_seconds
         self.close_timeout_seconds = close_timeout_seconds
         self.requests_per_connection = requests_per_connection
+
+    @property
+    def low_level_transport(self) -> bool:
+        return self.transport == AttackSettings.TRANSPORT_SOCK
 
     def with_options(self, **kwargs) -> "AttackSettings":
         settings = copy(self)
