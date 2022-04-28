@@ -888,8 +888,9 @@ class AttackSettings:
     def with_options(self, **kwargs) -> "AttackSettings":
         settings = copy(self)
         for k, v in kwargs.items():
-            assert hasattr(settings, k)
-            setattr(settings, k, v)
+            if v is not None:
+                assert hasattr(settings, k)
+                setattr(settings, k, v)
         return settings
 
 

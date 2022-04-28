@@ -23,7 +23,8 @@ def show_statistic(
 ):
     tabulate_text = []
     total_pps, total_bps, total_in_flight = 0, 0, 0
-    for (target, method), stats in statistics.items():
+    for (target, method, sig), stats in statistics.items():
+        method_sig = f" ({sig})" if sig is not None else ""
         rs, bs, in_flight_conn = stats.reset()
         pps = int(rs / refresh_rate)
         total_pps += pps
@@ -39,7 +40,7 @@ def show_statistic(
             logger.info(
                 f"{cl.YELLOW}Ціль:{cl.BLUE} {target.human_repr()}, "
                 f"{cl.YELLOW}Порт:{cl.BLUE} {target.url.port}, "
-                f"{cl.YELLOW}Метод:{cl.BLUE} {method}, "
+                f"{cl.YELLOW}Метод:{cl.BLUE} {method}{method_sig}, "
                 # XXX: add in flight connections to the table
                 f"{cl.YELLOW}Зʼєднань:{cl.BLUE} {Tools.humanformat(in_flight_conn)}, "
                 f"{cl.YELLOW}Запити:{cl.BLUE} {Tools.humanformat(pps)}/s, "

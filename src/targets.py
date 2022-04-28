@@ -67,6 +67,15 @@ class Target:
     def has_option(self, key: str) -> bool:
         return key in self.options
 
+    @property
+    def has_options(self) -> bool:
+        return len(self.options) > 0
+
+    @property
+    def options_repr(self) -> Optional[str]:
+        if not self.has_options: return None
+        return " ".join(f"{k}={v}" for k, v in self.options.items())
+
     def human_repr(self) -> str:
         if self.url.host != self.addr:
             return f"{self.url.host} ({self.addr})"

