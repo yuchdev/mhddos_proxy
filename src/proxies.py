@@ -51,6 +51,7 @@ class ProxySet:
         return ProxyConnector.from_url(proxy_url) if proxy_url is not None else None
     
     def __len__(self) -> int:
+        if not self.has_proxies: return 0
         return len(self._loaded_proxies)
 
 
@@ -63,6 +64,10 @@ class NoProxySet:
     @staticmethod
     def pick_random_connector(self) -> Optional[ProxyConnector]:
         return None
+
+    @staticmethod
+    def has_proxies(self) -> bool:
+        return False
 
 
 # XXX: move logging to the runner?
