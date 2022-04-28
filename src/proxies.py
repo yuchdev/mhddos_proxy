@@ -28,10 +28,8 @@ def normalize_url(url: str) -> str:
         if INVALID_SCHEME_ERROR in str(e):
             return normalize_url(f"http://{url}")
         elif INVALID_PORT_ERROR in str(e) and url.count(":") == 4:
-            parts = url.split(":")
-            username, password = parts[-2], parts[-1]
-            url = URL(":".join(parts[:-2])).with_user(username).with_password(password)
-            return url
+            url, username, password = url.rsplit(":", 2)
+            return URL(url).with_user(username).with_password(password)
         else:
             raise ValueError("Proxy config parsing failed") from e
 
