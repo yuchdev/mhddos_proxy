@@ -174,12 +174,13 @@ async def run_ddos(
                 num_proxies = len(proxies)
                 show_statistic(
                     statistics,
-                    REFRESH_RATE,
                     table,
+                    use_my_ip,
                     num_proxies,
                     None if targets_loader.age is None else reload_after-int(targets_loader.age),
-                    use_my_ip,
                 )
+            except Exception as e:
+                print(e)
             finally:
                 cycle_start = time.perf_counter()
 

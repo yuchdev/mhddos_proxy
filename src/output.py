@@ -15,22 +15,19 @@ def cls():
 
 def show_statistic(
     statistics: Dict[Tuple[Target, str], Stats],
-    refresh_rate: int,
     table: bool,
+    use_my_ip: int,
     num_proxies: int,
     next_targets_load: Optional[int],
-    use_my_ip: int,
 ):
     tabulate_text = []
     total_pps, total_bps, total_in_flight = 0, 0, 0
     for (target, method, sig), stats in statistics.items():
         method_sig = f" ({sig})" if sig is not None else ""
-        rs, bs, in_flight_conn = stats.reset()
-        pps = int(rs / refresh_rate)
+        pps, bps, in_flight_conn = stats.reset()
         total_pps += pps
-        total_in_flight += in_flight_conn
-        bps = int(8 * bs / refresh_rate)
         total_bps += bps
+        total_in_flight += in_flight_conn
         if table:
             tabulate_text.append((
                 f'{cl.YELLOW}%s' % target.url.host, target.url.port, method,
