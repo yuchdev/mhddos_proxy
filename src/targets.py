@@ -64,6 +64,9 @@ class Target:
     def option(self, key: str, default: Optional[str] = None) -> Optional[str]:
         return self.options.get(key, default)
 
+    def has_option(self, key: str) -> bool:
+        return key in self.options
+
     def human_repr(self) -> str:
         if self.url.host != self.addr:
             return f"{self.url.host} ({self.addr})"

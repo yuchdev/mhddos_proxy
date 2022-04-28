@@ -71,6 +71,12 @@ def init_argparse() -> argparse.ArgumentParser:
         action='store_true',
         default=False,
     )
+    parser.add_argument(
+        '--advanced-allow-uvloop',
+        action='store_true',
+        default=False,
+        help='Advanced setting. Allows the system to switch to the optimized implementation of the event loop (when available)'
+    )
 
     parser.add_argument('-p', '--period', type=int, help='DEPRECATED')
     parser.add_argument('--proxy-timeout', type=float, help='DEPRECATED')
