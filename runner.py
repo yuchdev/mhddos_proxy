@@ -173,7 +173,6 @@ async def run_ddos(
             finally:
                 cycle_start = time.perf_counter()
 
-
     # setup coroutine to print stats
     tasks.append(asyncio.ensure_future(stats_printer()))
 
