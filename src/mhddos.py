@@ -1218,6 +1218,7 @@ def main(url, ip, method, event, proxies, stats, rpc=None, refl_li_fn=None, loop
     if method in Methods.LAYER4_METHODS:
         port = url.port
 
+        # XXX: move this test to targets parser
         if port > 65535 or port < 1:
             exit("Invalid Port [Min: 1 / Max: 65535] ")
 

