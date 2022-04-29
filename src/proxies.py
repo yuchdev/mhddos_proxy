@@ -5,6 +5,7 @@ from aiohttp_socks import ProxyConnector
 from yarl import URL
 
 from .core import logger, cl, ONLY_MY_IP, PROXIES_URLS
+from .dns_utils import resolve_all
 from .system import read_or_fetch, fetch
 
 
@@ -29,7 +30,7 @@ def normalize_url(url: str) -> str:
             return normalize_url(f"http://{url}")
         elif INVALID_PORT_ERROR in str(e) and url.count(":") == 4:
             url, username, password = url.rsplit(":", 2)
-            return URL(url).with_user(username).with_password(password)
+            return str(URL(url).with_user(username).with_password(password))
         else:
             raise ValueError("Proxy config parsing failed") from e
 
@@ -45,8 +46,6 @@ class ProxySet:
     def has_proxies(self) -> bool:
         return self._skip_ratio != ONLY_MY_IP
 
-    # XXX: we can optimize here a little bit by switching to lower-level interface
-    #      with python_socks.async_.asyncio.Proxy object
     async def reload(self) -> int:
         if not self.has_proxies: return 0
         if self._proxies_file:
@@ -54,11 +53,15 @@ class ProxySet:
         else:
             proxies = await load_system_proxies()
 
-        if proxies:
-            self._loaded_proxies = list(proxies)
-            return len(self._loaded_proxies)
-        else:
+        if not proxies:
             return 0
+
+        # resolve DNS entires in case proxy is given using hostname rather than IP
+        urls = [URL(proxy_url) for proxy_url in proxies]
+        ips = await resolve_all([url.host for url in urls])
+        proxies = [str(url.with_host(ips.get(url.host, url.host))) for url in urls]
+        self._loaded_proxies = proxies
+        return len(self._loaded_proxies)
 
     def pick_random(self) -> Optional[str]:
         if not self.has_proxies: return None

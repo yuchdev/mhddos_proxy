@@ -1,6 +1,6 @@
-from asyncio import gather, ensure_future
+from asyncio import gather
 from asyncstdlib.functools import lru_cache
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from dns.asyncresolver import Resolver
 import dns.exception
@@ -34,10 +34,16 @@ async def safe_resolve_host(host: str) -> Optional[str]:
         return None
 
 
+async def resolve_all(hosts: List[str]) -> Dict[str, str]:
+    unresolved_hosts = list(set(host for host in hosts if not dns.inet.is_address(host)))
+    answers = await gather(*[safe_resolve_host(h) for h in unresolved_hosts])
+    ips = dict(zip(unresolved_hosts, answers))
+    return {host:ips.get(host, host) for host in hosts}
+
+
 async def resolve_all_targets(targets: List[Target]) -> List[Target]:
     unresolved_hosts = list(set(target.url.host for target in targets if not target.is_resolved))
-    answers = await gather(*[ensure_future(safe_resolve_host(h)) for h in unresolved_hosts])
-    ips = dict(zip(unresolved_hosts, answers))
+    ips = await resolve_all(unresolved_hosts)
     for target in targets:
         if not target.is_resolved:
             target.addr = ips.get(target.url.host)
