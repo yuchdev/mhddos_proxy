@@ -921,10 +921,10 @@ class AsyncTcpFlood(HttpFlood):
                 await self._send_packet(writer, payload)
                 packets_sent += 1
                 while True:
-                    # XXX: move this to config
                     await asyncio.sleep(.01)
-                    # XXX: timeout
-                    data = await reader.read(1)
+                    # XXX: should this be separate setting for config?
+                    data = await asyncio.wait_for(
+                        reader.read(1), timeout=self._settings.drain_timeout_seconds)
                     if not data: break
                 await self._send_packet(writer, b'0')
         finally:
