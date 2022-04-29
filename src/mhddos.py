@@ -675,6 +675,8 @@ class AsyncTcpFlood(HttpFlood):
         return reader, writer
 
     async def _close_connection(self, writer: asyncio.StreamWriter) -> None:
+        if writer.can_write_eof():
+            writer.write_eof()
         if self._settings.low_level_transport:
             writer.get_extra_info("socket")._sock.close()
             self._stats.track_close_connection()
