@@ -235,7 +235,7 @@ class Layer4:
         return sock
 
     def select(self, name):
-        self.SENT_FLOOD = self.TCP
+        self.SENT_FLOOD = self.UDP
         if name == "UDP": self.SENT_FLOOD = self.UDP
         if name == "SYN": self.SENT_FLOOD = self.SYN
         if name == "VSE": self.SENT_FLOOD = self.VSE
@@ -821,6 +821,8 @@ class HttpFlood:
 
     def select(self, name: str) -> None:
         self.SENT_FLOOD = self.GET
+        if name == "TCP":
+            self.SENT_FLOOD = self.TCP
         if name == "POST":
             self.SENT_FLOOD = self.POST
         if name == "CFB":
