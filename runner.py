@@ -179,8 +179,6 @@ async def run_ddos(
                     num_proxies,
                     None if targets_loader.age is None else reload_after-int(targets_loader.age),
                 )
-            except Exception as e:
-                print(e)
             finally:
                 cycle_start = time.perf_counter()
 
