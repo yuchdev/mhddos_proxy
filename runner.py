@@ -193,14 +193,15 @@ async def run_ddos(
             try:
                 await asyncio.sleep(delay_seconds)
                 targets, changed = await load_targets()
-                if not targets:
-                    logger.warning(
-                        f"{cl.RED}Не знайдено жодної доступної цілі - "
-                        f"чекаємо {delay_seconds} сек до наступної перевірки{cl.RESET}"
-                    )
-                elif not changed:
+                # XXX: what if DNS records were changed for some targets?
+                if not changed:
                     logger.warning(
                         f"{cl.YELLOW}Перелік цілей не змінився - "
+                        f"чекаємо {delay_seconds} сек до наступної перевірки{cl.RESET}"
+                    )
+                elif not targets:
+                    logger.warning(
+                        f"{cl.RED}Не знайдено жодної доступної цілі - "
                         f"чекаємо {delay_seconds} сек до наступної перевірки{cl.RESET}"
                     )
                 else:
