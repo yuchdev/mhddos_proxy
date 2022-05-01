@@ -653,7 +653,7 @@ class AsyncTcpFlood(HttpFlood):
             return await self.SENT_FLOOD()
         except OSError as exc:
             if exc.errno == errno.ENOBUFS:
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(0.1)
                 # going to try again, hope devie will be ready
                 return True
             else:
