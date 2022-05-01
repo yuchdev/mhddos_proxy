@@ -1,3 +1,4 @@
+from asyncio.log import logger as asyncio_logger
 import logging
 import random
 import time
@@ -7,9 +8,19 @@ from typing import Tuple
 from colorama import Fore
 
 
+class RemoveUselessWarnings(logging.Filter):
+
+    def filter(self, record):
+        return "socket.send() raised exception." not in record.getMessage()
+
+
 logging.basicConfig(format='[%(asctime)s - %(levelname)s] %(message)s', datefmt="%H:%M:%S")
 logger = logging.getLogger('mhddos_proxy')
 logger.setLevel('INFO')
+
+# Make asyncio logger a little bit less noisy
+asyncio_logger.addFilter(RemoveUselessWarnings())
+
 
 ROOT_DIR = Path(__file__).parent.parent
 

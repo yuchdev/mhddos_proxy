@@ -649,7 +649,15 @@ class AsyncTcpFlood(HttpFlood):
 
     async def run(self) -> bool:
         assert self._loop is not None, "Event loop has to be set to run async flooder"
-        return await self.SENT_FLOOD()
+        try:
+            return await self.SENT_FLOOD()
+        except OSError as exc:
+            if exc.errno == errno.ENOBUFS:
+                await asyncio.sleep(0.5)
+                # going to try again, hope devie will be ready
+                return True
+            else:
+                raise exc
 
     # note that TCP_NODELAY is set by default since Python3.6+
     async def open_connection(self) -> Tuple[asyncio.StreamReader, asyncio.StreamWriter]:
@@ -703,6 +711,7 @@ class AsyncTcpFlood(HttpFlood):
 
     async def _send_packet(self, writer: asyncio.StreamWriter, payload: bytes) -> None:
         # this means that connection_lost was caused by peer
+        # won't work for transport that do not track the attribute, e.g. SSL
         if getattr(writer.transport, "_conn_lost", 0):
             raise RuntimeError("Connection lost unexpectedly (transport)")
 

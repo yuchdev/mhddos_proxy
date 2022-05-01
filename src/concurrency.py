@@ -8,6 +8,8 @@ async def safe_run(f) -> Optional[Any]:
         return await f()
     except asyncio.CancelledError as e:
         raise e
+    except asyncio.TimeoutError:
+        return None
     except Exception:
         # XXX: there should be an option to see error
         #      e.g. TRACE level of logging or something
