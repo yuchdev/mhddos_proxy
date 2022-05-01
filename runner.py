@@ -4,6 +4,7 @@ import colorama; colorama.init()
 import asyncio
 from asyncio import events
 import selectors
+import socket
 import sys
 import time
 from threading import Event, Thread
@@ -302,8 +303,35 @@ async def start(args, shutdown_event: Event):
     shutdown_event.set()
 
 
+def _safe_connection_lost(transport, exc):
+    try:
+        transport._protocol.connection_lost(exc)
+    finally:
+        if hasattr(transport._sock, 'shutdown') and transport._sock.fileno() != -1:
+            transport._sock.shutdown(socket.SHUT_RDWR)
+        transport._sock.close()
+        transport._sock = None
+        server = transport._server
+        if server is not None:
+            server._detach()
+            transport._server = None
+
+
+def _patch_proactor_connection_lost():
+    """
+    The issue is described here:
+      https://github.com/python/cpython/issues/87419
+
+    The fix is going to be included into Python 3.11. This is merely
+    a backport for already versions.
+    """
+    from asyncio.proactor_events import _ProactorBasePipeTransport
+    setattr(_ProactorBasePipeTransport, "_call_connection_lost", _safe_connection_lost)
+
+
 def _main():
     if sys.platform == 'win32':
+        _patch_proactor_connection_lost()
         loop = asyncio.ProactorEventLoop()
     elif hasattr(selectors, "PollSelector"):
         selector = selectors.PollSelector()
