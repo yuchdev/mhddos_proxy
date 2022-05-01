@@ -2,6 +2,9 @@
 import colorama; colorama.init()
 # @formatter:on
 import asyncio
+from asyncio import events
+import selectors
+import sys
 import time
 from threading import Event, Thread
 from typing import List, Optional, Union
@@ -298,6 +301,18 @@ async def start(args, shutdown_event: Event):
     shutdown_event.set()
 
 
+def _main():
+    if sys.platform == 'win32':
+        loop = asyncio.ProactorEventLoop()
+    elif hasattr(selectors, "PollSelector"):
+        selector = selectors.PollSelector()
+        loop = asyncio.SelectorEventLoop(selector)
+    else:
+        loop = events.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(start(args, shutdown_event))
+
+
 if __name__ == '__main__':
     args = init_argparse().parse_args()
 
@@ -317,7 +332,7 @@ if __name__ == '__main__':
     try:
         # run event loop in a separate thread to ensure the application
         # exists immediately after Ctrl+C
-        Thread(target=lambda: asyncio.run(start(args, shutdown_event)), daemon=True).start()
+        Thread(target=_main, daemon=True).start()
         # we can do something smarter rather than waiting forever,
         # but as of now it's gonna be consistent with previous version
         shutdown_event.wait()
