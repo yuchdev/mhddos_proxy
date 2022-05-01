@@ -708,6 +708,8 @@ class AsyncTcpFlood(HttpFlood):
             writer.close()
             task = asyncio.create_task(writer.wait_closed())
             task.add_done_callback(self._closed_connection)
+            async with timeout(self._settings.close_timeout_seconds):
+                await task
 
     async def _send_packet(self, writer: asyncio.StreamWriter, payload: bytes) -> None:
         # this means that connection_lost was caused by peer
