@@ -607,6 +607,7 @@ class AttackSettings:
     http_response_timeout_seconds: float
     tcp_read_timeout_seconds: float
     requests_per_connection: int
+    high_watermark: int
 
     def __init__(
         self,
@@ -618,6 +619,7 @@ class AttackSettings:
         http_response_timeout_seconds: float = 15.0,
         tcp_read_timeout_seconds: float = 0.2,
         requests_per_connection: int = 1024,
+        high_watermark: int = 1024 << 5,
     ):
         self.transport = transport
         self.connect_timeout_seconds = connect_timeout_seconds
@@ -626,6 +628,7 @@ class AttackSettings:
         self.http_response_timeout_seconds = http_response_timeout_seconds
         self.tcp_read_timeout_seconds = tcp_read_timeout_seconds
         self.requests_per_connection = requests_per_connection
+        self.high_watermark = high_watermark
 
     @property
     def low_level_transport(self) -> bool:
@@ -681,6 +684,7 @@ class AsyncTcpFlood(HttpFlood):
         async with timeout(self._settings.connect_timeout_seconds):
             reader, writer = await conn
         self._stats.track_open_connection()
+        writer.transport.set_write_buffer_limits(high=self._settings.high_watermark)
         return reader, writer
 
     def _closed_connection(self, f: asyncio.Future) -> None:
@@ -706,10 +710,10 @@ class AsyncTcpFlood(HttpFlood):
             self._stats.track_close_connection()
         else:
             writer.close()
-            task = asyncio.create_task(writer.wait_closed())
-            task.add_done_callback(self._closed_connection)
+            close_task = asyncio.create_task(writer.wait_closed())
+            close_task.add_done_callback(self._closed_connection)
             async with timeout(self._settings.close_timeout_seconds):
-                await task
+                await close_task
 
     async def _send_packet(self, writer: asyncio.StreamWriter, payload: bytes) -> None:
         # this means that connection_lost was caused by peer

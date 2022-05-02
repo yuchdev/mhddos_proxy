@@ -82,7 +82,8 @@ async def run_ddos(
             target_rpc = int(target.option(Target.OPTION_RPC, "0"))
             settings = attack_settings.with_options(
                 requests_per_connection=target_rpc if target_rpc > 0 else None,
-                transport=target.option(Target.OPTION_TRANSPORT, None)
+                transport=target.option(Target.OPTION_TRANSPORT),
+                high_watermark=target.option(Target.OPTION_HIGH_WATERMARK),
             )
         else:
             settings = attack_settings
@@ -283,7 +284,8 @@ async def start(args, shutdown_event: Event):
     attack_settings = AttackSettings(
         requests_per_connection=args.rpc,
         transport=AttackSettings.TRANSPORT_STREAM,
-        drain_timeout_seconds=0.1,
+        drain_timeout_seconds=0.2,
+        high_watermark = 1024<<4, # roughly 16 packets (normally 1024 bytes on a single write)
     )
 
     # XXX: with the current implementation there's no need to
