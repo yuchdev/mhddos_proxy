@@ -362,9 +362,11 @@ def _main():
         loop.run_until_complete(start(args, shutdown_event))
     except KeyboardInterrupt:
         if WINDOWS:
+            logger.info("Got keyboard interrupt in non-main thread")
             # This is to allow CTRL-C to be detected in a timely fashion,
             # see: https://bugs.python.org/issue23057#msg246316
             loop.stop()
+            loop.close()
 
 
 if __name__ == '__main__':
@@ -392,4 +394,4 @@ if __name__ == '__main__':
         shutdown_event.wait()
     except KeyboardInterrupt:
         logger.info(f'{cl.BLUE}Завершуємо роботу...{cl.RESET}')
-        exit()
+        sys.exit()
