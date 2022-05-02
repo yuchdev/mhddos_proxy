@@ -25,6 +25,9 @@ from src.system import fix_ulimits, is_latest_version
 from src.targets import Target, TargetsLoader
 
 
+WINDOWS = sys.platform == "win32"
+
+
 AsyncFlood = Union[AsyncTcpFlood, AsyncUdpFlood]
 
 
@@ -334,17 +337,34 @@ def _patch_proactor_connection_lost():
     setattr(_ProactorBasePipeTransport, "_call_connection_lost", _safe_connection_lost)
 
 
+async def _windows_support_wakeup():
+    """See more info here:
+        https://bugs.python.org/issue23057#msg246316
+    """
+    while True:
+        await asyncio.sleep(0.1)
+
+
 def _main():
-    if sys.platform == 'win32':
+    if WINDOWS:
         _patch_proactor_connection_lost()
         loop = asyncio.ProactorEventLoop()
+        # This is to allow CTRL-C to be detected in a timely fashion,
+        # see: https://bugs.python.org/issue23057#msg246316
+        loop.create_task(_windows_support_wakeup())
     elif hasattr(selectors, "PollSelector"):
         selector = selectors.PollSelector()
         loop = asyncio.SelectorEventLoop(selector)
     else:
         loop = events.new_event_loop()
     asyncio.set_event_loop(loop)
-    loop.run_until_complete(start(args, shutdown_event))
+    try:
+        loop.run_until_complete(start(args, shutdown_event))
+    except KeyboardInterrupt:
+        if WINDOWS:
+            # This is to allow CTRL-C to be detected in a timely fashion,
+            # see: https://bugs.python.org/issue23057#msg246316
+            loop.stop()
 
 
 if __name__ == '__main__':
