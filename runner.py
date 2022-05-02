@@ -26,6 +26,7 @@ from src.targets import Target, TargetsLoader
 
 
 WINDOWS = sys.platform == "win32"
+WINDOWS_WAKEUP_SECONDS = 0.5
 
 
 AsyncFlood = Union[AsyncTcpFlood, AsyncUdpFlood]
@@ -342,7 +343,7 @@ async def _windows_support_wakeup():
         https://bugs.python.org/issue23057#msg246316
     """
     while True:
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(WINDOWS_WAKEUP_SECONDS)
 
 
 def _main(args, shutdown_event):
@@ -384,7 +385,7 @@ if __name__ == '__main__':
         # we can do something smarter rather than waiting forever,
         # but as of now it's gonna be consistent with previous version
         while True:
-            shutdown_event.wait(0.1)
+            shutdown_event.wait(WINDOWS_WAKEUP_SECONDS)
     except KeyboardInterrupt:
         logger.info(f'{cl.BLUE}Завершуємо роботу...{cl.RESET}')
         sys.exit()
