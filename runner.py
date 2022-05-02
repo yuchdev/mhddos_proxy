@@ -4,6 +4,7 @@ import colorama; colorama.init()
 import asyncio
 from asyncio import events
 import selectors
+import signal
 import socket
 import sys
 import time
@@ -345,7 +346,11 @@ async def _windows_support_wakeup():
         await asyncio.sleep(0.1)
 
 
-def _main():
+def _signal_handler(sig, frame):
+    sys.exit()
+
+
+def _main(args, shutdown_event):
     if WINDOWS:
         _patch_proactor_connection_lost()
         loop = asyncio.ProactorEventLoop()
@@ -357,6 +362,7 @@ def _main():
         loop = asyncio.SelectorEventLoop(selector)
     else:
         loop = events.new_event_loop()
+    # loop.add_signal_handler(signal.SIGINT, _signal_handler)
     asyncio.set_event_loop(loop)
     try:
         loop.run_until_complete(start(args, shutdown_event))
@@ -388,7 +394,7 @@ if __name__ == '__main__':
     try:
         # run event loop in a separate thread to ensure the application
         # exists immediately after Ctrl+C
-        Thread(target=_main, daemon=True).start()
+        Thread(target=_main, args=(args, shutdown_event), daemon=True).start()
         # we can do something smarter rather than waiting forever,
         # but as of now it's gonna be consistent with previous version
         shutdown_event.wait()
