@@ -398,7 +398,8 @@ if __name__ == '__main__':
         Thread(target=_main, args=(args, shutdown_event), daemon=True).start()
         # we can do something smarter rather than waiting forever,
         # but as of now it's gonna be consistent with previous version
-        shutdown_event.wait()
+        while True:
+            shutdown_event.wait(0.1)
     except KeyboardInterrupt:
         logger.info(f'{cl.BLUE}Завершуємо роботу...{cl.RESET}')
         sys.exit()
