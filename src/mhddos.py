@@ -43,7 +43,14 @@ REFERERS = list(set(a.strip() for a in REFERERS))
 
 ctx: SSLContext = create_default_context()
 ctx.check_hostname = False
-ctx.server_hostname = ""
+try:
+    ctx.server_hostname = ""
+except AttributeError:
+    # Old Python version. SNI might fail even though it's not requested
+    # the issue is only fixed in Python3.8+, and the attribute for SSLContext
+    # is supported in Python3.7+. With ealier version it's just going
+    # to fail
+    pass
 ctx.verify_mode = CERT_NONE
 ctx.set_ciphers("DEFAULT")
 
