@@ -346,11 +346,7 @@ async def _windows_support_wakeup():
         await asyncio.sleep(0.1)
 
 
-def _signal_handler(sig, frame):
-    sys.exit()
-
-
-def _main(args, shutdown_event):
+def _create_loop():
     if WINDOWS:
         _patch_proactor_connection_lost()
         loop = asyncio.ProactorEventLoop()
@@ -363,16 +359,21 @@ def _main(args, shutdown_event):
     else:
         loop = events.new_event_loop()
     # loop.add_signal_handler(signal.SIGINT, _signal_handler)
+    return loop
+
+
+def _main(args, shutdown_event):
+    loop = _create_loop()
     asyncio.set_event_loop(loop)
     try:
         loop.run_until_complete(start(args, shutdown_event))
     except KeyboardInterrupt:
-        if WINDOWS:
-            logger.info("Got keyboard interrupt in non-main thread")
-            # This is to allow CTRL-C to be detected in a timely fashion,
-            # see: https://bugs.python.org/issue23057#msg246316
-            loop.stop()
-            loop.close()
+        logger.info("Got keyboard interrupt in non-main thread")
+        sys.exit()
+        # This is to allow CTRL-C to be detected in a timely fashion,
+        # see: https://bugs.python.org/issue23057#msg246316
+        loop.stop()
+        loop.close()
 
 
 if __name__ == '__main__':
