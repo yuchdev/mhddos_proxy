@@ -33,7 +33,6 @@ async def safe_resolve_host(host: str) -> Optional[str]:
         logger.warning(
             f"{cl.YELLOW}Ціль {cl.BLUE}{host}{cl.YELLOW} не доступна "
             f"і {cl.RED}не буде атакована{cl.RESET}")
-        logger.exception("DNS failure")
         return None
 
 
