@@ -4,7 +4,6 @@ import colorama; colorama.init()
 import asyncio
 from asyncio import events
 import selectors
-import signal
 import socket
 import sys
 import time
@@ -346,7 +345,7 @@ async def _windows_support_wakeup():
         await asyncio.sleep(0.1)
 
 
-def _create_loop():
+def _main(args, shutdown_event):
     if WINDOWS:
         _patch_proactor_connection_lost()
         loop = asyncio.ProactorEventLoop()
@@ -358,12 +357,6 @@ def _create_loop():
         loop = asyncio.SelectorEventLoop(selector)
     else:
         loop = events.new_event_loop()
-    # loop.add_signal_handler(signal.SIGINT, _signal_handler)
-    return loop
-
-
-def _main(args, shutdown_event):
-    loop = _create_loop()
     asyncio.set_event_loop(loop)
     try:
         loop.run_until_complete(start(args, shutdown_event))
