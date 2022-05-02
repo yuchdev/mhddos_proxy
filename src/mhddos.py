@@ -627,6 +627,7 @@ class AttackSettings:
         tcp_read_timeout_seconds: float = 0.2,
         requests_per_connection: int = 1024,
         high_watermark: int = 1024 << 5,
+        reader_limit: int = 1024,
     ):
         self.transport = transport
         self.connect_timeout_seconds = connect_timeout_seconds
@@ -636,6 +637,7 @@ class AttackSettings:
         self.tcp_read_timeout_seconds = tcp_read_timeout_seconds
         self.requests_per_connection = requests_per_connection
         self.high_watermark = high_watermark
+        self.reader_limit = reader_limit
 
     @property
     def low_level_transport(self) -> bool:
@@ -683,11 +685,16 @@ class AsyncTcpFlood(HttpFlood):
                 port=self._target.port,
                 ssl=ssl_ctx,
                 server_hostname=server_hostname,
+                limit=self._settings.reader_limit,
             )
         else:
             conn = asyncio.open_connection(
-                host=self._addr, port=self._target.port, ssl=ssl_ctx,
-                server_hostname=server_hostname)
+                host=self._addr,
+                port=self._target.port,
+                ssl=ssl_ctx,
+                server_hostname=server_hostname,
+                limit=self._settings.reader_limit
+            )
         async with timeout(self._settings.connect_timeout_seconds):
             reader, writer = await conn
         self._stats.track_open_connection()

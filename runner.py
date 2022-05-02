@@ -290,6 +290,7 @@ async def start(args, shutdown_event: Event):
         transport=AttackSettings.TRANSPORT_STREAM,
         drain_timeout_seconds=0.2,
         high_watermark = 1024<<4, # roughly 16 packets (normally 1024 bytes on a single write)
+        reader_limit = 1024,
     )
 
     # XXX: with the current implementation there's no need to
