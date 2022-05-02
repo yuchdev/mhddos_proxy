@@ -358,15 +358,7 @@ def _main(args, shutdown_event):
     else:
         loop = events.new_event_loop()
     asyncio.set_event_loop(loop)
-    try:
-        loop.run_until_complete(start(args, shutdown_event))
-    except KeyboardInterrupt:
-        logger.info("Got keyboard interrupt in non-main thread")
-        sys.exit()
-        # This is to allow CTRL-C to be detected in a timely fashion,
-        # see: https://bugs.python.org/issue23057#msg246316
-        loop.stop()
-        loop.close()
+    loop.run_until_complete(start(args, shutdown_event))
 
 
 if __name__ == '__main__':
