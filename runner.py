@@ -392,3 +392,4 @@ if __name__ == '__main__':
         shutdown_event.wait()
     except KeyboardInterrupt:
         logger.info(f'{cl.BLUE}Завершуємо роботу...{cl.RESET}')
+        exit()
