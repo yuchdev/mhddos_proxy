@@ -69,6 +69,8 @@ def show_statistic(
 
 def print_progress(num_proxies: int, next_targets_load: Optional[int], use_my_ip: int):
     if next_targets_load is not None:
+        # XXX: it's possible to ask to reduce resource consumption here
+        next_targets_load = max(0, next_targets_load)
         logger.info(
             f"{cl.YELLOW}Оновлення цілей через: {cl.BLUE}{next_targets_load} секунд{cl.RESET}")
     if num_proxies:

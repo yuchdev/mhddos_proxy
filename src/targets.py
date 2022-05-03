@@ -120,9 +120,9 @@ class TargetsLoader:
         if resolve:
             all_targets = await resolve_all_targets(all_targets)
             all_targets = [target for target in all_targets if target.is_resolved]
-        self._last_loaded_at = time.time()
         changed = (all_targets == self._cached_targets)
         self._cached_targets = all_targets
+        self._last_loaded_at = time.time()
         return all_targets, changed
 
     # XXX: fix this to work properly with ETag

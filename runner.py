@@ -217,9 +217,8 @@ async def run_ddos(
                     f"{cl.BLUE}{delay_seconds} секунд{cl.RESET}"
                 )
 
-    # setup coroutine to reload targets (if configuration file is given)
-    if targets_loader.dynamic:
-        tasks.append(asyncio.ensure_future(reload_targets(delay_seconds=reload_after)))
+    # setup coroutine to reload targets
+    tasks.append(asyncio.ensure_future(reload_targets(delay_seconds=reload_after)))
 
     async def reload_proxies(delay_seconds: int = 30):
         while True:
@@ -291,7 +290,7 @@ async def start(args, shutdown_event: Event):
 
     # XXX: with the current implementation there's no need to
     # have 2 separate functions to setups params for launching flooders
-    reload_after = 300
+    reload_after = 30
     await run_ddos(
         proxies,
         targets_loader,
