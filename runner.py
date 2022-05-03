@@ -291,7 +291,7 @@ async def start(args, shutdown_event: Event):
 
     # XXX: with the current implementation there's no need to
     # have 2 separate functions to setups params for launching flooders
-    reload_after = 30
+    reload_after = 300
     await run_ddos(
         proxies,
         targets_loader,
