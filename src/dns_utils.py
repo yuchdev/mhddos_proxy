@@ -7,7 +7,6 @@ import dns.exception
 from yarl import URL
 
 from .core import logger, cl
-from .targets import Target
 
 
 resolver = Resolver(configure=False)
@@ -43,7 +42,7 @@ async def resolve_all(hosts: List[str]) -> Dict[str, str]:
     return {host:ips.get(host, host) for host in hosts}
 
 
-async def resolve_all_targets(targets: List[Target]) -> List[Target]:
+async def resolve_all_targets(targets: List["Target"]) -> List["Target"]:
     unresolved_hosts = list(set(target.url.host for target in targets if not target.is_resolved))
     ips = await resolve_all(unresolved_hosts)
     for target in targets:

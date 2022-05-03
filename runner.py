@@ -116,11 +116,6 @@ async def run_ddos(
 
     active_flooder_tasks = []
 
-    async def load_targets():
-        targets, changed = await targets_loader.load()
-        targets = await resolve_all_targets(targets)
-        return [target for target in targets if target.is_resolved], changed
-
     async def install_targets(targets):
         # cancel running flooders
         if active_flooder_tasks:
@@ -162,7 +157,7 @@ async def run_ddos(
             active_flooder_tasks.append(task)
 
     try:
-        initial_targets, _ = await load_targets()
+        initial_targets, _ = await targets_loader.load(resolve=True)
     except Exception as exc:
         logger.error(f"{cl.RED}Завнтаження цілей завершилося помилкою: {exc}{cl.RESET}")
         initial_targets = []
@@ -198,8 +193,7 @@ async def run_ddos(
         while True:
             try:
                 await asyncio.sleep(delay_seconds)
-                targets, changed = await load_targets()
-                # XXX: what if DNS records were changed for some targets?
+                targets, changed = await targets_loader.load(resolve=True)
                 if not changed:
                     logger.warning(
                         f"{cl.YELLOW}Перелік цілей не змінився - "

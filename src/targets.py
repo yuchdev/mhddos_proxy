@@ -6,6 +6,7 @@ from dns import inet
 from yarl import URL
 
 from .core import logger, cl
+from .dns_utils import resolve_all_targets
 from .system import read_or_fetch
 
 
@@ -97,6 +98,7 @@ class TargetsLoader:
         self._config = config
         self._tag: Optional[str] = None
         self._last_loaded_at: Optional[float] = None
+        self._cached_targets = None
 
     @property
     def dynamic(self):
@@ -108,16 +110,23 @@ class TargetsLoader:
         if not self._last_loaded_at: return 0
         return time.time() - self._last_loaded_at
 
-    async def load(self) -> Tuple[List[Target], bool]:
-        config_targets, changed = await self._load_config()
-        self._last_loaded_at = time.time()
+    async def load(self, resolve: bool = False) -> Tuple[List[Target], bool]:
+        config_targets = await self._load_config()
         if config_targets:
             logger.info(
                 f"{cl.YELLOW}Завантажено конфіг {self._config} "
                 f"на {cl.BLUE}{len(config_targets)} цілей{cl.RESET}")
-        return self._targets + (config_targets or []), changed
+        all_targets = self._targets + (config_targets or [])
+        if resolve:
+            all_targets = await resolve_all_targets(all_targets)
+            all_targets = [target for target in all_targets if target.is_resolved]
+        self._last_loaded_at = time.time()
+        changed = (all_targets == self._cached_targets)
+        self._cached_targets = all_targets
+        return all_targets, changed
 
-    async def _load_config(self) -> Tuple[List[Target], bool]:
+    # XXX: fix this to work properly with ETag
+    async def _load_config(self) -> List[Target]:
         if not self._config:
             return [], False
 
@@ -125,9 +134,7 @@ class TargetsLoader:
         if config_content is None:
             raise RuntimeError("Failed to load configuration")
 
-        etag = md5(config_content.encode()).hexdigest()
-        changed = self._tag is None or self._tag != etag
-        self._tag = etag
+        self._tag = md5(config_content.encode()).hexdigest()
 
         targets = []
         for row in config_content.splitlines():
@@ -135,5 +142,5 @@ class TargetsLoader:
             if target and not target.startswith('#'):
                 targets.append(Target.from_string(target))
 
-        return targets, changed
+        return targets
 
