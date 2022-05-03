@@ -285,6 +285,10 @@ async def start(args, shutdown_event: Event):
     # targets because the list of targets might change at any point in time
     proxies = ProxySet(args.proxies, use_my_ip)
 
+    # XXX: for the attack like BYPASS we would need larger read_limit
+    # to avoid problems reading the response. and for TCP flood high_watermark
+    # should be lower by default (we need to send a lot of small packages
+    # rather than buffer data before drain)
     attack_settings = AttackSettings(
         requests_per_connection=args.rpc,
         transport=AttackSettings.TRANSPORT_STREAM,

@@ -851,8 +851,6 @@ class AsyncTcpFlood(HttpFlood):
         )
         return await self._generic_flood(payload)
 
-    # XXX: for the attack like this we would need larger read_limit
-    # to avoid problems reading the response
     @scale_attack(factor=3)
     async def BYPASS(self) -> bool:
         connector = self._proxies.pick_random_connector()
