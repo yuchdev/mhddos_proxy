@@ -285,16 +285,14 @@ async def start(args, shutdown_event: Event):
     # targets because the list of targets might change at any point in time
     proxies = ProxySet(args.proxies, use_my_ip)
 
-    # XXX: for the attack like BYPASS we would need larger read_limit
-    # to avoid problems reading the response. and for TCP flood high_watermark
-    # should be lower by default (we need to send a lot of small packages
-    # rather than buffer data before drain)
+    # XXX: for TCP flood high_watermark should be lower by default
+    # (we need to send a lot of small packages rather than buffer data before drain)
     attack_settings = AttackSettings(
         requests_per_connection=args.rpc,
         transport=AttackSettings.TRANSPORT_STREAM,
         drain_timeout_seconds=0.2,
-        high_watermark = 1024<<4, # roughly 16 packets (normally 1024 bytes on a single write)
-        reader_limit = 1024,
+        high_watermark = 1024 << 4, # roughly 16 packets (normally 1024 bytes on a single write)
+        reader_limit = 1024 << 4,
     )
 
     # XXX: with the current implementation there's no need to
