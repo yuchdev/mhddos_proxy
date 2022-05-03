@@ -14,7 +14,7 @@ from src.cli import init_argparse
 from src.concurrency import safe_run
 from src.core import (
     logger, cl, Stats,
-    LOW_RPC, IT_ARMY_CONFIG_URL, REFRESH_RATE, ONLY_MY_IP,
+    LOW_RPC, IT_ARMY_CONFIG_URL, REFRESH_OVERTIME, REFRESH_RATE, ONLY_MY_IP,
     FAILURE_BUDGET_FACTOR, FAILURE_DELAY_SECONDS,
 )
 from src.dns_utils import resolve_all_targets
@@ -182,6 +182,7 @@ async def run_ddos(
                     use_my_ip,
                     num_proxies,
                     None if targets_loader.age is None else reload_after-int(targets_loader.age),
+                    passed > REFRESH_RATE * REFRESH_OVERTIME,
                 )
             finally:
                 cycle_start = time.perf_counter()

@@ -19,6 +19,7 @@ def show_statistic(
     use_my_ip: int,
     num_proxies: int,
     next_targets_load: Optional[int],
+    overtime: bool,
 ):
     tabulate_text = []
     total_pps, total_bps, total_in_flight = 0, 0, 0
@@ -64,15 +65,20 @@ def show_statistic(
             f"{cl.YELLOW}Трафік:{cl.GREEN} {Tools.humanbits(total_bps)}/s{cl.RESET}"
         )
 
-    print_progress(num_proxies, next_targets_load, use_my_ip)
+    print_progress(num_proxies, next_targets_load, use_my_ip, overtime)
 
 
-def print_progress(num_proxies: int, next_targets_load: Optional[int], use_my_ip: int):
+def print_progress(
+    num_proxies: int,
+    next_targets_load: Optional[int],
+    use_my_ip: int,
+    overtime: bool,
+):
     if next_targets_load is not None:
-        # XXX: it's possible to ask to reduce resource consumption here
         next_targets_load = max(0, next_targets_load)
         logger.info(
             f"{cl.YELLOW}Оновлення цілей через: {cl.BLUE}{next_targets_load} секунд{cl.RESET}")
+
     if num_proxies:
         logger.info(f"{cl.YELLOW}Кількість проксі: {cl.BLUE}{num_proxies}{cl.RESET}")
         if use_my_ip:
@@ -83,6 +89,11 @@ def print_progress(num_proxies: int, next_targets_load: Optional[int], use_my_ip
         logger.info(
             f"{cl.YELLOW}Атака {cl.MAGENTA}без проксі{cl.YELLOW} - "
             f"використовується тільки ваш IP{cl.RESET}")
+
+    if overtime:
+        logger.warning(
+            f"{cl.MAGENTA}Зафіксована затримка у виконанні операцій - "
+            f"атака продовжується, але радимо зменшити значення налаштування `-t`{cl.RESET}")
 
 
 def print_banner(use_my_ip):
