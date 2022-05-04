@@ -350,8 +350,8 @@ def _main(args, shutdown_event):
         # This is to allow CTRL-C to be detected in a timely fashion,
         # see: https://bugs.python.org/issue23057#msg246316
         loop.create_task(_windows_support_wakeup())
-    elif hasattr(selectors, "PollSelector"):
-        selector = selectors.PollSelector()
+    elif hasattr(selectors, "DefaultSelector"):
+        selector = selectors.DefaultSelector()
         loop = asyncio.SelectorEventLoop(selector)
     else:
         loop = events.new_event_loop()
