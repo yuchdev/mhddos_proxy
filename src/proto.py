@@ -1,4 +1,5 @@
 import asyncio
+from functools import partial
 import io
 import socket
 from ssl import SSLContext
@@ -22,7 +23,7 @@ from .core import logger, PacketPayload
 # XXX: type annotations
 class FloodAttackProtocol(asyncio.Protocol):
 
-    def __init__(self, loop, stats, payload: PacketPayload, settings, on_close: asyncio.Future):
+    def __init__(self, loop, on_close: asyncio.Future, stats, settings, payload: PacketPayload):
         self._loop = loop
         self._stats = stats
         self._payload: PacketPayload = payload
@@ -93,12 +94,12 @@ class ProxyProtocol(asyncio.Protocol):
 
     def __init__(
         self,
-        loop,
-        proxy_url: str,
+        proxy_url: str, # XXX: is one is only used for the logging
         proxy: Proxy,
+        loop,
+        on_close: asyncio.Future,
         dest: Tuple[str, int],
         ssl: Optional[SSLContext],
-        on_close: asyncio.Future,
         downstream_factory: Callable[[], asyncio.Protocol],
         connect_timeout: int = 30,
     ):
@@ -210,6 +211,7 @@ class Socks4Protocol(ProxyProtocol):
         self._dest_connect()
 
     def _negotiate_data_received(self, data):
+        # XXX: what if we get multiple packets?
         assert len(data) == 8
         res = socks4.ConnectResponse(data[:2])
         res.validate()
@@ -244,7 +246,7 @@ class Socks5Protocol(ProxyProtocol):
             logger.debug(f"Auth is ready for {self._proxy_url}")
             self._dest_connect()
         elif self._auth_method is None:
-            assert n_bytes == 2 # XXX: be more flexible about it
+            assert n_bytes == 2
             res = socks5.AuthMethodsResponse(data)
             res.validate(request=self._auth_method_req)
             self._auth_method = res.auth_method
@@ -343,6 +345,8 @@ _CONNECTORS = {
     HttpProxy:   HttpTunelProtocol,
 }
 
-def for_proxy(proxy):
-    return _CONNECTORS[type(proxy)]
+def for_proxy(proxy_url: str) -> Tuple[Proxy, Callable[[], asyncio.Protocol]]:
+    proxy = Proxy.from_url(proxy_url)
+    proxy_protocol = _CONNECTORS[type(proxy)]
+    return proxy, partial(proxy_protocol, proxy_url, proxy)
 

