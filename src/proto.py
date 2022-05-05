@@ -93,7 +93,7 @@ class FloodAttackProtocol(asyncio.Protocol):
     def resume_writing(self):
         self._paused = False
         if self._handle is None and self._budget > 0:
-            self._loop.call_soon(self._send_packet)
+            self._handle = self._loop.call_soon(self._send_packet)
 
 
 class ProxyProtocol(asyncio.Protocol):
