@@ -198,13 +198,15 @@ class ProxyProtocol(asyncio.Protocol):
         self._cancel_dest_connect_timer()
         try:
             transport = task.result()
+            if transport:
+                self._downstream_protocol.connection_made(transport)
+                logger.debug(f"Dest is connected through {self._proxy_url}")
+            elif self._transport:
+                self._transport.abort()
         except Exception as exc:
             if not self._on_close.done():
                 self._on_close.set_exception(exc)
                 self._transport.abort()
-        else:
-            self._downstream_protocol.connection_made(transport)
-            logger.debug(f"Dest is connected through {self._proxy_url}")
 
     def _abort_connection(self):
         logger.debug(f"Response timeout for {self._proxy_url}")
