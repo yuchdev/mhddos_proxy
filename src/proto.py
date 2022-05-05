@@ -4,7 +4,7 @@ import io
 import socket
 from ssl import SSLContext
 import struct
-from typing import Callable, Optional, Tuple
+from typing import BinaryIO, Callable, Optional, Tuple
 
 from python_socks.async_.asyncio._proxy import HttpProxy, Socks4Proxy, Socks5Proxy
 from python_socks.async_.asyncio import Proxy
@@ -217,26 +217,6 @@ class ProxyProtocol(asyncio.Protocol):
             self._transport.abort()
 
 
-SOCKS4_ERRORS = {
-    0x5B: "Request rejected or failed",
-    0x5C: ("Request rejected because SOCKS server cannot connect to identd on"
-           " the client"),
-    0x5D: ("Request rejected because the client program and identd report"
-           " different user-ids")
-}
-
-SOCKS5_ERRORS = {
-    0x01: "General SOCKS server failure",
-    0x02: "Connection not allowed by ruleset",
-    0x03: "Network unreachable",
-    0x04: "Host unreachable",
-    0x05: "Connection refused",
-    0x06: "TTL expired",
-    0x07: "Command not supported, or protocol error",
-    0x08: "Address type not supported"
-}
-
-
 class ProxyError(IOError):
     pass
 
@@ -246,35 +226,17 @@ class Socks4Protocol(ProxyProtocol):
 
     def _kickoff_negotiate(self):
         self._dest_connect()
-        self._expected = 8
-        self._buffer: bytes = b''
-        self._size: int = 0
 
     def _negotiate_data_received(self, data):
-        data = self._feed(data)
-        if data is not None:
-            self._read_response(data)
-            self._dest_connection_made()
-
-    def _read_response(self, data):
+        assert len(data) == 8, "SOCKS4: invalid response (wrong packet size)"
         # we are not validating addr, port pair
-        if data[0:1] != b"\x00":
+        if data[0] != socks4.RSV:
             raise ProxyError("SOCKS4: proxy server sent invalid data")
         status = ord(data[1:2])
-        if status != 0x5A:
-            status_error = SOCKS4_ERRORS.get(status, "Unknown error")
+        if status != socks4.ReplyCode.REQUEST_GRANTED:
+            status_error = socks4.ReplyMessages.get(status, "Unknown error")
             raise ProxyError(f"SOCKS4: wrong status {status_error}")
-
-    def _feed(self, data: bytes) -> Optional[bytes]:
-        n_bytes = len(data)
-        if n_bytes > 0: return None
-        if self._size + n_bytes > self._expected:
-            raise ProxyError("SOCKS4: proxy server sent excessive data")
-        if self._size + n_bytes == self._expected:
-            return self._buffer + data
-        self._buffer += data
-        self._size += n_bytes
-        return None
+        self._dest_connection_made()
 
     def _dest_connect(self):
         addr, port = self._dest
@@ -293,13 +255,16 @@ class Socks5Protocol(ProxyProtocol):
         self._auth_method = None
         self._auth_done = False
         self._auth_req_sent = False
-        self._connect_resp_buffer = None
 
     def _negotiate_data_received(self, data):
         n_bytes = len(data)
-        if self._auth_method_req is not None and not self._auth_method:
+        if self._auth_done:
+            # expecting connect response
+            self._read_connect_response(data)
+            self._dest_connection_made()
+        elif self._auth_method_req and self._auth_method is None:
             # expecting auth method response
-            assert n_bytes == 2
+            assert n_bytes == 2, "SOCKS5: invalid auth method response (wrong packet size)"
             res = socks5.AuthMethodsResponse(data)
             res.validate(request=self._auth_method_req)
             self._auth_method = res.auth_method
@@ -313,64 +278,48 @@ class Socks5Protocol(ProxyProtocol):
                 self._auth_done = True
                 logger.debug(f"Auth is ready for {self._proxy_url}")
                 self._dest_connect()
-        elif self._auth_method_req is not None and self._auth_method:
+        elif self._auth_method_req and self._auth_method is not None:
             # expecting auth response
-            assert n_bytes == 2
+            assert n_bytes == 2, "SOCKS5: invalid auth response (wrong packet size)"
             res = socks5.AuthResponse(data)
             res.validate()
             self._auth_done = True
             logger.debug(f"Auth is ready for {self._proxy_url}")
             self._dest_connect()
-        elif self._auth_done:
-            # expecting connect response
-            resp = self._connect_resp_buffer or b'' 
-            resp += data
-            if self._read_connect_response(resp):
-                self._dest_connection_made()
-            else:
-                self._connect_resp_buffer = resp
         else:
             raise ProxyError("SOCKS5: invalid state")
 
-    # XXX: optimize this code (we are re-executing it each time)
-    # XXX: set aggressive timer
-    def _read_connect_response(self, data) -> bool:
-        if len(data) < 4: return False
+    def _read_exactly(self, buffer: BinaryIO, n: int) -> bytes:
+        data = buffer.read(n)
+        if len(data) < n:
+            raise ProxyError("SOCKS5: invalid response (wrong packet size)")
+        return data
+
+    def _read_connect_response(self, data: bytes) -> None:
         buffer = io.BytesIO(data)
-        socks_ver = buffer.read(1)
-        if not socks_vers: return False
+        (socks_ver,) = self._read_exactly(buffer, 1)
         if socks_ver != socks5.SOCKS_VER:
-            raise ProxyError(f"SOCKS5: unexpected version number {socks_ver:#02X}")
-        reply = buffer.read(1)
-        if not reply: return False
+            raise ProxyError("SOCKS5: unexpected version number")
+        (reply,) = self._read_exactly(buffer, 1)
         if reply != socks5.ReplyCode.GRANTED:
-            error_message = socks5.ReplyMessages.get(self.reply, 'Unknown error')
+            error_message = socks5.ReplyMessages.get(reply, 'Unknown error')
             raise ProxyError(f"SOCKS5: invalid reply code {error_message}")
-        rsv = buffer.read(1)
-        if not rsv: return False
+        (rsv,) = self._read_exactly(buffer, 1)
         if rsv != socks5.RSV:
             raise ProxyError("SOCKS5: invalid reserved byte")
-        addr_type = buffer.read(1)
-        if not addr_type: return False
-        if addr_type == b"\x01":
-            addr = buffer.read(4)
-            if len(addr) < 4: return False
-        elif addr_type == b"\x03":
-            length = buffer.read(1)
-            if len(length) < 1: return False
-            addr = buffer.read(ord(length))
-            if len(addr) < ord(length): return False
-        elif addr_type == b"\x04":
-            addr = buffer.read(16)
-            if len(addr) < 16: return False
+        (addr_type,) = self._read_exactly(buffer, 1)
+        if addr_type == 0x01:
+            self._read_exactly(buffer, 4)
+        elif addr_type == 0x03:
+            length = self._read_exactly(buffer, 1)
+            self._read_exactly(buffer, ord(length))
+        elif addr_type == 0x04:
+            self._read_exactly(buffer, 16)
         else:
             raise ProxyError("SOCKS5: proxy server sent invalid data")
-        port = buffer.read(2)
-        if len(port) < 2: return False
-        struct.unpack(">H", port)
+        self._read_exactly(buffer, 2)
         if buffer.read(1):
-            raise ProxyError("SOCKS5: sent additional data")
-        return True
+            raise ProxyError("SOCKS5: invalid response (excessive data)")
 
     def _kickoff_negotiate(self):
         self._request_auth_methods()
