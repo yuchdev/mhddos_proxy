@@ -200,7 +200,6 @@ async def run_ddos(
             try:
                 await asyncio.sleep(delay_seconds)
                 targets, changed = await targets_loader.load(resolve=True)
-                changed = True
                 if not changed:
                     logger.warning(
                         f"{cl.YELLOW}Перелік цілей не змінився - "
