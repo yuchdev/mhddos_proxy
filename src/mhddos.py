@@ -612,6 +612,7 @@ class AttackSettings:
     TRANSPORT_PROTO = "proto"
 
     connect_timeout_seconds: float
+    dest_connect_timeout_seconds: float
     drain_timeout_seconds: float
     close_timeout_seconds: float
     http_response_timeout_seconds: float
@@ -624,6 +625,7 @@ class AttackSettings:
         *,
         transport: str = "stream",
         connect_timeout_seconds: float = SOCK_TIMEOUT,
+        dest_connect_timeout_seconds: float = SOCK_TIMEOUT,
         drain_timeout_seconds: float = 0.1,
         close_timeout_seconds: float = 1.0,
         http_response_timeout_seconds: float = 15.0,
@@ -634,6 +636,7 @@ class AttackSettings:
     ):
         self.transport = transport
         self.connect_timeout_seconds = connect_timeout_seconds
+        self.dest_connect_timeout_seconds = dest_connect_timeout_seconds
         self.drain_timeout_seconds = drain_timeout_seconds
         self.close_timeout_seconds = close_timeout_seconds
         self.http_response_timeout_seconds = http_response_timeout_seconds
@@ -812,7 +815,7 @@ class AsyncTcpFlood(HttpFlood):
                 self._raw_target,
                 ssl_ctx,
                 downstream_factory=flood_proto,
-                connect_timeout=self._settings.connect_timeout_seconds,
+                connect_timeout=self._settings.dest_connect_timeout_seconds,
             )
             conn = self._loop.create_connection(
                 flood_proto, host=proxy.proxy_host, port=proxy.proxy_port)

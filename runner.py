@@ -289,6 +289,7 @@ async def start(args, shutdown_event: Event):
     attack_settings = AttackSettings(
         requests_per_connection=args.rpc,
         transport=args.advanced_default_transport,
+        dest_connect_timeout_seconds=15,
         drain_timeout_seconds=0.2,
         high_watermark = 1024 << 2, # roughly 4 packets (normally 1024 bytes on a single write)
         # note that "generic flood" attacks switch reading off completely

