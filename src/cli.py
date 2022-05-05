@@ -80,7 +80,7 @@ def init_argparse() -> argparse.ArgumentParser:
     parser.add_argument(
         '--advanced-default-transport',
         type=str,
-        default=AttackSettings.TRANSPORT_STREAM,
+        default=AttackSettings.TRANSPORT_PROTO,
         choices=["stream", "sock", "proto"],
         help='For testing purposes only'
     )
