@@ -19,7 +19,6 @@ except ImportError:
 from .core import logger, PacketPayload, Stats
 
 
-# XXX: how to tigger cancel properly?
 class FloodAttackProtocol(asyncio.Protocol):
 
     def __init__(
@@ -36,6 +35,7 @@ class FloodAttackProtocol(asyncio.Protocol):
         self._payload_size: Optional[int] = len(payload) if isinstance(payload, bytes) else None
         self._settings = settings
         self._on_close: asyncio.Future = on_close
+        self._on_close.add_done_callback(self._handle_cancellation)
         self._transport = None
         self._handle = None
         self._paused: bool = False
@@ -49,6 +49,28 @@ class FloodAttackProtocol(asyncio.Protocol):
         if hasattr(self._transport, "pause_reading"):
             self._transport.pause_reading()
         self._handle = self._loop.call_soon(self._send_packet)
+
+    def data_received(self, data) -> None:
+        pass
+
+    def connection_lost(self, exc) -> None:
+        self._stats.track_close_connection()
+        self._transport = None
+        if self._handle:
+            self._handle.cancel()
+        if self._on_close.done() or self._on_close.cancelled(): return
+        if exc is not None:
+            self._on_close.set_exception(exc)
+        else:
+            self._on_close.set_result(self._return_code)
+
+    def pause_writing(self):
+        self._paused = True
+
+    def resume_writing(self):
+        self._paused = False
+        if self._handle is None and self._budget > 0:
+            self._handle = self._loop.call_soon(self._send_packet)
 
     def _prepare_packet(self) -> Tuple[bytes, int]:
         if self._payload_size is not None:
@@ -73,27 +95,10 @@ class FloodAttackProtocol(asyncio.Protocol):
                 self._handle = None
                 self._transport.close()
 
-    def data_received(self, data) -> None:
-        pass
-
-    def connection_lost(self, exc) -> None:
-        self._stats.track_close_connection()
-        self._transport = None
-        if self._handle:
-            self._handle.cancel()
-        if self._on_close.done(): return
-        if exc is not None:
-            self._on_close.set_exception(exc)
-        else:
-            self._on_close.set_result(self._return_code)
-
-    def pause_writing(self):
-        self._paused = True
-
-    def resume_writing(self):
-        self._paused = False
-        if self._handle is None and self._budget > 0:
-            self._handle = self._loop.call_soon(self._send_packet)
+    def _handle_cancellation(self, on_close):
+        if on_close.cancelled() and self._transport and not self._transport.is_closing:
+            self._transport.abort()
+            self._transport = None
 
 
 class ProxyProtocol(asyncio.Protocol):
@@ -121,6 +126,7 @@ class ProxyProtocol(asyncio.Protocol):
         self._dest = dest
         self._ssl = ssl
         self._on_close = on_close
+        self._on_close.add_done_callback(self._handle_cancellation)
         self._dest_connected = False
         self._dest_connect_timer = None
         self._dest_connect_timeout = connect_timeout
@@ -163,8 +169,14 @@ class ProxyProtocol(asyncio.Protocol):
                 self._negotiate_data_received(data)
             except Exception as exc:
                 logger.debug(f"Processing failed for {self._proxy_url} with {exc}")
-                self._on_close.set_exception(exc)
-                self._transport.abort()
+                if not self._on_close.done():
+                    self._on_close.set_exception(exc)
+                    self._transport.abort()
+
+    def _handle_cancellation(self, on_close):
+        if on_close.cancelled() and self._transport and not self._transport.is_closing:
+            self._transport.abort()
+            self._transport = None
 
     def _dest_connection_made(self):
         assert not self._dest_connected
@@ -197,7 +209,7 @@ class ProxyProtocol(asyncio.Protocol):
         except Exception as exc:
             if not self._on_close.done():
                 self._on_close.set_exception(exc)
-            self._transport.abort()
+                self._transport.abort()
 
     def _abort_connection(self):
         logger.debug(f"Response timeout for {self._proxy_url}")

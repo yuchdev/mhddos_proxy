@@ -44,17 +44,22 @@ class FloodTask:
         return asyncio.create_task(safe_run(self._runnable.run))
 
     async def loop(self) -> None:
-        tasks = set(self._launch_task() for _ in range(self._scale))
-        num_failures = 0
-        while tasks:
-            done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
-            for f in done:
-                num_failures += int(not f.result())
-                if num_failures >= self._failure_budget:
-                    await asyncio.sleep(self._failure_budget_delay)
-                    num_failures = 0
-                pending.add(self._launch_task())
-            tasks = pending
+        try:
+            tasks = set(self._launch_task() for _ in range(self._scale))
+            num_failures = 0
+            while tasks:
+                done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+                for f in done:
+                    num_failures += int(not f.result())
+                    if num_failures >= self._failure_budget:
+                        await asyncio.sleep(self._failure_budget_delay)
+                        num_failures = 0
+                    pending.add(self._launch_task())
+                tasks = pending
+        except asyncio.CancelledError as e:
+            for t in tasks:
+                t.cancel()
+            raise e
 
 
 async def run_ddos(
@@ -195,6 +200,7 @@ async def run_ddos(
             try:
                 await asyncio.sleep(delay_seconds)
                 targets, changed = await targets_loader.load(resolve=True)
+                changed = True
                 if not changed:
                     logger.warning(
                         f"{cl.YELLOW}Перелік цілей не змінився - "

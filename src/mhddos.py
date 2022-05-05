@@ -816,9 +816,14 @@ class AsyncTcpFlood(HttpFlood):
             )
             conn = self._loop.create_connection(
                 flood_proto, host=proxy.proxy_host, port=proxy.proxy_port)
-        async with timeout(self._settings.connect_timeout_seconds):
-            await conn
-        return bool(await on_close)
+        try:
+            async with timeout(self._settings.connect_timeout_seconds):
+                await conn
+        except asyncio.CancelledError as e:
+            on_close.cancel()
+            raise e
+        else:
+            return bool(await on_close)
 
     # XXX: again, with functions it's just a partial
     async def GET(self) -> bool:
