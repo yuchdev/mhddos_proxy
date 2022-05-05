@@ -1,4 +1,5 @@
 import asyncio
+import errno
 from functools import partial
 import io
 import socket
@@ -53,10 +54,15 @@ class FloodAttackProtocol(asyncio.Protocol):
         if self._handle:
             self._handle.cancel()
         if self._on_close.done(): return
-        if exc is not None:
-            self._on_close.set_exception(exc)
-        else:
+        if exc is None:
             self._on_close.set_result(self._return_code)
+        elif isinstance(exc, IOError) and exc.errno == errno.EPIPE:
+            # EPIPE exception here means that the connection was interrupted
+            # we still consider connection to the target "succesful", no need
+            # to bump our failure budget
+            self._on_close.set_result(self._return_code)
+        else:
+            self._on_close.set_exception(exc)
 
     def pause_writing(self):
         self._paused = True
