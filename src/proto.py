@@ -108,6 +108,8 @@ class ProxyProtocol(asyncio.Protocol):
         self._transport = None
         self._downstream_factory = downstream_factory
         self._downstream_protocol = None
+        self._downstream_pause_writing = None
+        self._downstream_resume_writing = None
         self._proxy_url = proxy_url
         self._proxy = proxy
         self._dest = dest
@@ -138,25 +140,17 @@ class ProxyProtocol(asyncio.Protocol):
             self._on_close.set_result(None)
 
     def pause_writing(self):
-        # XXX: dynamically remove to avoid constrant checks
-        if (self._downstream_protocol is not None
-                and hasattr(self._downstream_protocol, "pause_writing")):
-            self._downstream_protocol.pause_writing()
+        if self._downstream_pause_writing is not None:
+            self._downstream_pause_writing()
 
     def resume_writing(self):
-        # XXX: dynamically remove to avoid constrant checks
-        if (self._downstream_protocol is not None
-                and hasattr(self._downstream_protocol, "resume_writing")):
-            self._downstream_protocol.resume_writing()
-    
+        if self._downstream_resume_writing is not None:
+            self._downstream_resume_writing()
+
     def data_received(self, data):
         n_bytes = len(data)
         logger.debug(f"Receieved data from {self._proxy_url} {n_bytes} bytes")
         if self._dest_connected:
-            # XXX: pipeline + chaining?
-            #      ideally we want to avoid number of func calls on each packet
-            #      which means we need to find a way to "replace" protocol
-            #      with it's downstream rather than use additional invocations
             self._downstream_protocol.data_received(data)
         else:
             try:
@@ -170,6 +164,10 @@ class ProxyProtocol(asyncio.Protocol):
         assert not self._dest_connected
         self._dest_connected = True
         self._downstream_protocol = self._downstream_factory()
+        if hasattr(self._downstream_procol, "pause_writing"):
+            self._downstream_pause_writing = self._downstream_protocol.pause_writing
+        if hasattr(self._downstream_procol, "resume_writing"):
+            self._downstream_resume_writing = self._downstream_protocol.resume_writing
         if self._ssl is None:
             self._cancel_dest_connect_timer()
             logger.debug(f"Dest is connected through {self._proxy_url}")
