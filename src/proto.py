@@ -348,11 +348,28 @@ class HttpTunelProtocol(ProxyProtocol):
         self._dest_connect()
 
     def _negotiate_data_received(self, data):
-        # XXX: not sure if it's actually a valid way for doing so
-        # we might get multiple packets
-        # XXX: read headers as well
-        res = http_proto.ConnectResponse(data)
-        res.validate()
+        status_line = io.BytesIO(data).readline().decode("utf-8", "surrogateescape")
+
+        if not status_line:
+            raise ProxyError("HTTP: connection closed unexpectedly")
+
+        status_line = status_line.rstrip()
+        try:
+            proto, status_code, status_msg = status_line.split(" ", 2)
+        except ValueError:
+            raise ProxyError("HTTP: proxy server sent invalid response")
+
+        if not proto.startswith("HTTP/"):
+            raise ProxyError("HTTP: proxy server does not appear to be an HTTP proxy")
+
+        try:
+            status_code = int(status_code)
+        except ValueError:
+            raise ProxyError("HTTP: proxy server did not return a valid HTTP status")
+
+        if status_code not in {200, 201, 204}:
+            raise ProxyError(f"HTTP: proxy server sent non-200 HTTP status {status_line}")
+
         self._dest_connection_made()
 
     def _dest_connect(self):
