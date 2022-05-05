@@ -128,7 +128,7 @@ class TargetsLoader:
     # XXX: fix this to work properly with ETag
     async def _load_config(self) -> List[Target]:
         if not self._config:
-            return [], False
+            return []
 
         config_content = await read_or_fetch(self._config)
         if config_content is None:
