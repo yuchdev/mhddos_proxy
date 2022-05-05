@@ -198,12 +198,13 @@ class ProxyProtocol(asyncio.Protocol):
         self._cancel_dest_connect_timer()
         try:
             transport = task.result()
-            self._downstream_protocol.connection_made(transport)
-            logger.debug(f"Dest is connected through {self._proxy_url}")
         except Exception as exc:
             if not self._on_close.done():
                 self._on_close.set_exception(exc)
                 self._transport.abort()
+        else:
+            self._downstream_protocol.connection_made(transport)
+            logger.debug(f"Dest is connected through {self._proxy_url}")
 
     def _abort_connection(self):
         logger.debug(f"Response timeout for {self._proxy_url}")
@@ -213,7 +214,7 @@ class ProxyProtocol(asyncio.Protocol):
         if self._transport is not None:
             self._transport.abort()
 
-
+# XXX: this could be proper ABC
 class Socks4Protocol(ProxyProtocol):
 
     def _kickoff_negotiate(self):
@@ -247,6 +248,7 @@ class Socks5Protocol(ProxyProtocol):
 
     def _negotiate_data_received(self, data):
         n_bytes = len(data)
+        # XXX: re-write this as a normal FSM
         if self._auth_req_sent and not self._auth_done:
             assert n_bytes == 2
             res = socks5.AuthResponse(data)
