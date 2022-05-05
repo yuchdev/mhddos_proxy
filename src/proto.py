@@ -52,7 +52,7 @@ class FloodAttackProtocol(asyncio.Protocol):
         self._transport = None
         if self._handle:
             self._handle.cancel()
-        if self._on_close.done() or self._on_close.cancelled(): return
+        if self._on_close.done(): return
         if exc is not None:
             self._on_close.set_exception(exc)
         else:
@@ -90,7 +90,7 @@ class FloodAttackProtocol(asyncio.Protocol):
                 self._transport.close()
 
     def _handle_cancellation(self, on_close):
-        if on_close.cancelled() and self._transport and not self._transport.is_closing:
+        if on_close.cancelled() and self._transport and not self._transport.is_closing():
             self._transport.abort()
             self._transport = None
 
