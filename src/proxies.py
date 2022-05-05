@@ -1,10 +1,14 @@
+from collections import defaultdict
 from random import choice, random
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from aiohttp_socks import ProxyConnector
 from yarl import URL
 
-from .core import logger, cl, ONLY_MY_IP, PROXIES_URLS
+from .core import (
+    logger, cl,
+    ONLY_MY_IP, PROXIES_URLS, PROXY_ALIVE_PRIOR, PROXY_ALIVE_THRESHOLD
+)
 from .dns_utils import resolve_all
 from .system import read_or_fetch, fetch
 
@@ -41,7 +45,8 @@ class ProxySet:
         self._proxies_file = proxies_file
         self._skip_ratio = skip_ratio
         self._loaded_proxies = []
-    
+        self._connections = defaultdict(int)
+
     @property
     def has_proxies(self) -> bool:
         return self._skip_ratio != ONLY_MY_IP
@@ -61,12 +66,18 @@ class ProxySet:
         ips = await resolve_all([url.host for url in urls])
         proxies = [str(url.with_host(ips.get(url.host, url.host))) for url in urls]
         self._loaded_proxies = proxies
+        self._connections = defaultdict(int)
         return len(self._loaded_proxies)
 
     def pick_random(self) -> Optional[str]:
         if not self.has_proxies: return None
         if self._skip_ratio > 0 and random() * 100 <= self._skip_ratio: return None
-        return choice(self._loaded_proxies)
+        alive_proxies = self.alive
+        if len(alive_proxies) < PROXY_ALIVE_THRESHOLD or random() > PROXY_ALIVE_PRIOR:
+            return choice(self._loaded_proxies)
+        else:
+            _, proxy_url = choice(alive_proxies)
+            return proxy_url
 
     def pick_random_connector(self) -> Optional[ProxyConnector]:
         proxy_url = self.pick_random()
@@ -76,8 +87,17 @@ class ProxySet:
         if not self.has_proxies: return 0
         return len(self._loaded_proxies)
 
+    def track_alive(self, proxy_url: str) -> None:
+        self._connections[proxy_url] += 1
+
+    @property
+    def alive(self) -> List[Tuple[int, str]]:
+        return sorted([(v,k) for (k,v) in self._connections.items()], reverse=True)
+
 
 class NoProxySet:
+
+    alive = []
 
     @staticmethod
     def pick_random(self) -> Optional[str]:
@@ -90,6 +110,10 @@ class NoProxySet:
     @staticmethod
     def has_proxies(self) -> bool:
         return False
+
+    @staticmethod
+    def track_open_connection(self, proxy_url: str) -> None:
+        pass
 
 
 # XXX: move logging to the runner?

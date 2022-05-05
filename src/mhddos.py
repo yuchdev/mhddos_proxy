@@ -807,7 +807,7 @@ class AsyncTcpFlood(HttpFlood):
                 server_hostname=server_hostname
             )
         else:
-            proxy, proxy_protocol = proto.for_proxy(proxy_url)
+            proxy, proxy_protocol = proto.for_proxy(self._proxies, proxy_url)
             flood_proto = partial(
                 proxy_protocol,
                 self._loop,

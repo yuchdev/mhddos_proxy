@@ -12,6 +12,7 @@ from python_socks.async_.asyncio import Proxy
 from python_socks._proto import socks4, socks5, http as http_proto
 
 from .core import logger, PacketPayload, Stats
+from .proxies import ProxySet
 
 
 class FloodAttackProtocol(asyncio.Protocol):
@@ -102,6 +103,7 @@ class ProxyProtocol(asyncio.Protocol):
 
     def __init__(
         self,
+        proxies: ProxySet,
         proxy_url: str, # XXX: is one is only used for the logging
         proxy: Proxy,
         loop: asyncio.AbstractEventLoop,
@@ -118,6 +120,7 @@ class ProxyProtocol(asyncio.Protocol):
         self._downstream_protocol = None
         self._downstream_pause_writing = None
         self._downstream_resume_writing = None
+        self._proxies = proxies
         self._proxy_url = proxy_url
         self._proxy = proxy
         self._dest = dest
@@ -186,6 +189,7 @@ class ProxyProtocol(asyncio.Protocol):
         if self._ssl is None:
             self._cancel_dest_connect_timer()
             logger.debug(f"Dest is connected through {self._proxy_url}")
+            self._proxies.track_alive(self._proxy_url)
             self._downstream_protocol.connection_made(self._transport)
         else:
             _tls = self._loop.create_task(
@@ -203,6 +207,7 @@ class ProxyProtocol(asyncio.Protocol):
             transport = task.result()
             if not self._transport: return
             if transport:
+                self._proxies.track_alive(self._proxy_url)
                 self._downstream_protocol.connection_made(transport)
                 logger.debug(f"Dest is connected through {self._proxy_url}")
             else:
@@ -391,8 +396,8 @@ _CONNECTORS = {
     HttpProxy:   HttpTunelProtocol,
 }
 
-def for_proxy(proxy_url: str) -> Tuple[Proxy, Callable[[], asyncio.Protocol]]:
+def for_proxy(proxies: ProxySet, proxy_url: str) -> Tuple[Proxy, Callable[[], asyncio.Protocol]]:
     proxy = Proxy.from_url(proxy_url)
     proxy_protocol = _CONNECTORS[type(proxy)]
-    return proxy, partial(proxy_protocol, proxy_url, proxy)
+    return proxy, partial(proxy_protocol, proxies, proxy_url, proxy)
 
