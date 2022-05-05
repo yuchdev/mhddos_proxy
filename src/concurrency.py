@@ -10,8 +10,7 @@ async def safe_run(f) -> Optional[Any]:
         raise e
     except asyncio.TimeoutError:
         return None
-    except Exception as e:
-        print(e)
+    except Exception:
         # XXX: there should be an option to see error
         #      e.g. TRACE level of logging or something
         return None
