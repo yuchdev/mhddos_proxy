@@ -10,12 +10,6 @@ from python_socks.async_.asyncio._proxy import HttpProxy, Socks4Proxy, Socks5Pro
 from python_socks.async_.asyncio import Proxy
 from python_socks._proto import socks4, socks5, http as http_proto
 
-# XXX: decide what to do with this library
-try:
-    from http_parser.parser import HttpParser
-except ImportError:
-    from http_parser.pyparser import HttpParser
-
 from .core import logger, PacketPayload, Stats
 
 
