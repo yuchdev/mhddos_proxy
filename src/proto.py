@@ -216,18 +216,65 @@ class ProxyProtocol(asyncio.Protocol):
         if self._transport is not None:
             self._transport.abort()
 
+
+SOCKS4_ERRORS = {
+    0x5B: "Request rejected or failed",
+    0x5C: ("Request rejected because SOCKS server cannot connect to identd on"
+           " the client"),
+    0x5D: ("Request rejected because the client program and identd report"
+           " different user-ids")
+}
+
+SOCKS5_ERRORS = {
+    0x01: "General SOCKS server failure",
+    0x02: "Connection not allowed by ruleset",
+    0x03: "Network unreachable",
+    0x04: "Host unreachable",
+    0x05: "Connection refused",
+    0x06: "TTL expired",
+    0x07: "Command not supported, or protocol error",
+    0x08: "Address type not supported"
+}
+
+
+class ProxyError(IOError):
+    pass
+
+
 # XXX: this could be proper ABC
 class Socks4Protocol(ProxyProtocol):
 
     def _kickoff_negotiate(self):
         self._dest_connect()
+        self._expected = 8
+        self._buffer: bytes = b''
+        self._size: int = 0
 
     def _negotiate_data_received(self, data):
-        # XXX: what if we get multiple packets?
-        assert len(data) == 8
-        res = socks4.ConnectResponse(data[:2])
-        res.validate()
-        self._dest_connection_made()
+        data = self._feed(data)
+        if data is not None:
+            self._read_response(data)
+            self._dest_connection_made()
+
+    def _read_response(self, data):
+        # we are not validating addr, port pair
+        if data[0:1] != b"\x00":
+            raise ProxyError("SOCKS4: proxy server sent invalid data")
+        status = ord(data[1:2])
+        if status != 0x5A:
+            status_error = SOCKS4_ERRORS.get(status, "Unknown error")
+            raise ProxyError(f"SOCKS4: wrong status {status_error}")
+
+    def _feed(self, data: bytes) -> Optional[bytes]:
+        n_bytes = len(data)
+        if n_bytes > 0: return None
+        if self._size + n_bytes > self._expected:
+            raise ProxyError("SOCKS4: proxy server sent excessive data")
+        if self._size + n_bytes == self._expected:
+            return self._buffer + data
+        self._buffer += data
+        self._size += n_bytes
+        return None
 
     def _dest_connect(self):
         addr, port = self._dest
@@ -244,77 +291,92 @@ class Socks5Protocol(ProxyProtocol):
         super().__init__(*args, **kwargs)
         self._auth_method_req = None
         self._auth_method = None
-        self._auth_req_sent = False
         self._auth_done = False
+        self._auth_req_sent = False
         self._connect_resp_buffer = None
 
     def _negotiate_data_received(self, data):
         n_bytes = len(data)
-        # XXX: re-write this as a normal FSM
-        if self._auth_req_sent and not self._auth_done:
+        if self._auth_method_req is not None and not self._auth_method:
+            # expecting auth method response
+            assert n_bytes == 2
+            res = socks5.AuthMethodsResponse(data)
+            res.validate(request=self._auth_method_req)
+            self._auth_method = res.auth_method
+            if self._auth_method == socks5.AuthMethod.USERNAME_PASSWORD:
+                req = socks5.AuthRequest(
+                    username=self._proxy._username, password=self._proxy._password)
+                self._transport.write(bytes(req))
+                self._auth_req_sent = True
+                logger.debug(f"Sent user/pass for {self._proxy_url}")
+            else:
+                self._auth_done = True
+                logger.debug(f"Auth is ready for {self._proxy_url}")
+                self._dest_connect()
+        elif self._auth_method_req is not None and self._auth_method:
+            # expecting auth response
             assert n_bytes == 2
             res = socks5.AuthResponse(data)
             res.validate()
             self._auth_done = True
             logger.debug(f"Auth is ready for {self._proxy_url}")
             self._dest_connect()
-        elif self._auth_method is None:
-            assert n_bytes == 2
-            res = socks5.AuthMethodsResponse(data)
-            res.validate(request=self._auth_method_req)
-            self._auth_method = res.auth_method
-            if self._auth_method == socks5.AuthMethod.USERNAME_PASSWORD:
-                self._auth_req_sent = True 
-                req = socks5.AuthRequest(
-                    username=self._proxy._username, password=self._proxy._password)
-                self._transport.write(bytes(req))
-                logger.debug(f"Sent user/pass for {self._proxy_url}")
-            else:
-                self._auth_done = True
-                logger.debug(f"Auth is ready for {self._proxy_url}")
-                self._dest_connect()
-        else:
+        elif self._auth_done:
+            # expecting connect response
             resp = self._connect_resp_buffer or b'' 
             resp += data
             if self._read_connect_response(resp):
                 self._dest_connection_made()
             else:
                 self._connect_resp_buffer = resp
+        else:
+            raise ProxyError("SOCKS5: invalid state")
 
+    # XXX: optimize this code (we are re-executing it each time)
+    # XXX: set aggressive timer
     def _read_connect_response(self, data) -> bool:
-        if len(data) < 3: return False
+        if len(data) < 4: return False
         buffer = io.BytesIO(data)
-        # XXX: optimize this code
-        socks5.ConnectResponse(buffer.read(3)).validate()
+        socks_ver = buffer.read(1)
+        if not socks_vers: return False
+        if socks_ver != socks5.SOCKS_VER:
+            raise ProxyError(f"SOCKS5: unexpected version number {socks_ver:#02X}")
+        reply = buffer.read(1)
+        if not reply: return False
+        if reply != socks5.ReplyCode.GRANTED:
+            error_message = socks5.ReplyMessages.get(self.reply, 'Unknown error')
+            raise ProxyError(f"SOCKS5: invalid reply code {error_message}")
+        rsv = buffer.read(1)
+        if not rsv: return False
+        if rsv != socks5.RSV:
+            raise ProxyError("SOCKS5: invalid reserved byte")
         addr_type = buffer.read(1)
         if not addr_type: return False
         if addr_type == b"\x01":
             addr = buffer.read(4)
             if len(addr) < 4: return False
-            socket.inet_ntoa(addr)
         elif addr_type == b"\x03":
             length = buffer.read(1)
             if len(length) < 1: return False
             addr = buffer.read(ord(length))
             if len(addr) < ord(length): return False
-        elif atyp == b"\x04":
+        elif addr_type == b"\x04":
             addr = buffer.read(16)
             if len(addr) < 16: return False
-            socket.inet_ntop(socket.AF_INET6, addr)
         else:
-            raise ValueError("SOCKS5 proxy server sent invalid data")
+            raise ProxyError("SOCKS5: proxy server sent invalid data")
         port = buffer.read(2)
         if len(port) < 2: return False
         struct.unpack(">H", port)
         if buffer.read(1):
-            raise ValueError("SOCKS5 sent additional data")
+            raise ProxyError("SOCKS5: sent additional data")
         return True
 
     def _kickoff_negotiate(self):
         self._request_auth_methods()
 
     def _request_auth_methods(self):
-        assert self._auth_method is None
+        assert self._auth_method_req is None
         self._auth_method_req = socks5.AuthMethodsRequest(
             username=self._proxy._username,
             password=self._proxy._password,
