@@ -16,14 +16,20 @@ try:
 except ImportError:
     from http_parser.pyparser import HttpParser
 
-from .core import logger, PacketPayload
+from .core import logger, PacketPayload, Stats
 
 
 # XXX: how to tigger cancel properly?
-# XXX: type annotations
 class FloodAttackProtocol(asyncio.Protocol):
 
-    def __init__(self, loop, on_close: asyncio.Future, stats, settings, payload: PacketPayload):
+    def __init__(
+        self,
+        loop: asyncio.AbstractEventLoop,
+        on_close: asyncio.Future,
+        stats: Stats,
+        settings: "AttackSettings",
+        payload: PacketPayload
+    ):
         self._loop = loop
         self._stats = stats
         self._payload: PacketPayload = payload
@@ -96,7 +102,7 @@ class ProxyProtocol(asyncio.Protocol):
         self,
         proxy_url: str, # XXX: is one is only used for the logging
         proxy: Proxy,
-        loop,
+        loop: asyncio.AbstractEventLoop,
         on_close: asyncio.Future,
         dest: Tuple[str, int],
         ssl: Optional[SSLContext],
@@ -164,16 +170,15 @@ class ProxyProtocol(asyncio.Protocol):
         assert not self._dest_connected
         self._dest_connected = True
         self._downstream_protocol = self._downstream_factory()
-        if hasattr(self._downstream_procol, "pause_writing"):
+        if hasattr(self._downstream_protocol, "pause_writing"):
             self._downstream_pause_writing = self._downstream_protocol.pause_writing
-        if hasattr(self._downstream_procol, "resume_writing"):
+        if hasattr(self._downstream_protocol, "resume_writing"):
             self._downstream_resume_writing = self._downstream_protocol.resume_writing
         if self._ssl is None:
             self._cancel_dest_connect_timer()
             logger.debug(f"Dest is connected through {self._proxy_url}")
             self._downstream_protocol.connection_made(self._transport)
         else:
-            # XXX: deal with handshake timeout
             _tls = self._loop.create_task(
                 self._loop.start_tls(self._transport, self._downstream_protocol, self._ssl))
             _tls.add_done_callback(self._setup_downstream_tls)
