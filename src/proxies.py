@@ -73,11 +73,11 @@ class ProxySet:
         if not self.has_proxies: return None
         if self._skip_ratio > 0 and random() * 100 <= self._skip_ratio: return None
         alive_proxies = self.alive
-        if len(alive_proxies) < PROXY_ALIVE_THRESHOLD or random() > PROXY_ALIVE_PRIOR:
-            return choice(self._loaded_proxies)
-        else:
+        if len(alive_proxies) > PROXY_ALIVE_THRESHOLD and random() < PROXY_ALIVE_PRIOR:
             _, proxy_url = choice(alive_proxies)
             return proxy_url
+        else:
+            return choice(self._loaded_proxies)
 
     def pick_random_connector(self) -> Optional[ProxyConnector]:
         proxy_url = self.pick_random()
@@ -92,6 +92,7 @@ class ProxySet:
 
     @property
     def alive(self) -> List[Tuple[int, str]]:
+        if PROXY_ALIVE_THRESHOLD == 0: return []
         return sorted([(v,k) for (k,v) in self._connections.items()], reverse=True)
 
 
