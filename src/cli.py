@@ -3,7 +3,7 @@ import random
 from multiprocessing import cpu_count
 
 from .core import THREADS_PER_CORE, MAX_DEFAULT_THREADS, ONLY_MY_IP
-from .mhddos import Methods
+from .mhddos import Methods, AttackSettings
 
 
 def init_argparse() -> argparse.ArgumentParser:
@@ -76,6 +76,13 @@ def init_argparse() -> argparse.ArgumentParser:
         action='store_true',
         default=False,
         help='Advanced setting. Allows the system to switch to the optimized implementation of the event loop (when available)'
+    )
+    parser.add_argument(
+        '--advanced-default-transport',
+        type=str,
+        default=AttackSettings.TRANSPORT_STREAM,
+        choices=["stream", "sock", "proto"],
+        help='For testing purposes only'
     )
 
     parser.add_argument('-p', '--period', type=int, help='DEPRECATED')

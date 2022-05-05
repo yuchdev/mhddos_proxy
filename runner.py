@@ -283,10 +283,11 @@ async def start(args, shutdown_event: Event):
     # (we need to send a lot of small packages rather than buffer data before drain)
     attack_settings = AttackSettings(
         requests_per_connection=args.rpc,
-        transport=AttackSettings.TRANSPORT_STREAM,
+        transport=args.advanced_default_transport,
         drain_timeout_seconds=0.2,
-        high_watermark = 1024 << 4, # roughly 16 packets (normally 1024 bytes on a single write)
-        reader_limit = 1024 << 4,
+        high_watermark = 1024 << 2, # roughly 4 packets (normally 1024 bytes on a single write)
+        # note that "generic flood" attacks switch reading off completely
+        reader_limit = 1024 << 6,
     )
 
     # XXX: with the current implementation there's no need to
