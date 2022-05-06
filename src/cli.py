@@ -84,6 +84,16 @@ def init_argparse() -> argparse.ArgumentParser:
         choices=["stream", "sock", "proto"],
         help='For testing purposes only'
     )
+    parser.add_argument(
+        '--initial-capacity',
+        type=int,
+        default=3,
+    )
+    parser.add_argument(
+        '--fork-scale',
+        type=int,
+        default=2,
+    )
 
     parser.add_argument('-p', '--period', type=int, help='DEPRECATED')
     parser.add_argument('--proxy-timeout', type=float, help='DEPRECATED')

