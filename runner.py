@@ -56,8 +56,8 @@ class ForkJoinTaskSet:
             scale = self._fork_scale if f.result() else 1
         except asyncio.TimeoutError:
             pass
-        except Exception as e:
-            print(e)
+        except Exception:
+            pass
         finally:
             if len(self) >= self._max_capacity - scale:
                 scale = 1
