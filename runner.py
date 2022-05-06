@@ -61,11 +61,11 @@ class ForkJoinTaskSet:
             pass
 
     def _on_finish(self, runnable, f):
+        if f.cancelled(): return
         try:
             f.result()
         finally:
             self._launch(runnable)
-
 
     def append(self, runnable) -> None:
         self._tasks.append(runnable)
@@ -93,11 +93,13 @@ class ForkJoinTaskSet:
                 for _ in range(self._initial_capacity):
                     self._launch(runnable)
             while self._pending:
-                done, pending = await asyncio.wait(
+                done, _ = await asyncio.wait(
                     self._pending, return_when=asyncio.FIRST_COMPLETED)
                 for f in done:
                     try:
                         f.result()
+                    except asyncio.TimeoutError:
+                        pass
                     except Exception as e:
                         pass
                     finally:
