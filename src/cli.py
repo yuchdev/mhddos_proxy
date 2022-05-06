@@ -94,6 +94,11 @@ def init_argparse() -> argparse.ArgumentParser:
         type=int,
         default=2,
     )
+    parser.add_argument(
+        '--failure-delay',
+        type=float,
+        default=0.5,
+    )
 
     parser.add_argument('-p', '--period', type=int, help='DEPRECATED')
     parser.add_argument('--proxy-timeout', type=float, help='DEPRECATED')

@@ -39,9 +39,10 @@ class ForkJoinTaskSet:
         self,
         loop,
         runnables,
-        initial_capacity:int=2,
-        max_capacity:int=10_000,
-        fork_scale:int=2
+        initial_capacity: int = 2,
+        max_capacity: int = 10_000,
+        fork_scale: int = 2,
+        failure_delay: int = 0.25
     ):
         self._loop = loop
         self._tasks = runnables
@@ -50,6 +51,7 @@ class ForkJoinTaskSet:
         self._fork_scale = fork_scale
         self._num_pending: int = 0
         self._pending = set()
+        self._failure_delay: float = failure_delay
 
     def _on_connect(self, runnable, f):
         try:
@@ -65,7 +67,13 @@ class ForkJoinTaskSet:
         if f.cancelled(): return
         try:
             f.result()
-        finally:
+        except asyncio.CancelledError as e:
+            raise e
+        except Exception:
+            self._num_pending += 1
+            self._loop.call_later(
+                self._failure_delay, partial(self._launch, runnable, prealloc=True))
+        else:
             self._launch(runnable)
 
     def append(self, runnable) -> None:
@@ -74,12 +82,13 @@ class ForkJoinTaskSet:
     def __len__(self) -> int:
         return self._num_pending
 
-    def _launch(self, runnable):
+    def _launch(self, runnable, prealloc:bool=False):
         on_connect = self._loop.create_future()
         on_connect.add_done_callback(partial(self._on_connect, runnable))
         task = self._loop.create_task(runnable.run(on_connect))
         task.add_done_callback(partial(self._on_finish, runnable))
-        self._num_pending += 1
+        if not prealloc:
+            self._num_pending += 1
         self._pending.add(task)
 
     async def loop(self) -> None:
@@ -162,6 +171,7 @@ async def run_ddos(
     use_my_ip: int,
     initial_capacity: int,
     fork_scale: int,
+    failure_delay: float,
 ):
     loop = asyncio.get_event_loop()
     statistics = {}
@@ -251,6 +261,7 @@ async def run_ddos(
                 initial_capacity=initial_capacity,
                 max_capacity=total_threads,
                 fork_scale=fork_scale,
+                failure_delay=failure_delay,
             )
             task = loop.create_task(tcp_task_group.loop())
             active_flooder_tasks.append(task)
@@ -418,6 +429,7 @@ async def start(args, shutdown_event: Event):
         use_my_ip,
         args.initial_capacity,
         args.fork_scale,
+        args.failure_delay,
     )
     shutdown_event.set()
 
