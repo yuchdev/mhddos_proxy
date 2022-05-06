@@ -3,7 +3,7 @@ import logging
 import random
 import time
 from pathlib import Path
-from typing import Callable, Tuple, Union
+from typing import Tuple
 
 from colorama import Fore
 
@@ -43,9 +43,6 @@ REFRESH_RATE = 5
 FAILURE_BUDGET_FACTOR = 6
 FAILURE_DELAY_SECONDS = 1
 ONLY_MY_IP = 100
-
-
-PacketPayload = Union[bytes, Callable[[], bytes]]
 
 
 class cl:
