@@ -57,9 +57,9 @@ class ForkJoinTaskSet:
         except asyncio.TimeoutError:
             pass
         except Exception as e:
-            pass
+            print(e)
         finally:
-            if len(self) >= self._max_capacity:
+            if len(self) >= self._max_capacity - scale:
                 scale = 1
             for _ in range(scale):
                 self._launch(runnable)
@@ -83,19 +83,24 @@ class ForkJoinTaskSet:
         # 3) on finish, restart corresponding runner
         #
         # potential improvement: find a way to downscale
-        for runnable in self._tasks:
-            for _ in range(self._initial_capacity):
-                self._launch(runnable)
-        while self._pending:
-            done, pending = await asyncio.wait(
-                self._pending, return_when=asyncio.FIRST_COMPLETED)
-            for f in done:
-                try:
-                    f.result()
-                except Exception as e:
-                    pass
-                finally:
-                    self._pending.remove(f)
+        try:
+            for runnable in self._tasks:
+                for _ in range(self._initial_capacity):
+                    self._launch(runnable)
+            while self._pending:
+                done, pending = await asyncio.wait(
+                    self._pending, return_when=asyncio.FIRST_COMPLETED)
+                for f in done:
+                    try:
+                        f.result()
+                    except Exception as e:
+                        pass
+                    finally:
+                        self._pending.remove(f)
+        except asyncio.CancelledError as e:
+            for task in self._pending:
+                task.cancel()
+            raise e
 
 
 class FloodTaskSet:

@@ -1034,9 +1034,10 @@ class AsyncTcpFlood(HttpFlood):
 
         return await self._generic_flood_proto(_gen())
 
-    async def TCP(self) -> bool:
+    async def TCP(self, on_connect=None) -> bool:
         packet_size = 1024
-        return await self._generic_flood(partial(randbytes, packet_size))
+        return await self._generic_flood_proto(
+            partial(randbytes, packet_size), on_connect=on_connect)
 
 
 class AsyncUdpFlood(Layer4):
