@@ -51,18 +51,21 @@ class ForkJoinTaskSet:
         self._pending = set()
 
     def _on_connect(self, runnable, f):
-        scale = 1
         try:
-            scale = self._fork_scale if f.result() else 1
+            if f.result() and len(self) <= self._max_capacity - self._fork_scale:
+                for _ in range(self._fork_scale):
+                    self._launch(runnable)
         except asyncio.TimeoutError:
             pass
         except Exception:
             pass
+
+    def _on_finish(self, runnable, f):
+        try:
+            f.result()
         finally:
-            if len(self) >= self._max_capacity - scale:
-                scale = 1
-            for _ in range(scale):
-                self._launch(runnable)
+            self._launch(runnable)
+
 
     def append(self, runnable) -> None:
         self._tasks.append(runnable)
@@ -73,7 +76,9 @@ class ForkJoinTaskSet:
     def _launch(self, runnable):
         on_connect = self._loop.create_future()
         on_connect.add_done_callback(partial(self._on_connect, runnable))
-        self._pending.add(self._loop.create_task(runnable.run(on_connect)))
+        task = self._loop.create_task(runnable.run(on_connect))
+        task.add_done_callback(partial(self._on_finish, runnable))
+        self._pending.add(task)
 
     async def loop(self) -> None:
         # the algo:
