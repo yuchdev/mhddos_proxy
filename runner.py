@@ -476,8 +476,10 @@ def _handle_uncaught_exception(loop: asyncio.AbstractEventLoop, context):
     logger.debug(f"Uncaught event loop exception: {error_message}")
 
 
-def _main(args, shutdown_event):
-    if WINDOWS:
+def _main(args, uvloop: bool, shutdown_event: Event) -> None:
+    if uvloop:
+        loop = events.new_event_loop()
+    elif WINDOWS:
         _patch_proactor_connection_lost()
         loop = asyncio.ProactorEventLoop()
         # This is to allow CTRL-C to be detected in a timely fashion,
@@ -496,9 +498,11 @@ def _main(args, shutdown_event):
 if __name__ == '__main__':
     args = init_argparse().parse_args()
 
+    unvloop = False
     if args.advanced_allow_uvloop:
         try:
             __import__("uvloop").install()
+            uvloop = True
             logger.info(
                 f"{cl.GREEN}'uvloop' успішно активований "
                 f"(підвищенна ефективність роботи з мережею){cl.RESET}")
@@ -512,7 +516,7 @@ if __name__ == '__main__':
     try:
         # run event loop in a separate thread to ensure the application
         # exists immediately after Ctrl+C
-        Thread(target=_main, args=(args, shutdown_event), daemon=True).start()
+        Thread(target=_main, args=(args, uvloop, shutdown_event), daemon=True).start()
         # we can do something smarter rather than waiting forever,
         # but as of now it's gonna be consistent with previous version
         while True:

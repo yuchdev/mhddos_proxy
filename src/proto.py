@@ -27,6 +27,7 @@ class FloodOp:
 
 class FloodSpec:
 
+    # XXX: this API might be handy but `isinstance` calls are incredibly slow
     @classmethod
     def from_any(cls, spec, *args) -> FloodSpecGen:
         if isinstance(spec, GeneratorType): return spec
