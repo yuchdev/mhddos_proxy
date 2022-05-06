@@ -350,6 +350,11 @@ async def _windows_support_wakeup():
         await asyncio.sleep(WINDOWS_WAKEUP_SECONDS)
 
 
+def _handle_uncaught_exception(loop: asyncio.AbstractEventLoop, context):
+    error_message = context.get("exception", context["message"])
+    logger.debug(f"Uncaught event loop exception: {error_message}")
+
+
 def _main(args, shutdown_event):
     if WINDOWS:
         _patch_proactor_connection_lost()
@@ -362,6 +367,7 @@ def _main(args, shutdown_event):
         loop = asyncio.SelectorEventLoop(selector)
     else:
         loop = events.new_event_loop()
+    loop.set_exception_handler(_handle_uncaught_exception)
     asyncio.set_event_loop(loop)
     loop.run_until_complete(start(args, shutdown_event))
 
