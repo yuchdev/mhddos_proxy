@@ -198,7 +198,7 @@ async def run_ddos(
                 cycle_start = time.perf_counter()
 
     # setup coroutine to print stats
-    tasks.append(asyncio.ensure_future(stats_printer()))
+    tasks.append(loop.create_task(stats_printer()))
 
     async def reload_targets(delay_seconds: int = 30):
         while True:
@@ -229,7 +229,7 @@ async def run_ddos(
                 )
 
     # setup coroutine to reload targets
-    tasks.append(asyncio.ensure_future(reload_targets(delay_seconds=reload_after)))
+    tasks.append(loop.create_task(reload_targets(delay_seconds=reload_after)))
 
     async def reload_proxies(delay_seconds: int = 30):
         while True:
@@ -251,7 +251,7 @@ async def run_ddos(
 
     # setup coroutine to reload proxies
     if proxies is not None:
-        tasks.append(asyncio.ensure_future(reload_proxies(delay_seconds=reload_after)))
+        tasks.append(loop.create_task(reload_proxies(delay_seconds=reload_after)))
 
     await asyncio.gather(*tasks, return_exceptions=True)
 
