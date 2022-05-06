@@ -5,10 +5,7 @@ from typing import List, Optional, Tuple
 from aiohttp_socks import ProxyConnector
 from yarl import URL
 
-from .core import (
-    logger, cl,
-    ONLY_MY_IP, PROXIES_URLS, PROXY_ALIVE_PRIOR, PROXY_ALIVE_THRESHOLD
-)
+from .core import logger, cl, ONLY_MY_IP, PROXIES_URLS
 from .dns_utils import resolve_all
 from .system import read_or_fetch, fetch
 
@@ -72,12 +69,7 @@ class ProxySet:
     def pick_random(self) -> Optional[str]:
         if not self.has_proxies: return None
         if self._skip_ratio > 0 and random() * 100 <= self._skip_ratio: return None
-        alive_proxies = self.alive
-        if len(alive_proxies) > PROXY_ALIVE_THRESHOLD and random() < PROXY_ALIVE_PRIOR:
-            _, proxy_url = choice(alive_proxies)
-            return proxy_url
-        else:
-            return choice(self._loaded_proxies)
+        return choice(self._loaded_proxies)
 
     def pick_random_connector(self) -> Optional[ProxyConnector]:
         proxy_url = self.pick_random()
@@ -92,7 +84,6 @@ class ProxySet:
 
     @property
     def alive(self) -> List[Tuple[int, str]]:
-        if PROXY_ALIVE_THRESHOLD == 0: return []
         return sorted([(v,k) for (k,v) in self._connections.items()], reverse=True)
 
 
@@ -113,7 +104,7 @@ class NoProxySet:
         return False
 
     @staticmethod
-    def track_open_connection(self, proxy_url: str) -> None:
+    def track_alive(self, proxy_url: str) -> None:
         pass
 
 
