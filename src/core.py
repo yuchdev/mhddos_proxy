@@ -1,6 +1,5 @@
 from asyncio.log import logger as asyncio_logger
 import logging
-import random
 import time
 from pathlib import Path
 from typing import Tuple
@@ -38,7 +37,7 @@ THREADS_PER_CORE = 2000
 MAX_DEFAULT_THREADS = 7500
 CONFIG_FETCH_RETRIES = 3
 CONFIG_FETCH_TIMEOUT = 10
-REFRESH_OVERTIME = 2 # rougly 5 more seconds
+REFRESH_OVERTIME = 2  # roughly 5 more seconds
 REFRESH_RATE = 5
 FAILURE_BUDGET_FACTOR = 6
 FAILURE_DELAY_SECONDS = 1

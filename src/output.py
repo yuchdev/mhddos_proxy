@@ -1,5 +1,4 @@
 import os
-import time
 from typing import Dict, Optional, Tuple
 
 from tabulate import tabulate
@@ -39,7 +38,7 @@ def show_statistic(
                 f"{cl.YELLOW}Ціль:{cl.BLUE} {target.human_repr()}, "
                 f"{cl.YELLOW}Порт:{cl.BLUE} {target.url.port}, "
                 f"{cl.YELLOW}Метод:{cl.BLUE} {method}{method_sig}, "
-                # XXX: add in flight connections to the table
+                # TODO: Add to table? Display connections per second for consistency with other stats?
                 f"{cl.YELLOW}Зʼєднань:{cl.BLUE} {Tools.humanformat(in_flight_conn)}, "
                 f"{cl.YELLOW}Запити:{cl.BLUE} {Tools.humanformat(pps)}/s, "
                 f"{cl.YELLOW}Трафік:{cl.BLUE} {Tools.humanbits(bps)}/s"

