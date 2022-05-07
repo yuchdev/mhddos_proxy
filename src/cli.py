@@ -2,7 +2,10 @@ import argparse
 import random
 from multiprocessing import cpu_count
 
-from .core import THREADS_PER_CORE, MAX_DEFAULT_THREADS, ONLY_MY_IP
+from .core import (
+    THREADS_PER_CORE, MAX_DEFAULT_THREADS, ONLY_MY_IP,
+    SCHEDULER_INITIAL_CAPACITY, SCHEDULER_FORK_SCALE, SCHEDULER_FAILURE_DELAY,
+)
 from .mhddos import Methods, AttackSettings
 
 
@@ -83,6 +86,24 @@ def init_argparse() -> argparse.ArgumentParser:
         default=AttackSettings.TRANSPORT_PROTO,
         choices=["stream", "sock", "proto"],
         help='For testing purposes only'
+    )
+    parser.add_argument(
+        '--scheduler-initial-capacity',
+        type=int,
+        default=SCHEDULER_INITIAL_CAPACITY,
+        help='How many tasks per target to initialize on launch',
+    )
+    parser.add_argument(
+        '--scheduler-fork-scale',
+        type=int,
+        default=SCHEDULER_FORK_SCALE,
+        help='How many tasks to fork on succesful connect to the target',
+    )
+    parser.add_argument(
+        '--scheduler-failure-delay',
+        type=float,
+        default=SCHEDULER_FAILURE_DELAY,
+        help='Time delay before re-launching failed tasks (seconds)',
     )
 
     parser.add_argument('-p', '--period', type=int, help='DEPRECATED')

