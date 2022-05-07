@@ -33,7 +33,7 @@ WINDOWS_WAKEUP_SECONDS = 0.5
 AsyncFlood = Union[AsyncTcpFlood, AsyncUdpFlood]
 
 
-class ForkJoinTaskSet:
+class GeminoCurseTaskSet:
 
     def __init__(
         self,
@@ -50,9 +50,9 @@ class ForkJoinTaskSet:
         self._max_capacity = max_capacity
         self._fork_scale = fork_scale
         self._num_pending: int = 0
-        # self._pending = set()
         self._pending = asyncio.Queue()
         self._failure_delay: float = failure_delay
+        self._shutdown: bool = False
 
     def _on_connect(self, runnable, f):
         try:
@@ -86,14 +86,14 @@ class ForkJoinTaskSet:
     def __len__(self) -> int:
         return self._num_pending
 
-    def _launch(self, runnable, prealloc: bool = False):
+    def _launch(self, runnable, prealloc: bool = False) -> None:
+        if self._shutdown: return
         on_connect = self._loop.create_future()
         on_connect.add_done_callback(partial(self._on_connect, runnable))
         task = self._loop.create_task(runnable.run(on_connect))
         task.add_done_callback(partial(self._on_finish, runnable))
         if not prealloc:
             self._num_pending += 1
-        # self._pending.add(task)
         self._pending.put_nowait(task)
 
     async def loop(self) -> None:
@@ -104,34 +104,25 @@ class ForkJoinTaskSet:
         # 3) on finish, restart corresponding runner
         #
         # potential improvement: find a way to downscale
+        assert not self._shutdown, "Can only be used once"
         try:
             for runnable in self._tasks:
                 for _ in range(self._initial_capacity):
                     self._launch(runnable)
             await self._pending.join()
-            """
-            while self._pending:
-                done, _ = await asyncio.wait(
-                    self._pending, return_when=asyncio.FIRST_COMPLETED)
-                for f in done:
-                    try:
-                        f.result()
-                    except asyncio.TimeoutError:
-                        pass
-                    except asyncio.CancelledError as e:
-                        raise e
-                    except Exception as e:
-                        pass
-                    finally:
-                        self._num_pending -= int(f in self._pending)
-                        self._pending.remove(f)
-            """
         except asyncio.CancelledError as e:
-            for task in self._pending:
-                task.cancel()
+            self._shutdown = True
+            while True:
+                try:
+                    task = self._queue.get_nowait()
+                    task.cancel()
+                except asyncio.QueueEmpty:
+                    break
             raise e
 
 
+# XXX: this is going to be used for UDP tasks only, maybe it's better
+#      to rename it properly
 class FloodTaskSet:
 
     def __init__(self, loop: asyncio.AbstractEventLoop, runnable: AsyncFlood, scale: int = 1):
@@ -232,6 +223,7 @@ async def run_ddos(
 
     async def install_targets(targets):
         nonlocal tcp_task_group
+
         # cancel running flooders
         if active_flooder_tasks:
             for task in active_flooder_tasks:
@@ -259,11 +251,8 @@ async def run_ddos(
             else:
                 logger.error(f"Unsupported scheme given: {target.url.scheme}")
 
-        # num_tcp = len(tcp_flooders)
-        # scale = max(1, (total_threads // num_tcp) if num_tcp > 0 else 0)
-        
         if tcp_flooders:
-            tcp_task_group = ForkJoinTaskSet(
+            tcp_task_group = GeminoCurseTaskSet(
                 loop,
                 runnables=tcp_flooders,
                 initial_capacity=initial_capacity,
@@ -275,11 +264,6 @@ async def run_ddos(
             active_flooder_tasks.append(task)
         else:
             tcp_task_group = None
-
-        # for flooder in tcp_flooders:
-            # task = loop.create_task(FloodTaskSet(loop, flooder, scale).loop())
-            # XXX: add stats for running/cancelled tasks with add_done_callback
-            # active_flooder_tasks.append(task)
 
         for flooder in udp_flooders:
             task = loop.create_task(FloodTaskSet(loop, flooder).loop())
