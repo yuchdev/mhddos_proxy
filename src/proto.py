@@ -90,7 +90,7 @@ class FloodIO(asyncio.Protocol):
         # read from the network. in such a case, use of operations like
         # read(1) does not make much of sense (as the data is already
         # buffered anyways)
-        if False and hasattr(self._transport, "pause_reading"):
+        if hasattr(self._transport, "pause_reading"):
             self._transport.pause_reading()
         if self._read_waiting:
             self._read_waiting = False
@@ -123,9 +123,11 @@ class FloodIO(asyncio.Protocol):
     def resume_writing(self):
         self._paused = False
         if self._handle is None:
+            # XXX: there's an interesting race condition here
+            #      as it might happen multiple times
             self._handle = self._loop.call_soon(self._step)
 
-    def _step(self) -> None:
+    def _step(self, resumed: bool = False) -> None:
         if not self._transport: return
         # XXX: replace with on_dest_connected future
         #      (how nice would it be to have completion futures with stages)
