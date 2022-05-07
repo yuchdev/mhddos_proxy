@@ -49,7 +49,8 @@ class GeminoCurseTaskSet:
         self._initial_capacity = initial_capacity
         self._max_capacity = max_capacity
         self._fork_scale = fork_scale
-        self._pending = asyncio.Queue()
+        #:self._pending = asyncio.Queue()
+        self._pending = set()
         self._failure_delay: float = failure_delay
         self._shutdown: bool = False
 
@@ -64,26 +65,26 @@ class GeminoCurseTaskSet:
             pass
 
     def _on_finish(self, runnable, f):
+        self._pending.remove(f)
         try:
             f.result()
         except asyncio.CancelledError as e:
-            return
             raise e
         finally:
             self._launch(runnable)
 
-    def append(self, runnable) -> None:
-        self._tasks.append(runnable)
-
     def __len__(self) -> int:
-        return self._pending.qsize()
+        # return self._pending.qsize()
+        return len(self._pending)
 
     def _launch(self, runnable, prealloc: bool = False) -> None:
         if self._shutdown: return
         on_connect = self._loop.create_future()
         on_connect.add_done_callback(partial(self._on_connect, runnable))
         task = self._loop.create_task(runnable.run(on_connect))
-        self._pending.put_nowait((task, runnable))
+        task.add_done_callback(partial(self._on_finish, runnable))
+        self._pending.add(task)
+        # self._pending.put_nowait((task, runnable))
 
     async def loop(self) -> None:
         # the algo:
@@ -94,10 +95,13 @@ class GeminoCurseTaskSet:
         #
         # potential improvement: find a way to downscale
         assert not self._shutdown, "Can only be used once"
+        on_shutdown = asyncio.Event()
         try:
             for runnable in self._tasks:
                 for _ in range(self._initial_capacity):
                     self._launch(runnable)
+            await on_shutdown
+            """
             while True:
                 (on_done, runnable) = await self._pending.get()
                 try:
@@ -107,6 +111,7 @@ class GeminoCurseTaskSet:
                 finally:
                     self._pending.task_done()
                     self._launch(runnable)
+            """
         except asyncio.CancelledError as e:
             self._shutdown = True
             while True:
