@@ -49,7 +49,6 @@ class GeminoCurseTaskSet:
         self._initial_capacity = initial_capacity
         self._max_capacity = max_capacity
         self._fork_scale = fork_scale
-        #:self._pending = asyncio.Queue()
         self._pending = set()
         self._failure_delay: float = failure_delay
         self._shutdown: bool = False
@@ -69,12 +68,11 @@ class GeminoCurseTaskSet:
         try:
             f.result()
         except asyncio.CancelledError as e:
-            raise e
+            return
         finally:
             self._launch(runnable)
 
     def __len__(self) -> int:
-        # return self._pending.qsize()
         return len(self._pending)
 
     def _launch(self, runnable, prealloc: bool = False) -> None:
@@ -84,7 +82,6 @@ class GeminoCurseTaskSet:
         task = self._loop.create_task(runnable.run(on_connect))
         task.add_done_callback(partial(self._on_finish, runnable))
         self._pending.add(task)
-        # self._pending.put_nowait((task, runnable))
 
     async def loop(self) -> None:
         # the algo:
@@ -100,26 +97,12 @@ class GeminoCurseTaskSet:
             for runnable in self._tasks:
                 for _ in range(self._initial_capacity):
                     self._launch(runnable)
-            await on_shutdown
-            """
-            while True:
-                (on_done, runnable) = await self._pending.get()
-                try:
-                    await on_done
-                except Exception:
-                    pass
-                finally:
-                    self._pending.task_done()
-                    self._launch(runnable)
-            """
+            while not on_shutdown.is_set():
+                await asyncio.sleep(WINDOWS_WAKEUP_SECONDS)
         except asyncio.CancelledError as e:
             self._shutdown = True
-            while True:
-                try:
-                    task = self._queue.get_nowait()
-                    task.cancel()
-                except asyncio.QueueEmpty:
-                    break
+            for task in self._pending:
+                task.cancel()
             raise e
 
 
