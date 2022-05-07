@@ -51,7 +51,7 @@ class GeminoCurseTaskSet:
         self._fork_scale = fork_scale
         self._pending = set()
         self._failure_delay: float = failure_delay
-        self._shutdown: bool = False
+        self._shutdown_event = asyncio.Event()
 
     def _on_connect(self, runnable, f):
         try:
@@ -76,7 +76,7 @@ class GeminoCurseTaskSet:
         return len(self._pending)
 
     def _launch(self, runnable, prealloc: bool = False) -> None:
-        if self._shutdown: return
+        if self._shutdown_event.is_set(): return
         on_connect = self._loop.create_future()
         on_connect.add_done_callback(partial(self._on_connect, runnable))
         task = self._loop.create_task(runnable.run(on_connect))
@@ -91,16 +91,15 @@ class GeminoCurseTaskSet:
         # 3) on finish, restart corresponding runner
         #
         # potential improvement: find a way to downscale
-        assert not self._shutdown, "Can only be used once"
-        on_shutdown = asyncio.Event()
+        assert not self._shutdown_event.is_set(), "Can only be used once"
         try:
             for runnable in self._tasks:
                 for _ in range(self._initial_capacity):
                     self._launch(runnable)
-            while not on_shutdown.is_set():
+            while not self._shutdown_event.is_set():
                 await asyncio.sleep(WINDOWS_WAKEUP_SECONDS)
         except asyncio.CancelledError as e:
-            self._shutdown = True
+            self._shutdown_event.set()
             for task in self._pending:
                 task.cancel()
             raise e
