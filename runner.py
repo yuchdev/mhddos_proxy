@@ -9,7 +9,7 @@ import socket
 import sys
 import time
 from threading import Event, Thread
-from typing import List, Union
+from typing import List, Set, Union
 
 from src.cli import init_argparse
 from src.concurrency import safe_run
@@ -45,9 +45,9 @@ class GeminoCurseTaskSet:
         self._initial_capacity = initial_capacity
         self._max_capacity = max_capacity
         self._fork_scale = fork_scale
-        self._pending = set()
+        self._pending: Set[asyncio.Task] = set()
         self._failure_delay: float = failure_delay
-        self._shutdown_event = asyncio.Event()
+        self._shutdown_event: asyncio.Event = asyncio.Event()
 
     def _on_connect(self, runnable, f):
         try:
