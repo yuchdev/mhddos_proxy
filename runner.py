@@ -69,13 +69,13 @@ class GeminoCurseTaskSet:
             f.result()
         except asyncio.CancelledError as e:
             return
-        finally:
+        else:
             self._launch(runnable)
 
     def __len__(self) -> int:
         return len(self._pending)
 
-    def _launch(self, runnable, prealloc: bool = False) -> None:
+    def _launch(self, runnable) -> None:
         if self._shutdown_event.is_set(): return
         on_connect = self._loop.create_future()
         on_connect.add_done_callback(partial(self._on_connect, runnable))
