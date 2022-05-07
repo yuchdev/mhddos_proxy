@@ -50,7 +50,8 @@ class ForkJoinTaskSet:
         self._max_capacity = max_capacity
         self._fork_scale = fork_scale
         self._num_pending: int = 0
-        self._pending = set()
+        # self._pending = set()
+        self._pending = asyncio.Queue()
         self._failure_delay: float = failure_delay
 
     def _on_connect(self, runnable, f):
@@ -65,6 +66,7 @@ class ForkJoinTaskSet:
 
     def _on_finish(self, runnable, f):
         if f.cancelled(): return
+        self._num_pending -= 1
         try:
             f.result()
         except asyncio.CancelledError as e:
@@ -75,6 +77,8 @@ class ForkJoinTaskSet:
                 self._failure_delay, partial(self._launch, runnable, prealloc=True))
         else:
             self._launch(runnable)
+        finally:
+            self._pending.task_done()
 
     def append(self, runnable) -> None:
         self._tasks.append(runnable)
@@ -82,14 +86,15 @@ class ForkJoinTaskSet:
     def __len__(self) -> int:
         return self._num_pending
 
-    def _launch(self, runnable, prealloc:bool=False):
+    def _launch(self, runnable, prealloc: bool = False):
         on_connect = self._loop.create_future()
         on_connect.add_done_callback(partial(self._on_connect, runnable))
         task = self._loop.create_task(runnable.run(on_connect))
         task.add_done_callback(partial(self._on_finish, runnable))
         if not prealloc:
             self._num_pending += 1
-        self._pending.add(task)
+        # self._pending.add(task)
+        self._pending.put_nowait(task)
 
     async def loop(self) -> None:
         # the algo:
@@ -103,6 +108,8 @@ class ForkJoinTaskSet:
             for runnable in self._tasks:
                 for _ in range(self._initial_capacity):
                     self._launch(runnable)
+            await self._pending.join()
+            """
             while self._pending:
                 done, _ = await asyncio.wait(
                     self._pending, return_when=asyncio.FIRST_COMPLETED)
@@ -118,6 +125,7 @@ class ForkJoinTaskSet:
                     finally:
                         self._num_pending -= int(f in self._pending)
                         self._pending.remove(f)
+            """
         except asyncio.CancelledError as e:
             for task in self._pending:
                 task.cancel()
