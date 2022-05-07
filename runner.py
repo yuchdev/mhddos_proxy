@@ -490,7 +490,7 @@ def _main(args, uvloop: bool, shutdown_event: Event) -> None:
 if __name__ == '__main__':
     args = init_argparse().parse_args()
 
-    unvloop = False
+    uvloop = False
     if args.advanced_allow_uvloop:
         try:
             __import__("uvloop").install()
