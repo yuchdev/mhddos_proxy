@@ -2,9 +2,7 @@ import asyncio
 import errno
 from functools import partial
 import io
-import socket
 from ssl import SSLContext
-import struct
 from types import GeneratorType
 from typing import Any, BinaryIO, Callable, Generator, Optional, Tuple
 
@@ -29,9 +27,12 @@ class FloodSpec:
 
     @classmethod
     def from_any(cls, spec, *args) -> FloodSpecGen:
-        if isinstance(spec, GeneratorType): return spec
-        if isinstance(spec, bytes): return cls.from_static(spec, *args)
-        if callable(spec): return cls.from_callable(spec, *args)
+        if isinstance(spec, GeneratorType):
+            return spec
+        if isinstance(spec, bytes):
+            return cls.from_static(spec, *args)
+        if callable(spec):
+            return cls.from_callable(spec, *args)
         raise ValueError(f"Don't know how to create spec from {type(spec)}")
 
     @staticmethod
@@ -138,7 +139,7 @@ class FloodIO(asyncio.Protocol):
                     self._handle = self._loop.call_soon(self._step)
             elif op == FloodOp.SLEEP:
                 self._handle = self._loop.call_later(args, self._step)
-            elif op == FLoodOp.READ:
+            elif op == FloodOp.READ:
                 # XXX: what about read timeout, do we even need it?
                 #      (it might be okay as long as connection is consumed)
                 self._read_waiting = True
@@ -161,7 +162,7 @@ class ProxyProtocol(asyncio.Protocol):
     def __init__(
         self,
         proxies: ProxySet,
-        proxy_url: str, # XXX: is one is only used for the logging
+        proxy_url: str,  # XXX: is one is only used for the logging
         proxy: Proxy,
         loop: asyncio.AbstractEventLoop,
         on_close: asyncio.Future,
@@ -197,12 +198,16 @@ class ProxyProtocol(asyncio.Protocol):
             self._dest_connect_timeout, self._abort_connection)
         self._kickoff_negotiate()
 
+    def _kickoff_negotiate(self):
+        raise NotImplemented
+
     def connection_lost(self, exc):
         logger.debug(f"Disconnected from {self._proxy_url} {exc}")
         self._transport = None
         if self._downstream_protocol is not None:
             self._downstream_protocol.connection_lost(exc)
-        if self._on_close.done(): return
+        if self._on_close.done():
+            return
         if exc is not None:
             self._on_close.set_exception(exc)
         else:
@@ -229,6 +234,9 @@ class ProxyProtocol(asyncio.Protocol):
                 if not self._on_close.done():
                     self._on_close.set_exception(exc)
                     self._transport.abort()
+
+    def _negotiate_data_received(self, data):
+        raise NotImplemented
 
     def eof_received(self):
         if self._downstream_protocol is not None:
@@ -281,7 +289,7 @@ class ProxyProtocol(asyncio.Protocol):
     def _abort_connection(self):
         logger.debug(f"Response timeout for {self._proxy_url}")
         if not self._on_close.done():
-            # XXX: msot likely this should be timeout exception rather than None
+            # XXX: most likely this should be timeout exception rather than None
             self._on_close.set_result(None)
         if self._transport is not None:
             self._transport.abort()
