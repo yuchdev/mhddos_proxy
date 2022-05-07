@@ -49,14 +49,13 @@ class GeminoCurseTaskSet:
         self._initial_capacity = initial_capacity
         self._max_capacity = max_capacity
         self._fork_scale = fork_scale
-        self._num_pending: int = 0
         self._pending = asyncio.Queue()
         self._failure_delay: float = failure_delay
         self._shutdown: bool = False
 
     def _on_connect(self, runnable, f):
         try:
-            if f.result() and self._num_pending <= self._max_capacity - self._fork_scale:
+            if f.result() and len(self) <= self._max_capacity - self._fork_scale:
                 for _ in range(self._fork_scale):
                     self._launch(runnable)
         except asyncio.TimeoutError:
@@ -65,36 +64,26 @@ class GeminoCurseTaskSet:
             pass
 
     def _on_finish(self, runnable, f):
-        if f.cancelled(): return
-        self._num_pending -= 1
         try:
             f.result()
         except asyncio.CancelledError as e:
+            return
             raise e
-        except Exception:
-            self._num_pending += 1
-            self._loop.call_later(
-                self._failure_delay, partial(self._launch, runnable, prealloc=True))
-        else:
-            self._launch(runnable)
         finally:
-            self._pending.task_done()
+            self._launch(runnable)
 
     def append(self, runnable) -> None:
         self._tasks.append(runnable)
 
     def __len__(self) -> int:
-        return self._num_pending
+        return self._pending.qsize()
 
     def _launch(self, runnable, prealloc: bool = False) -> None:
         if self._shutdown: return
         on_connect = self._loop.create_future()
         on_connect.add_done_callback(partial(self._on_connect, runnable))
         task = self._loop.create_task(runnable.run(on_connect))
-        task.add_done_callback(partial(self._on_finish, runnable))
-        if not prealloc:
-            self._num_pending += 1
-        self._pending.put_nowait(task)
+        self._pending.put_nowait((task, runnable))
 
     async def loop(self) -> None:
         # the algo:
@@ -109,7 +98,15 @@ class GeminoCurseTaskSet:
             for runnable in self._tasks:
                 for _ in range(self._initial_capacity):
                     self._launch(runnable)
-            await self._pending.join()
+            while True:
+                (on_done, runnable) = await self._pending.get()
+                try:
+                    await on_done
+                except Exception:
+                    pass
+                finally:
+                    self._pending.task_done()
+                    self._launch(runnable)
         except asyncio.CancelledError as e:
             self._shutdown = True
             while True:
