@@ -419,9 +419,9 @@ async def start(args, shutdown_event: Event):
         args.table,
         args.threads,
         use_my_ip,
-        args.initial_capacity,
-        args.fork_scale,
-        args.failure_delay,
+        args.scheduler_initial_capacity,
+        args.scheduler_fork_scale,
+        args.scheduler_failure_delay,
     )
     shutdown_event.set()
 
