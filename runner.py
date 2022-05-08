@@ -12,7 +12,7 @@ from src.cli import init_argparse
 from src.core import (
     logger, cl,
     IT_ARMY_CONFIG_URL, REFRESH_OVERTIME, REFRESH_RATE, ONLY_MY_IP,
-    FAILURE_BUDGET_FACTOR, FAILURE_DELAY_SECONDS,
+    FAILURE_BUDGET_FACTOR, FAILURE_DELAY_SECONDS, SCHEDULER_MIN_INIT_FRACTION
 )
 from src.mhddos import main as mhddos_main, AsyncTcpFlood, AsyncUdpFlood, AttackSettings
 from src.output import print_progress, show_statistic, print_banner
@@ -210,10 +210,18 @@ async def run_ddos(
                     f"максимально дозволену: -t={total_threads}.{cl.RESET}"
                 )
 
+            # adjust settings to avoid situation when we have just a few
+            # targets in the config (in this case with default CLI settings you are
+            # going to start scaling from 3-15 tasks to 7_500)
+            adjusted_capacity = max(
+                initial_capacity,
+                int(SCHEDULER_MIN_INIT_FRACTION * total_threads / num_flooders)
+            )
+
             tcp_task_group = GeminoCurseTaskSet(
                 loop,
                 runnables=tcp_flooders,
-                initial_capacity=initial_capacity,
+                initial_capacity=adjusted_capacity,
                 max_capacity=total_threads,
                 fork_scale=fork_scale,
                 failure_delay=failure_delay,
