@@ -12,7 +12,6 @@ from threading import Event, Thread
 from typing import List, Set, Union
 
 from src.cli import init_argparse
-from src.concurrency import safe_run
 from src.core import (
     logger, cl,
     LOW_RPC, IT_ARMY_CONFIG_URL, REFRESH_OVERTIME, REFRESH_RATE, ONLY_MY_IP,
