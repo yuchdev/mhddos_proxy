@@ -365,6 +365,11 @@ async def start(args, shutdown_event: Event):
     shutdown_event.set()
 
 
+def _main(args, shutdown_event, uvloop):
+    loop = setup_event_loop(uvloop)
+    loop.run_until_complete(start(args, shutdown_event))
+
+
 def main():
     args = init_argparse().parse_args()
 
@@ -383,8 +388,7 @@ def main():
     try:
         # run event loop in a separate thread to ensure the application
         # exists immediately after Ctrl+C
-        loop = setup_event_loop(uvloop)
-        Thread(target=loop.run_until_complete, args=[start(args, shutdown_event)], daemon=True).start()
+        Thread(target=_main, args=[args, shutdown_event, uvloop], daemon=True).start()
         # we can do something smarter rather than waiting forever,
         # but as of now it's gonna be consistent with previous version
         while True:
