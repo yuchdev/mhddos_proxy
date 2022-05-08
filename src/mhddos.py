@@ -32,7 +32,7 @@ from requests import Response, Session, cookies
 from yarl import URL
 
 from .ImpactPacket import IP, TCP, UDP, Data
-from .core import cl, logger, ROOT_DIR, Stats
+from .core import cl, logger, ROOT_DIR
 from .proxies import ProxySet, NoProxySet
 
 from . import proto
@@ -40,6 +40,7 @@ from .proto import FloodIO, FloodOp, FloodSpec
 from .referers import REFERERS
 from .useragents import USERAGENTS
 from .rotate import suffix as rotate_suffix, params as rotate_params
+from .targets import TargetStats
 
 
 USERAGENTS = list(USERAGENTS)
@@ -132,14 +133,14 @@ class Tools:
         return (url, ip), proxies
 
     @staticmethod
-    def send(sock: socket, packet: bytes, stats: Stats):
+    def send(sock: socket, packet: bytes, stats: TargetStats):
         if not sock.send(packet):
             return False
         stats.track(1, len(packet))
         return True
 
     @staticmethod
-    def sendto(sock, packet, target, stats: Stats):
+    def sendto(sock, packet, target, stats: TargetStats):
         if not sock.sendto(packet, target):
             return False
         stats.track(1, len(packet))
@@ -229,7 +230,7 @@ class Layer4:
         method: str,
         event: Event,
         proxies: ProxySet,
-        stats: Stats,
+        stats: TargetStats,
     ):
         self._amp_payload = None
         self._amp_payloads = cycle([])
@@ -421,7 +422,7 @@ class HttpFlood:
         useragents: List[str],
         referers: List[str],
         proxies: ProxySet,
-        stats: Stats
+        stats: TargetStats
     ) -> None:
         self.SENT_FLOOD = None
         self._event = event

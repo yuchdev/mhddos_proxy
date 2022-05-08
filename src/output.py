@@ -1,11 +1,11 @@
 import os
-from typing import Dict, Optional, Tuple
+from typing import List, Optional
 
 from tabulate import tabulate
 
-from .core import cl, logger, THREADS_PER_CORE, Stats
+from .core import cl, logger, THREADS_PER_CORE
 from .mhddos import Tools
-from .targets import Target
+from .targets import Target, TargetStats
 
 
 def cls():
@@ -13,7 +13,7 @@ def cls():
 
 
 def show_statistic(
-    statistics: Dict[Tuple[Target, str], Stats],
+    statistics: List[TargetStats],
     table: bool,
     use_my_ip: int,
     num_proxies: int,
@@ -22,7 +22,8 @@ def show_statistic(
 ):
     tabulate_text = []
     total_pps, total_bps, total_in_flight = 0, 0, 0
-    for (target, method, sig), stats in statistics.items():
+    for stats in statistics:
+        (target, method, sig) = stats.target
         method_sig = f" ({sig})" if sig is not None else ""
         pps, bps, in_flight_conn = stats.reset()
         total_pps += pps

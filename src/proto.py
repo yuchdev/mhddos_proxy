@@ -10,8 +10,9 @@ from python_socks.async_.asyncio._proxy import HttpProxy, Socks4Proxy, Socks5Pro
 from python_socks.async_.asyncio import Proxy
 from python_socks._proto import socks4, socks5, http as http_proto
 
-from .core import logger, Stats
+from .core import logger
 from .proxies import ProxySet
+from .targets import TargetStats
 
 
 FloodSpecGen = Generator[Tuple[int, Any], None, None]
@@ -55,7 +56,7 @@ class FloodIO(asyncio.Protocol):
         self,
         loop: asyncio.AbstractEventLoop,
         on_close: asyncio.Future,
-        stats: Stats,
+        stats: TargetStats,
         settings: "AttackSettings",
         flood_spec: FloodSpecGen,
         on_connect = None

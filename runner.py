@@ -14,7 +14,7 @@ from typing import List, Set, Union
 from src.cli import init_argparse
 from src.concurrency import safe_run
 from src.core import (
-    logger, cl, Stats,
+    logger, cl,
     LOW_RPC, IT_ARMY_CONFIG_URL, REFRESH_OVERTIME, REFRESH_RATE, ONLY_MY_IP,
     FAILURE_BUDGET_FACTOR, FAILURE_DELAY_SECONDS,
 )
@@ -132,7 +132,7 @@ async def run_ddos(
     failure_delay: float,
 ):
     loop = asyncio.get_event_loop()
-    statistics = {}
+    stats = []
 
     # initial set of proxies
     if proxies.has_proxies:
@@ -142,9 +142,8 @@ async def run_ddos(
             exit()
 
     def prepare_flooder(target: Target, method: str) -> Union[AsyncUdpFlood, AsyncTcpFlood]:
-        thread_statistics = Stats()
-        sig = target.options_repr
-        statistics[(target, method, sig)] = thread_statistics
+        target_stats = target.create_stats(method)
+        stats.append(target_stats)
         if target.has_options:
             target_rpc = int(target.option(Target.OPTION_RPC, "0"))
             settings = attack_settings.with_options(
@@ -160,7 +159,7 @@ async def run_ddos(
             'ip': target.addr,
             'method': method,
             'event': None,
-            'stats': thread_statistics,
+            'stats': target_stats,
             'proxies': proxies,
             'loop': loop,
             'settings': settings,
@@ -189,7 +188,7 @@ async def run_ddos(
                 task.cancel()
             active_flooder_tasks.clear()
 
-        statistics.clear()
+        stats.clear()
 
         tcp_flooders, udp_flooders = [], []
         for target in targets:
@@ -249,7 +248,7 @@ async def run_ddos(
                 passed = time.perf_counter() - cycle_start
                 num_proxies = len(proxies)
                 show_statistic(
-                    statistics,
+                    stats,
                     table,
                     use_my_ip,
                     num_proxies,

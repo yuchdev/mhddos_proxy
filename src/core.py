@@ -1,8 +1,6 @@
 from asyncio.log import logger as asyncio_logger
 import logging
-import time
 from pathlib import Path
-from typing import Tuple
 
 from colorama import Fore
 
@@ -55,29 +53,3 @@ class cl:
     RED = Fore.LIGHTRED_EX
     RESET = Fore.RESET
 
-
-class Stats:
-    def __init__(self):
-        self._requests: int = 0
-        self._bytes: int = 0
-        self._conns: int = 0
-        self._reset_at = time.perf_counter()
-
-    def get(self) -> Tuple[int, int]:
-        return self._requests, self._bytes
-
-    def track(self, rs: int, bs: int) -> None:
-        self._requests += rs
-        self._bytes += bs
-
-    def track_open_connection(self) -> None:
-        self._conns += 1
-
-    def track_close_connection(self) -> None:
-        self._conns -= 1
-
-    def reset(self) -> Tuple[int, int, int]:
-        sent_requests, sent_bytes, prev_reset_at = self._requests, self._bytes, self._reset_at
-        self._requests, self._bytes, self._reset_at = 0, 0, time.perf_counter()
-        interval = self._reset_at - prev_reset_at
-        return int(sent_requests / interval), int(8 * sent_bytes / interval), self._conns
