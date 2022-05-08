@@ -15,6 +15,7 @@ from socket import (
     AF_INET, IP_HDRINCL, IPPROTO_IP, IPPROTO_TCP, IPPROTO_UDP, SOCK_DGRAM,
     SOCK_RAW, SOCK_STREAM, TCP_NODELAY, socket, inet_ntoa
 )
+import socket as _socket
 from ssl import CERT_NONE, SSLContext, create_default_context
 from sys import exit as _exit
 from threading import Event
@@ -627,6 +628,7 @@ class AttackSettings:
     tcp_read_timeout_seconds: float
     requests_per_connection: int
     high_watermark: int
+    socket_rcvbuf: int
 
     def __init__(
         self,
@@ -640,6 +642,7 @@ class AttackSettings:
         requests_per_connection: int = 1024,
         high_watermark: int = 1024 << 5,
         reader_limit: int = 1024 << 6,
+        socket_rcvbuf: int = 1024 << 5,
     ):
         self.connect_timeout_seconds = connect_timeout_seconds
         self.dest_connect_timeout_seconds = dest_connect_timeout_seconds
@@ -650,6 +653,7 @@ class AttackSettings:
         self.requests_per_connection = requests_per_connection
         self.high_watermark = high_watermark
         self.reader_limit = reader_limit
+        self.socket_rcvbuf = socket_rcvbuf
 
     def with_options(self, **kwargs) -> "AttackSettings":
         settings = copy(self)
@@ -727,7 +731,11 @@ class AsyncTcpFlood(HttpFlood):
                 flood_proto, host=proxy.proxy_host, port=proxy.proxy_port)
         try:
             async with timeout(self._settings.connect_timeout_seconds):
-                await conn
+                transport, _ = await conn
+            sock = transport.get_extra_info("socket")
+            if sock and hasattr(sock, "setsockopt"):
+                sock.setsockopt(
+                    _socket.SOL_SOCKET, _socket.SO_RCVBUF, self._settings.socket_rcvbuf)
         except asyncio.CancelledError as e:
             if on_connect:
                 on_connect.cancel()

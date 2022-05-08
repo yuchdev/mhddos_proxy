@@ -359,7 +359,8 @@ async def start(args, shutdown_event: Event):
         drain_timeout_seconds=10.0,
         high_watermark=1024 << 2,  # roughly 4 packets (normally 1024 bytes on a single write)
         # note that "generic flood" attacks switch reading off completely
-        reader_limit=1024 << 6,
+        reader_limit=1024 << 4,
+        socket_rcvbuf=1024 << 4,
     )
 
     # XXX: with the current implementation there's no need to
