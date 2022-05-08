@@ -222,7 +222,7 @@ async def run_ddos(
     try:
         initial_targets, _ = await targets_loader.load(resolve=True)
     except Exception as exc:
-        logger.error(f"{cl.RED}Завнтаження цілей завершилося помилкою: {exc}{cl.RESET}")
+        logger.error(f"{cl.RED}Завантаження цілей завершилося помилкою: {exc}{cl.RESET}")
         initial_targets = []
 
     if not initial_targets:
