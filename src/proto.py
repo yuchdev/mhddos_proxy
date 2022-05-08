@@ -101,7 +101,8 @@ class FloodIO(asyncio.Protocol):
         # probing each 5 seconds allows to catch timeouts with ~5s precision while
         # keeping number of callbacks relatively low
         self._probe_handle = None
-        if not self._transport: return
+        if not self._transport:
+            return
         if self._paused_at is not None:
             resumed_after = time.time() - self._paused_at
             if resumed_after > self._settings.drain_timeout_seconds:
@@ -126,7 +127,8 @@ class FloodIO(asyncio.Protocol):
         # read from the network. in such a case, use of operations like
         # read(1) does not make much of sense (as the data is already
         # buffered anyways)
-        if not self._transport: return
+        if not self._transport:
+            return
         if hasattr(self._transport, "pause_reading"):
             self._transport.pause_reading()
         if self._read_waiting:
@@ -143,7 +145,8 @@ class FloodIO(asyncio.Protocol):
             self._handle.cancel()
         if self._probe_handle:
             self._probe_handle.cancel()
-        if self._on_close.done(): return
+        if self._on_close.done():
+            return
         if exc is None:
             self._on_close.set_result(self._return_code)
         elif isinstance(exc, IOError) and exc.errno == errno.EPIPE:
@@ -157,20 +160,24 @@ class FloodIO(asyncio.Protocol):
             self._on_close.set_exception(exc)
 
     def pause_writing(self) -> None:
-        if self._paused: return
+        if self._paused:
+            return
         self._paused, self._paused_at = True, time.time()
 
     def resume_writing(self) -> None:
-        if not self._paused: return
+        if not self._paused:
+            return
         self._paused, self._paused_at = False, None
-        if not self._transport: return
+        if not self._transport:
+            return
         if self._handle is None:
             # XXX: there's an interesting race condition here
             #      as it might happen multiple times
             self._handle = self._loop.call_soon(self._step)
 
     def _step(self, resumed: bool = False) -> None:
-        if not self._transport: return
+        if not self._transport:
+            return
         self._num_steps += 1
         self._return_code = True
         try:

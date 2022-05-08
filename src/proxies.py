@@ -1,5 +1,5 @@
+import random
 from collections import defaultdict
-from random import choice, random
 from typing import List, Optional, Tuple
 
 from aiohttp_socks import ProxyConnector
@@ -69,16 +69,19 @@ class ProxySet:
         return len(self._loaded_proxies)
 
     def pick_random(self) -> Optional[str]:
-        if not self.has_proxies: return None
-        if self._skip_ratio > 0 and random() * 100 <= self._skip_ratio: return None
-        return choice(self._loaded_proxies)
+        if not self.has_proxies:
+            return None
+        if self._skip_ratio > 0 and random.random() * 100 <= self._skip_ratio:
+            return None
+        return random.choice(self._loaded_proxies)
 
     def pick_random_connector(self) -> Optional[ProxyConnector]:
         proxy_url = self.pick_random()
         return ProxyConnector.from_url(proxy_url) if proxy_url is not None else None
 
     def __len__(self) -> int:
-        if not self.has_proxies: return 0
+        if not self.has_proxies:
+            return 0
         return len(self._loaded_proxies)
 
     def track_alive(self, proxy_url: str) -> None:
@@ -116,7 +119,7 @@ async def load_provided_proxies(proxies_file: str) -> Optional[List[str]]:
 
 
 async def load_system_proxies():
-    raw = await fetch(choice(PROXIES_URLS))
+    raw = await fetch(random.choice(PROXIES_URLS))
     try:
         proxies = decrypt_proxies(raw)
     except Exception:

