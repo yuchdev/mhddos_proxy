@@ -6,7 +6,7 @@ from .core import (
     THREADS_PER_CORE, MAX_DEFAULT_THREADS, ONLY_MY_IP,
     SCHEDULER_INITIAL_CAPACITY, SCHEDULER_FORK_SCALE, SCHEDULER_FAILURE_DELAY,
 )
-from .mhddos import Methods, AttackSettings
+from .mhddos import Methods
 
 
 def init_argparse() -> argparse.ArgumentParser:
@@ -73,19 +73,6 @@ def init_argparse() -> argparse.ArgumentParser:
         '--itarmy',
         action='store_true',
         default=False,
-    )
-    parser.add_argument(
-        '--advanced-allow-uvloop',
-        action='store_true',
-        default=False,
-        help='Advanced setting. Allows the system to switch to the optimized implementation of the event loop (when available)'
-    )
-    parser.add_argument(
-        '--advanced-default-transport',
-        type=str,
-        default=AttackSettings.TRANSPORT_PROTO,
-        choices=["stream", "sock", "proto"],
-        help='For testing purposes only'
     )
     parser.add_argument(
         '--scheduler-initial-capacity',

