@@ -1,17 +1,16 @@
-from asyncio.log import logger as asyncio_logger
 import logging
+from asyncio.log import logger as asyncio_logger
 from pathlib import Path
 
 from colorama import Fore
 
 
 class RemoveUselessWarnings(logging.Filter):
-
     def filter(self, record):
-        return all(
+        return all((
             "socket.send() raised exception." not in record.getMessage(),
-            "SSL connection is closed" not in record.getMessages()
-        )
+            "SSL connection is closed" not in record.getMessage()
+        ))
 
 
 logging.basicConfig(format='[%(asctime)s - %(levelname)s] %(message)s', datefmt="%H:%M:%S")
@@ -20,7 +19,6 @@ logger.setLevel('INFO')
 
 # Make asyncio logger a little bit less noisy
 asyncio_logger.addFilter(RemoveUselessWarnings())
-
 
 ROOT_DIR = Path(__file__).parent.parent
 
@@ -43,9 +41,9 @@ REFRESH_RATE = 5
 FAILURE_BUDGET_FACTOR = 6
 FAILURE_DELAY_SECONDS = 1
 ONLY_MY_IP = 100
-SCHEDULER_INITIAL_CAPACITY=3
-SCHEDULER_FORK_SCALE=2
-SCHEDULER_FAILURE_DELAY=0.5
+SCHEDULER_INITIAL_CAPACITY = 3
+SCHEDULER_FORK_SCALE = 2
+SCHEDULER_FAILURE_DELAY = 0.5
 CONN_PROBE_PERIOD = 5
 
 
@@ -56,4 +54,3 @@ class cl:
     YELLOW = Fore.LIGHTYELLOW_EX
     RED = Fore.LIGHTRED_EX
     RESET = Fore.RESET
-

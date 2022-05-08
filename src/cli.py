@@ -3,7 +3,7 @@ import random
 from multiprocessing import cpu_count
 
 from .core import (
-    THREADS_PER_CORE, MAX_DEFAULT_THREADS, ONLY_MY_IP,
+    THREADS_PER_CORE, MAX_DEFAULT_THREADS,
     SCHEDULER_INITIAL_CAPACITY, SCHEDULER_FORK_SCALE, SCHEDULER_FAILURE_DELAY,
 )
 from .mhddos import Methods

@@ -2,10 +2,7 @@
 import colorama; colorama.init()
 # @formatter:on
 import asyncio
-from asyncio import events
 from functools import partial
-import selectors
-import socket
 import sys
 import time
 from threading import Event, Thread
@@ -20,12 +17,8 @@ from src.core import (
 from src.mhddos import main as mhddos_main, AsyncTcpFlood, AsyncUdpFlood, AttackSettings
 from src.output import show_statistic, print_banner
 from src.proxies import ProxySet
-from src.system import fix_ulimits, is_latest_version
+from src.system import fix_ulimits, is_latest_version, setup_event_loop, WINDOWS_WAKEUP_SECONDS
 from src.targets import Target, TargetsLoader
-
-
-WINDOWS = sys.platform == "win32"
-WINDOWS_WAKEUP_SECONDS = 0.5
 
 
 class GeminoCurseTaskSet:
@@ -37,7 +30,7 @@ class GeminoCurseTaskSet:
         initial_capacity: int = 2,
         max_capacity: int = 10_000,
         fork_scale: int = 2,
-        failure_delay: int = 0.25
+        failure_delay: float = 0.25
     ):
         self._loop = loop
         self._tasks = runnables
@@ -102,13 +95,13 @@ class GeminoCurseTaskSet:
             raise e
 
 
-async def run_udp_flood(self, runnable: AsyncUdpFlood) -> None:
+async def run_udp_flood(runnable: AsyncUdpFlood) -> None:
     num_failures = 0
     while True:
         try:
             await runnable.run()
         except asyncio.CancelledError:
-            raise e
+            raise
         except:
             num_failures += 1
             if num_failures >= FAILURE_BUDGET_FACTOR:
@@ -175,7 +168,7 @@ async def run_ddos(
         await asyncio.sleep(5)
 
     active_flooder_tasks = []
-    tcp_task_group = None 
+    tcp_task_group = None
 
     async def install_targets(targets):
         nonlocal tcp_task_group
@@ -250,7 +243,6 @@ async def run_ddos(
                     table,
                     use_my_ip,
                     num_proxies,
-                    None if targets_loader.age is None else reload_after - int(targets_loader.age),
                     passed > REFRESH_RATE * REFRESH_OVERTIME,
                 )
                 if tcp_task_group is not None:
@@ -297,19 +289,11 @@ async def run_ddos(
         while True:
             try:
                 await asyncio.sleep(delay_seconds)
-                num_proxies = await proxies.reload()
-                if num_proxies == 0:
-                    logger.warning(
-                        f"{cl.MAGENTA}Буде використано попередній список проксі{cl.RESET}")
-            except asyncio.CancelledError as e:
-                raise e
+                await proxies.reload()
+            except asyncio.CancelledError:
+                raise
             except Exception:
                 pass
-            finally:
-                logger.info(
-                    f"{cl.YELLOW}Оновлення проксей через: "
-                    f"{cl.BLUE}{delay_seconds} секунд{cl.RESET}"
-                )
 
     # setup coroutine to reload proxies
     if proxies is not None:
@@ -383,68 +367,7 @@ async def start(args, shutdown_event: Event):
     shutdown_event.set()
 
 
-def _safe_connection_lost(transport, exc):
-    try:
-        transport._protocol.connection_lost(exc)
-    finally:
-        if hasattr(transport._sock, 'shutdown') and transport._sock.fileno() != -1:
-            try:
-                transport._sock.shutdown(socket.SHUT_RDWR)
-            except ConnectionResetError:
-                pass
-        transport._sock.close()
-        transport._sock = None
-        server = transport._server
-        if server is not None:
-            server._detach()
-            transport._server = None
-
-
-def _patch_proactor_connection_lost():
-    """
-    The issue is described here:
-      https://github.com/python/cpython/issues/87419
-
-    The fix is going to be included into Python 3.11. This is merely
-    a backport for already versions.
-    """
-    from asyncio.proactor_events import _ProactorBasePipeTransport
-    setattr(_ProactorBasePipeTransport, "_call_connection_lost", _safe_connection_lost)
-
-
-async def _windows_support_wakeup():
-    """See more info here:
-        https://bugs.python.org/issue23057#msg246316
-    """
-    while True:
-        await asyncio.sleep(WINDOWS_WAKEUP_SECONDS)
-
-
-def _handle_uncaught_exception(loop: asyncio.AbstractEventLoop, context):
-    error_message = context.get("exception", context["message"])
-    logger.debug(f"Uncaught event loop exception: {error_message}")
-
-
-def _main(args, uvloop: bool, shutdown_event: Event) -> None:
-    if uvloop:
-        loop = events.new_event_loop()
-    elif WINDOWS:
-        _patch_proactor_connection_lost()
-        loop = asyncio.ProactorEventLoop()
-        # This is to allow CTRL-C to be detected in a timely fashion,
-        # see: https://bugs.python.org/issue23057#msg246316
-        loop.create_task(_windows_support_wakeup())
-    elif hasattr(selectors, "DefaultSelector"):
-        selector = selectors.DefaultSelector()
-        loop = asyncio.SelectorEventLoop(selector)
-    else:
-        loop = events.new_event_loop()
-    loop.set_exception_handler(_handle_uncaught_exception)
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(start(args, shutdown_event))
-
-
-if __name__ == '__main__':
+def main():
     args = init_argparse().parse_args()
 
     uvloop = False
@@ -453,7 +376,8 @@ if __name__ == '__main__':
         uvloop = True
         logger.info(
             f"{cl.GREEN}'uvloop' успішно активований "
-            f"(підвищенна ефективність роботи з мережею){cl.RESET}")
+            f"(підвищенна ефективність роботи з мережею){cl.RESET}"
+        )
     except:
         pass
 
@@ -461,7 +385,8 @@ if __name__ == '__main__':
     try:
         # run event loop in a separate thread to ensure the application
         # exists immediately after Ctrl+C
-        Thread(target=_main, args=(args, uvloop, shutdown_event), daemon=True).start()
+        loop = setup_event_loop(uvloop)
+        Thread(target=loop.run_until_complete, args=[start(args, shutdown_event)], daemon=True).start()
         # we can do something smarter rather than waiting forever,
         # but as of now it's gonna be consistent with previous version
         while True:
@@ -469,3 +394,7 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         logger.info(f'{cl.BLUE}Завершуємо роботу...{cl.RESET}')
         sys.exit()
+
+
+if __name__ == '__main__':
+    main()
