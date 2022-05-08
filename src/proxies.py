@@ -5,9 +5,9 @@ from typing import List, Optional, Tuple
 from aiohttp_socks import ProxyConnector
 from yarl import URL
 
-from .core import logger, cl, ONLY_MY_IP, PROXIES_URLS
+from .core import ONLY_MY_IP, PROXIES_URLS
 from .dns_utils import resolve_all
-from .system import read_or_fetch, fetch
+from .system import fetch, read_or_fetch
 
 
 # @formatter:off
@@ -76,7 +76,7 @@ class ProxySet:
     def pick_random_connector(self) -> Optional[ProxyConnector]:
         proxy_url = self.pick_random()
         return ProxyConnector.from_url(proxy_url) if proxy_url is not None else None
-    
+
     def __len__(self) -> int:
         if not self.has_proxies: return 0
         return len(self._loaded_proxies)
@@ -86,11 +86,10 @@ class ProxySet:
 
     @property
     def alive(self) -> List[Tuple[int, str]]:
-        return sorted([(v,k) for (k,v) in self._connections.items()], reverse=True)
+        return sorted([(v, k) for (k, v) in self._connections.items()], reverse=True)
 
 
 class NoProxySet:
-
     alive = []
 
     @staticmethod
@@ -110,19 +109,9 @@ class NoProxySet:
         pass
 
 
-# XXX: move logging to the runner?
 async def load_provided_proxies(proxies_file: str) -> Optional[List[str]]:
     content = await read_or_fetch(proxies_file)
-    if content is None:
-        logger.warning(f'{cl.RED}Не вдалося зчитати проксі з {proxies_file}{cl.RESET}')
-        return None
-
     proxies = list(map(normalize_url, content.split()))
-    if not proxies:
-        logger.warning(
-            f"{cl.RED}У {proxies_file} не знайдено проксі - перевірте формат{cl.RESET}")
-    else:
-        logger.info(f'{cl.YELLOW}Зчитано {cl.BLUE}{len(proxies)}{cl.YELLOW} проксі{cl.RESET}')
     return proxies
 
 
@@ -133,11 +122,4 @@ async def load_system_proxies():
     except Exception:
         proxies = []
     proxies = list(map(normalize_url, proxies))
-    if proxies:
-        logger.info(
-            f'{cl.YELLOW}Отримано вибірку {cl.BLUE}{len(proxies):,}{cl.YELLOW} проксі '
-            f'зі списку {cl.BLUE}25.000+{cl.YELLOW} робочих{cl.RESET}'
-        )
-    else:
-        logger.warning(f'{cl.RED}Не вдалося отримати персональну вибірку проксі{cl.RESET}')
     return proxies
