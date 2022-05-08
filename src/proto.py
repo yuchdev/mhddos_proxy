@@ -1,4 +1,5 @@
 import asyncio
+from enum import Enum
 import errno
 from functools import partial
 import io
@@ -25,21 +26,26 @@ class FloodOp:
     SLEEP = 2
 
 
+class FloodSpecType(Enum):
+    GENERATOR = 0
+    BYTES = 1
+    CALLABLE = 2
+
+
 class FloodSpec:
 
-    # XXX: this API might be handy but `isinstance` calls are incredibly slow
     @classmethod
-    def from_any(cls, spec, *args) -> FloodSpecGen:
-        if isinstance(spec, GeneratorType):
+    def from_any(cls, spec_type: FloodSpecType, spec, *args) -> FloodSpecGen:
+        if spec_type == FloodSpecType.GENERATOR:
             return spec
-        if isinstance(spec, bytes):
-            return cls.from_static(spec, *args)
-        if callable(spec):
+        if spec_type == FloodSpecType.BYTES:
+            return cls.from_bytes(spec, *args)
+        if spec_type == FloodSpecType.CALLABLE:
             return cls.from_callable(spec, *args)
         raise ValueError(f"Don't know how to create spec from {type(spec)}")
 
     @staticmethod
-    def from_static(packet: bytes, num_packets: int) -> FloodSpecGen:
+    def from_bytes(packet: bytes, num_packets: int) -> FloodSpecGen:
         packet_size = len(packet)
         for _ in range(num_packets):
             yield FloodOp.WRITE, (packet, packet_size)
