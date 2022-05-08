@@ -11,7 +11,7 @@ from typing import List, Set, Union
 from src.cli import init_argparse
 from src.core import (
     logger, cl,
-    LOW_RPC, IT_ARMY_CONFIG_URL, REFRESH_OVERTIME, REFRESH_RATE, ONLY_MY_IP,
+    IT_ARMY_CONFIG_URL, REFRESH_OVERTIME, REFRESH_RATE, ONLY_MY_IP,
     FAILURE_BUDGET_FACTOR, FAILURE_DELAY_SECONDS,
 )
 from src.mhddos import main as mhddos_main, AsyncTcpFlood, AsyncUdpFlood, AttackSettings
@@ -304,15 +304,6 @@ async def start(args, shutdown_event: Event):
 
     if args.table:
         args.debug = False
-
-    for bypass in ('CFB', 'DGB'):
-        if bypass in args.http_methods:
-            logger.warning(f'{cl.RED}Робота методу {bypass} не гарантована{cl.RESET}')
-
-    if args.rpc < LOW_RPC:
-        logger.warning(
-            f'{cl.YELLOW}RPC менше за {LOW_RPC}. Це може призвести до падіння продуктивності '
-            f'через збільшення кількості перепідключень{cl.RESET}')
 
     is_old_version = not await is_latest_version()
     if is_old_version:

