@@ -353,7 +353,7 @@ class AsyncTcpFlood:
         )
         return await self._generic_flood_proto(FloodSpecType.BYTES, payload, on_connect)
 
-    async def COOKIES(self, on_connect=None) -> bool:
+    async def COOKIE(self, on_connect=None) -> bool:
         payload: bytes = self.build_request(
             headers=(
                 self.default_headers +
