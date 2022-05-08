@@ -197,6 +197,7 @@ class AsyncTcpFlood:
             f"X-Forwarded-Host: {self._target.raw_host}\r\n"
             f"Via: {spoof}\r\n"
             f"Client-IP: {spoof}\r\n"
+            f'X-Forwarded-Proto: https\r\n'
             f'X-Forwarded-For: {spoof}\r\n'
             f'Real-IP: {spoof}\r\n'
         )
