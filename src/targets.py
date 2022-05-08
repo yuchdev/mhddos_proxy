@@ -168,7 +168,11 @@ class TargetStats:
         self._conns += 1
 
     def track_close_connection(self) -> None:
-        self._conns -= 1
+        if self._conns <= 0:
+            logger.debug(
+                f"Invalid connection stats calculation for {self._target.human_repr()}")
+        else:
+            self._conns -= 1
 
     def reset(self) -> Tuple[int, int, int]:
         sent_requests, sent_bytes, prev_reset_at = self._requests, self._bytes, self._reset_at
