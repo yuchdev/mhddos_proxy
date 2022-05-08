@@ -8,7 +8,10 @@ from colorama import Fore
 class RemoveUselessWarnings(logging.Filter):
 
     def filter(self, record):
-        return "socket.send() raised exception." not in record.getMessage()
+        return all(
+            "socket.send() raised exception." not in record.getMessage(),
+            "SSL connection is closed" not in record.getMessages()
+        )
 
 
 logging.basicConfig(format='[%(asctime)s - %(levelname)s] %(message)s', datefmt="%H:%M:%S")
