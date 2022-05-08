@@ -13,7 +13,7 @@ from .system import fetch, read_or_fetch
 # @formatter:off
 _globals_before = set(globals().keys()).union({'_globals_before'})
 # noinspection PyUnresolvedReferences
-from .load_proxies import *
+from .vendor.load_proxies import *
 decrypt_proxies = globals()[set(globals().keys()).difference(_globals_before).pop()]
 # @formatter:on
 
