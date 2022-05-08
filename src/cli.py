@@ -62,7 +62,7 @@ def init_argparse() -> argparse.ArgumentParser:
         nargs='+',
         type=str.upper,
         default=['GET', random.choice(['POST', 'STRESS'])],
-        choices=Methods.LAYER7_METHODS,
+        choices=[m for m in Methods.LAYER7_METHODS if m != "TCP"],
         help='List of HTTP(s) attack methods to use. Default is GET + POST|STRESS',
     )
     parser.add_argument(
