@@ -49,7 +49,9 @@ class ProxySet:
         return self._skip_ratio != ONLY_MY_IP
 
     async def reload(self) -> int:
-        if not self.has_proxies: return 0
+        if not self.has_proxies:
+            return 0
+
         if self._proxies_file:
             proxies = await load_provided_proxies(self._proxies_file)
         else:

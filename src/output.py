@@ -5,7 +5,7 @@ from tabulate import tabulate
 
 from .core import cl, logger, THREADS_PER_CORE
 from .mhddos import Tools
-from .targets import Target, TargetStats
+from .targets import TargetStats
 
 
 def cls():
@@ -17,7 +17,6 @@ def show_statistic(
     table: bool,
     use_my_ip: int,
     num_proxies: int,
-    next_targets_load: Optional[int],
     overtime: bool,
 ):
     tabulate_text = []
@@ -31,15 +30,18 @@ def show_statistic(
         total_in_flight += in_flight_conn
         if table:
             tabulate_text.append((
-                f'{cl.YELLOW}%s' % target.url.host, target.url.port, method,
-                Tools.humanformat(pps) + "/s", f'{Tools.humanbits(bps)}/s{cl.RESET}'
+                f'{cl.YELLOW}%s' % target.url.host,
+                target.url.port,
+                method,
+                Tools.humanformat(in_flight_conn),
+                Tools.humanformat(pps) + "/s",
+                f'{Tools.humanbits(bps)}/s{cl.RESET}'
             ))
         else:
             logger.info(
                 f"{cl.YELLOW}Ціль:{cl.BLUE} {target.human_repr()}, "
                 f"{cl.YELLOW}Порт:{cl.BLUE} {target.url.port}, "
                 f"{cl.YELLOW}Метод:{cl.BLUE} {method}{method_sig}, "
-                # TODO: Add to table? Display connections per second for consistency with other stats?
                 f"{cl.YELLOW}Зʼєднань:{cl.BLUE} {Tools.humanformat(in_flight_conn)}, "
                 f"{cl.YELLOW}Запити:{cl.BLUE} {Tools.humanformat(pps)}/s, "
                 f"{cl.YELLOW}Трафік:{cl.BLUE} {Tools.humanbits(bps)}/s"
@@ -47,13 +49,19 @@ def show_statistic(
             )
 
     if table:
-        tabulate_text.append((f'{cl.GREEN}Усього', '', '', Tools.humanformat(total_pps) + "/s",
-                              f'{Tools.humanbits(total_bps)}/s{cl.RESET}'))
+        tabulate_text.append((
+            f'{cl.GREEN}Усього',
+            '',
+            '',
+            Tools.humanformat(total_in_flight),
+            Tools.humanformat(total_pps) + "/s",
+            f'{Tools.humanbits(total_bps)}/s{cl.RESET}'
+        ))
 
         cls()
         print(tabulate(
             tabulate_text,
-            headers=[f'{cl.BLUE}Ціль', 'Порт', 'Метод', 'Запити', f'Трафік{cl.RESET}'],
+            headers=[f'{cl.BLUE}Ціль', 'Порт', 'Метод', 'Зʼєднань', 'Запити', f'Трафік{cl.RESET}'],
             tablefmt='fancy_grid'
         ))
         print_banner(use_my_ip)
@@ -65,20 +73,14 @@ def show_statistic(
             f"{cl.YELLOW}Трафік:{cl.GREEN} {Tools.humanbits(total_bps)}/s{cl.RESET}"
         )
 
-    print_progress(num_proxies, next_targets_load, use_my_ip, overtime)
+    print_progress(num_proxies, use_my_ip, overtime)
 
 
 def print_progress(
     num_proxies: int,
-    next_targets_load: Optional[int],
     use_my_ip: int,
     overtime: bool,
 ):
-    if next_targets_load is not None:
-        next_targets_load = max(0, next_targets_load)
-        logger.info(
-            f"{cl.YELLOW}Оновлення цілей через: {cl.BLUE}{next_targets_load} секунд{cl.RESET}")
-
     if num_proxies:
         logger.info(f"{cl.YELLOW}Кількість проксі: {cl.BLUE}{num_proxies}{cl.RESET}")
         if use_my_ip:

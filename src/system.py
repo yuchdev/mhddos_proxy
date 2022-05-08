@@ -1,11 +1,19 @@
 import asyncio
-from contextlib import suppress
 import os.path
+import selectors
+import socket
+import sys
+from asyncio import events
+from contextlib import suppress
 from typing import Optional
 
 from aiohttp import ClientSession
 
-from src.core import CONFIG_FETCH_RETRIES, CONFIG_FETCH_TIMEOUT, VERSION_URL
+from src.core import CONFIG_FETCH_RETRIES, CONFIG_FETCH_TIMEOUT, VERSION_URL, logger
+
+
+WINDOWS = sys.platform == "win32"
+WINDOWS_WAKEUP_SECONDS = 0.5
 
 
 def fix_ulimits():
@@ -43,3 +51,64 @@ async def is_latest_version():
     latest = int((await read_or_fetch(VERSION_URL)).strip())
     current = int((await read_or_fetch('version.txt')).strip())
     return current >= latest
+
+
+def _safe_connection_lost(transport, exc):
+    try:
+        transport._protocol.connection_lost(exc)
+    finally:
+        if hasattr(transport._sock, 'shutdown') and transport._sock.fileno() != -1:
+            try:
+                transport._sock.shutdown(socket.SHUT_RDWR)
+            except ConnectionResetError:
+                pass
+        transport._sock.close()
+        transport._sock = None
+        server = transport._server
+        if server is not None:
+            server._detach()
+            transport._server = None
+
+
+def _patch_proactor_connection_lost():
+    """
+    The issue is described here:
+      https://github.com/python/cpython/issues/87419
+
+    The fix is going to be included into Python 3.11. This is merely
+    a backport for already versions.
+    """
+    from asyncio.proactor_events import _ProactorBasePipeTransport
+    setattr(_ProactorBasePipeTransport, "_call_connection_lost", _safe_connection_lost)
+
+
+async def _windows_support_wakeup():
+    """See more info here:
+        https://bugs.python.org/issue23057#msg246316
+    """
+    while True:
+        await asyncio.sleep(WINDOWS_WAKEUP_SECONDS)
+
+
+def _handle_uncaught_exception(loop: asyncio.AbstractEventLoop, context):
+    error_message = context.get("exception", context["message"])
+    logger.debug(f"Uncaught event loop exception: {error_message}")
+
+
+def setup_event_loop(uvloop: bool):
+    if uvloop:
+        loop = events.new_event_loop()
+    elif WINDOWS:
+        _patch_proactor_connection_lost()
+        loop = asyncio.ProactorEventLoop()
+        # This is to allow CTRL-C to be detected in a timely fashion,
+        # see: https://bugs.python.org/issue23057#msg246316
+        loop.create_task(_windows_support_wakeup())
+    elif hasattr(selectors, "DefaultSelector"):
+        selector = selectors.DefaultSelector()
+        loop = asyncio.SelectorEventLoop(selector)
+    else:
+        loop = events.new_event_loop()
+    loop.set_exception_handler(_handle_uncaught_exception)
+    asyncio.set_event_loop(loop)
+    return loop

