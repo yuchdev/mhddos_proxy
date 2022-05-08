@@ -202,6 +202,14 @@ async def run_ddos(
                 logger.error(f"Unsupported scheme given: {target.url.scheme}")
 
         if tcp_flooders:
+            num_flooders = len(tcp_flooders)
+
+            if initial_capacity * num_flooders >= total_threads:
+                logger.warning(
+                    f"{cl.MAGENTA}Початкова кількість одночасних атак перевищує "
+                    f"максимально дозволену: -t={total_threads}.{cl.RESET}"
+                )
+
             tcp_task_group = GeminoCurseTaskSet(
                 loop,
                 runnables=tcp_flooders,
