@@ -425,10 +425,10 @@ class AsyncTcpFlood:
         packets_sent = 0
         cl_timeout = aiohttp.ClientTimeout(connect=self._settings.connect_timeout_seconds)
         async with aiohttp.ClientSession(connector=connector, timeout=cl_timeout) as s:
-            if on_connect and not on_connect.cancelled():
-                on_connect.set_result(True)
             for _ in range(self._settings.requests_per_connection):
                 async with s.get(self._target.human_repr()) as response:
+                    if on_connect and not on_connect.done():
+                        on_connect.set_result(True)
                     self._stats.track(1, request_info_size(response.request_info))
                     packets_sent += 1
                     # XXX: we need to track in/out traffic separately
