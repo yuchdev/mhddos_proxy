@@ -351,16 +351,14 @@ async def start(args, shutdown_event: Event):
     # targets because the list of targets might change at any point in time
     proxies = ProxySet(args.proxies, use_my_ip)
 
-    # XXX: for TCP flood high_watermark should be lower by default
-    # (we need to send a lot of small packages rather than buffer data before drain)
     attack_settings = AttackSettings(
         requests_per_connection=args.rpc,
         dest_connect_timeout_seconds=10.0,
         drain_timeout_seconds=10.0,
         high_watermark=1024 << 2,  # roughly 4 packets (normally 1024 bytes on a single write)
         # note that "generic flood" attacks switch reading off completely
-        reader_limit=1024 << 4,
-        socket_rcvbuf=1024 << 4,
+        reader_limit=1024 << 3,
+        socket_rcvbuf=1024 << 3,
     )
 
     # XXX: with the current implementation there's no need to

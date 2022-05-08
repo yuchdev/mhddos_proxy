@@ -34,7 +34,7 @@ IT_ARMY_CONFIG_URL = 'https://gist.githubusercontent.com/ddosukraine2022/f739250
 VERSION_URL = 'https://raw.githubusercontent.com/porthole-ascend-cinnamon/mhddos_proxy/main/version.txt'
 
 LOW_RPC = 1000
-THREADS_PER_CORE = 2000
+THREADS_PER_CORE = 2500
 MAX_DEFAULT_THREADS = 7500
 CONFIG_FETCH_RETRIES = 3
 CONFIG_FETCH_TIMEOUT = 10
