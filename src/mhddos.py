@@ -35,7 +35,7 @@ from .ImpactPacket import IP, TCP, UDP, Data
 from .core import cl, logger, ROOT_DIR
 from .proxies import ProxySet, NoProxySet
 
-from . import proto
+from . import proto, proxy_proto
 from .proto import FloodIO, FloodOp, FloodSpec, FloodSpecType
 from .referers import REFERERS
 from .useragents import USERAGENTS
@@ -712,7 +712,7 @@ class AsyncTcpFlood(HttpFlood):
                 server_hostname=server_hostname
             )
         else:
-            proxy, proxy_protocol = proto.for_proxy(self._proxies, proxy_url)
+            proxy, proxy_protocol = proxy_proto.for_proxy(proxy_url)
             flood_proto = partial(
                 proxy_protocol,
                 self._loop,
