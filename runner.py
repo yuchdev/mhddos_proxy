@@ -65,6 +65,8 @@ class GeminoCurseTaskSet:
             f.result()
         except asyncio.CancelledError as e:
             return
+        except Exception:
+            pass
         finally:
             self._launch(runnable)
 
