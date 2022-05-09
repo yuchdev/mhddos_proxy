@@ -86,6 +86,7 @@ class ProxyProtocol(asyncio.Protocol):
             try:
                 self._negotiate_data_received(data)
             except Exception as exc:
+                print(self._proxy_url, exc)
                 logger.debug(f"Processing failed for {self._proxy_url} with {exc}")
                 if not self._on_close.done():
                     self._on_close.set_exception(exc)
@@ -231,17 +232,14 @@ class Socks5Protocol(ProxyProtocol):
 
     def _read_connect_response(self, data: bytes) -> None:
         buffer = io.BytesIO(data)
-        (socks_ver,) = self._read_exactly(buffer, 1)
+        (socks_ver, reply, rsv, addr_type) = self._read_exactly(buffer, 4)
         if socks_ver != socks5.SOCKS_VER:
             raise ProxyError("SOCKS5: unexpected version number")
-        (reply,) = self._read_exactly(buffer, 1)
         if reply != socks5.ReplyCode.GRANTED:
             error_message = socks5.ReplyMessages.get(reply, 'Unknown error')
             raise ProxyError(f"SOCKS5: invalid reply code {error_message}")
-        (rsv,) = self._read_exactly(buffer, 1)
         if rsv != socks5.RSV:
             raise ProxyError("SOCKS5: invalid reserved byte")
-        (addr_type,) = self._read_exactly(buffer, 1)
         if addr_type == 0x01:
             self._read_exactly(buffer, 4)
         elif addr_type == 0x03:

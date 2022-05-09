@@ -57,6 +57,8 @@ class GeminoCurseTaskSet:
             f.result()
         except asyncio.CancelledError as e:
             return
+        except asyncio.TimeoutError:
+            pass
         except Exception:
             pass
         finally:
@@ -204,10 +206,10 @@ async def run_ddos(
         if tcp_flooders:
             num_flooders = len(tcp_flooders)
 
-            if initial_capacity * num_flooders >= total_threads:
+            if initial_capacity * num_flooders > total_threads:
                 logger.warning(
                     f"{cl.MAGENTA}Початкова кількість одночасних атак перевищує "
-                    f"максимально дозволену: -t={total_threads}.{cl.RESET}"
+                    f"максимально дозволену параметром `-t` ({total_threads}).{cl.RESET}"
                 )
 
             # adjust settings to avoid situation when we have just a few
