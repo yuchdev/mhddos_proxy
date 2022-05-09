@@ -688,18 +688,8 @@ def main(url, ip, method, event, proxies, stats, loop=None, settings=None):
         )
 
     if method in Methods.UDP_METHODS:
-        port = url.port
-
-        # XXX: move this test to targets parser
-        if port > 65535 or port < 1:
-            raise RuntimeError("Invalid Port [Min: 1 / Max: 65535]")
-
-        if not port:
-            logger.warning("Port Not Selected, Set To Default: 80")
-            port = 80
-
         return AsyncUdpFlood(
-            (ip, port),
+            (ip, url.port),
             method,
             event,
             proxies,
