@@ -86,7 +86,6 @@ class ProxyProtocol(asyncio.Protocol):
             try:
                 self._negotiate_data_received(data)
             except Exception as exc:
-                print(self._proxy_url, exc)
                 logger.debug(f"Processing failed for {self._proxy_url} with {exc}")
                 if not self._on_close.done():
                     self._on_close.set_exception(exc)

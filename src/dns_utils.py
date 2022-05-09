@@ -2,15 +2,20 @@ from asyncio import gather
 from asyncstdlib.functools import lru_cache
 from typing import Dict, List, Optional
 
+from dns.resolver import NoResolverConfiguration
 from dns.asyncresolver import Resolver
 import dns.exception
 from yarl import URL
 
 from .core import logger, cl
 
+try:
+    resolver = Resolver(configure=True)
+except NoResolverConfiguration:
+    resolver = Resolver(configure=False)
 
-resolver = Resolver(configure=False)
-resolver.nameservers = ['1.1.1.1', '1.0.0.1', '8.8.8.8', '8.8.4.4', '208.67.222.222', '208.67.220.220']
+ns = ['1.1.1.1', '1.0.0.1', '8.8.8.8', '8.8.4.4', '208.67.222.222', '208.67.220.220']
+resolver.nameservers = ns + list(resolver.nameservers)
 
 
 @lru_cache(maxsize=1024)
