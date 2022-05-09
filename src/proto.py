@@ -5,7 +5,7 @@ import time
 from types import GeneratorType
 from typing import Any, Callable, Generator, Optional, Tuple
 
-from .core import logger, CONN_PROBE_PERIOD
+from .core import logger, CONN_PROBE_PERIOD, UDP_BATCH_PACKETS, UDP_ENOBUFS_PAUSE
 from .targets import TargetStats
 
 
@@ -204,6 +204,67 @@ class FloodIO(asyncio.Protocol):
         except StopIteration:
             self._transport.close()
             self._transport = None
+
+    def _handle_cancellation(self, on_close):
+        if on_close.cancelled() and self._transport and not self._transport.is_closing():
+            self._transport.abort()
+            self._transport = None
+
+
+class DatagramFloodIO(asyncio.Protocol):
+
+    def __init__(
+        self,
+        loop: asyncio.AbstractEventLoop,
+        stats: TargetStats,
+        packet_gen: Callable[[], Tuple[bytes, int]],
+        on_close: asyncio.Future,
+    ):
+        self._loop = loop
+        self._stats = stats
+        self._packet_gen = packet_gen
+        self._on_close = on_close
+        self._on_close.add_done_callback(self._handle_cancellation)
+        self._transport = None
+        self._handle = None
+
+    def connection_made(self, transport) -> None:
+        self._transport = transport
+        self._handle = self._loop.call_soon(self._send_batch)
+
+    def _send_batch(self) -> None:
+        if not self._transport: return
+        self._handle = None
+        sent_bytes = 0
+        for _ in range(UDP_BATCH_PACKETS):
+            packet, packet_size = self._packet_gen()
+            sent_bytes += packet_size
+            self._transport.sendto(packet)
+        self._stats.track(UDP_BATCH_PACKETS, sent_bytes)
+        self._handle = self._loop.call_soon(self._send_batch)
+
+    def datagram_received(self, data, addr) -> None:
+        pass
+
+    def error_received(self, exc) -> None:
+        if isinstance(exc, OSError) and exc.errno == errno.ENOBUFS:
+            if self._handle is not None:
+                self._handle.cancel()
+            self._handle = self._loop.call_later(UDP_ENOBUFS_PAUSE, self._send_batch)
+        elif self._transport:
+            self._on_close.set_excetion(exc)
+            self._transport.abort()
+            self._transport = None
+
+    def connection_lost(self, exc) -> None:
+        self._transport = None
+        if self._handle is not None:
+            self._handle.cancel()
+        if self._on_close.done(): return
+        if exc is None:
+            self._on_close.set_result(True)
+        else:
+            self._on_close.set_exception(exc)
 
     def _handle_cancellation(self, on_close):
         if on_close.cancelled() and self._transport and not self._transport.is_closing():

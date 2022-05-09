@@ -102,7 +102,7 @@ async def run_udp_flood(runnable: AsyncUdpFlood) -> None:
             await runnable.run()
         except asyncio.CancelledError:
             raise
-        except:
+        except Exception:
             num_failures += 1
             if num_failures >= FAILURE_BUDGET_FACTOR:
                 await asyncio.sleep(FAILURE_DELAY_SECONDS)
