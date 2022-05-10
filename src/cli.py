@@ -29,6 +29,12 @@ def init_argparse() -> argparse.ArgumentParser:
         help=f'Total number of threads to run (default is CPU * {THREADS_PER_CORE})',
     )
     parser.add_argument(
+        '--processes',
+        type=int,
+        default=1,
+        help=f'Number of subprocess to spawn. Feature is disabled when set to 1 (default)',
+    )
+    parser.add_argument(
         '--rpc',
         type=int,
         default=2000,

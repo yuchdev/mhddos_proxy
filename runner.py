@@ -3,6 +3,7 @@ import colorama; colorama.init()
 # @formatter:on
 import asyncio
 from functools import partial
+import multiprocessing as mp
 import sys
 import time
 from threading import Event, Thread
@@ -315,7 +316,7 @@ async def run_ddos(
     await asyncio.gather(*tasks, return_exceptions=True)
 
 
-async def start(args, shutdown_event: Event):
+async def start(args):
     use_my_ip = min(args.use_my_ip, ONLY_MY_IP)
     print_banner(use_my_ip)
     fix_ulimits()
@@ -366,12 +367,11 @@ async def start(args, shutdown_event: Event):
         args.scheduler_fork_scale,
         args.scheduler_failure_delay,
     )
-    shutdown_event.set()
 
 
-def _main(args, shutdown_event, uvloop):
+def _main(args, uvloop):
     loop = setup_event_loop(uvloop)
-    loop.run_until_complete(start(args, shutdown_event))
+    loop.run_until_complete(start(args))
 
 
 def main():
@@ -388,11 +388,24 @@ def main():
     except:
         pass
 
+    if args.processes > 1:
+        cpus = mp.cpu_count()
+        max_processes = cpus//2 # XXX: const
+        num_processes = min(args.processes, max_processes)
+        # XXX: warning if the setting is too high
+    else:
+        num_processes = 1
+
     shutdown_event = Event()
     try:
         # run event loop in a separate thread to ensure the application
         # exists immediately after Ctrl+C
-        Thread(target=_main, args=[args, shutdown_event, uvloop], daemon=True).start()
+        if num_processes == 1:
+            Thread(target=_main, args=(args, uvloop), daemon=True).start()
+        else:
+            # XXX: test signals processing (most likely need special treatment)
+            for _ in range(num_processes):
+                mp.Process(target=_main, args=(args, uvloop), daemon=True).start()
         # we can do something smarter rather than waiting forever,
         # but as of now it's gonna be consistent with previous version
         while True:
