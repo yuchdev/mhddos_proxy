@@ -77,7 +77,7 @@ class ProxySet:
 
     def pick_random_connector(self) -> Optional[ProxyConnector]:
         proxy_url = self.pick_random()
-        return ProxyConnector.from_url(proxy_url) if proxy_url is not None else None
+        return ProxyConnector.from_url(proxy_url, ssl=False) if proxy_url is not None else None
 
     def __len__(self) -> int:
         if not self.has_proxies:

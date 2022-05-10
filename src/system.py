@@ -7,7 +7,7 @@ from asyncio import events
 from contextlib import suppress
 from typing import Optional
 
-from aiohttp import ClientSession
+from aiohttp import ClientSession, TCPConnector
 
 from src.core import CONFIG_FETCH_RETRIES, CONFIG_FETCH_TIMEOUT, VERSION_URL, logger
 
@@ -36,7 +36,7 @@ async def read_or_fetch(path_or_url: str) -> Optional[str]:
 
 
 async def fetch(url: str) -> Optional[str]:
-    async with ClientSession(raise_for_status=True) as session:
+    async with ClientSession(connector=TCPConnector(ssl=False)) as session:
         for _ in range(CONFIG_FETCH_RETRIES):
             try:
                 async with session.get(url, timeout=CONFIG_FETCH_TIMEOUT) as response:
