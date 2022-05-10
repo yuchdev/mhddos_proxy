@@ -74,6 +74,8 @@ def init_argparse() -> argparse.ArgumentParser:
         action='store_true',
         default=False,
     )
+
+    # Advanced
     parser.add_argument(
         '--scheduler-initial-capacity',
         type=int,
@@ -84,7 +86,7 @@ def init_argparse() -> argparse.ArgumentParser:
         '--scheduler-fork-scale',
         type=int,
         default=SCHEDULER_FORK_SCALE,
-        help='How many tasks to fork on succesful connect to the target',
+        help='How many tasks to fork on successful connect to the target',
     )
     parser.add_argument(
         '--scheduler-failure-delay',
@@ -93,6 +95,7 @@ def init_argparse() -> argparse.ArgumentParser:
         help='Time delay before re-launching failed tasks (seconds)',
     )
 
+    # Deprecated
     parser.add_argument('-p', '--period', type=int, help='DEPRECATED')
     parser.add_argument('--proxy-timeout', type=float, help='DEPRECATED')
     parser.add_argument('--udp-threads', type=int, help='DEPRECATED')

