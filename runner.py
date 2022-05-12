@@ -343,10 +343,10 @@ async def start(args, shutdown_event: Event):
         requests_per_connection=args.rpc,
         dest_connect_timeout_seconds=10.0,
         drain_timeout_seconds=10.0,
-        high_watermark=1024 << 2,  # roughly 4 packets (normally 1024 bytes on a single write)
+        high_watermark=1024 << 4,
         # note that "generic flood" attacks switch reading off completely
-        reader_limit=1024 << 3,
-        socket_rcvbuf=1024 << 3,
+        reader_limit=1024 << 2,
+        socket_rcvbuf=1024 << 2,
     )
 
     # XXX: with the current implementation there's no need to

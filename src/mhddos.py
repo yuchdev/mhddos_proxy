@@ -534,6 +534,7 @@ class AsyncTcpFlood:
         return await self._generic_flood_proto(FloodSpecType.GENERATOR, _gen(), on_connect)
 
     async def TCP(self, on_connect=None) -> bool:
+        self._settings = self._settings.with_options(high_watermark=1024 << 2)
         packet_size = 1024
         return await self._generic_flood_proto(
             FloodSpecType.CALLABLE,
