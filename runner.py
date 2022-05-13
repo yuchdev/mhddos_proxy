@@ -131,6 +131,7 @@ async def run_ddos(
 
     # initial set of proxies
     if proxies.has_proxies:
+        logger.info(f'{cl.YELLOW}Завантажуємо проксі...{cl.RESET}')
         num_proxies = await proxies.reload()
         if num_proxies == 0:
             logger.error(f"{cl.RED}Не знайдено робочих проксі - зупиняємо атаку{cl.RESET}")
@@ -164,11 +165,6 @@ async def run_ddos(
                 % (target.url.host, target.url.port, method)
             )
         return mhddos_main(**kwargs)
-
-    logger.info(f'{cl.GREEN}Запускаємо атаку...{cl.RESET}')
-    if not print_stats:
-        # Keep the docs/info on-screen for some time before outputting the logger.info above
-        await asyncio.sleep(5)
 
     active_flooder_tasks = []
     tcp_task_group = None
@@ -238,6 +234,7 @@ async def run_ddos(
             active_flooder_tasks.append(task)
 
     try:
+        logger.info(f'{cl.YELLOW}Завантажуємо цілі...{cl.RESET}')
         initial_targets, _ = await targets_loader.load(resolve=True)
     except Exception as exc:
         logger.error(f"{cl.RED}Завантаження цілей завершилося помилкою: {exc}{cl.RESET}")
@@ -246,6 +243,11 @@ async def run_ddos(
     if not initial_targets:
         logger.error(f'{cl.RED}Не вказано жодної цілі для атаки{cl.RESET}')
         return
+
+    logger.info(f'{cl.GREEN}Запускаємо атаку...{cl.RESET}')
+    if not print_stats:
+        # Keep the docs/info on-screen for some time before outputting the logger.info above
+        await asyncio.sleep(5)
 
     await install_targets(initial_targets)
 
