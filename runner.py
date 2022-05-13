@@ -134,7 +134,7 @@ async def run_ddos(
         num_proxies = await proxies.reload()
         if num_proxies == 0:
             logger.error(f"{cl.RED}Не знайдено робочих проксі - зупиняємо атаку{cl.RESET}")
-            exit()
+            return
 
     def prepare_flooder(target: Target, method: str) -> Union[AsyncUdpFlood, AsyncTcpFlood]:
         target_stats = target.create_stats(method)
@@ -245,7 +245,8 @@ async def run_ddos(
 
     if not initial_targets:
         logger.error(f'{cl.RED}Не вказано жодної цілі для атаки{cl.RESET}')
-        exit()
+        return
+
     await install_targets(initial_targets)
 
     tasks = []
@@ -391,12 +392,12 @@ def main():
     shutdown_event = Event()
     try:
         # run event loop in a separate thread to ensure the application
-        # exists immediately after Ctrl+C
+        # exits immediately after Ctrl+C
         Thread(target=_main, args=[args, shutdown_event, uvloop], daemon=True).start()
         # we can do something smarter rather than waiting forever,
         # but as of now it's gonna be consistent with previous version
-        while True:
-            shutdown_event.wait(WINDOWS_WAKEUP_SECONDS)
+        while not shutdown_event.wait(WINDOWS_WAKEUP_SECONDS):
+            continue
     except KeyboardInterrupt:
         logger.info(f'{cl.BLUE}Завершуємо роботу...{cl.RESET}')
         sys.exit()
