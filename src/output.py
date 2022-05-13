@@ -1,9 +1,9 @@
 import os
-from typing import List, Optional
+from typing import List
 
 from tabulate import tabulate
 
-from .core import cl, logger, THREADS_PER_CORE
+from .core import THREADS_PER_CORE, cl, logger
 from .mhddos import Tools
 from .targets import TargetStats
 

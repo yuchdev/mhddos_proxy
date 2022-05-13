@@ -1,13 +1,13 @@
 from asyncio import gather
-from asyncstdlib.functools import lru_cache
 from typing import Dict, List, Optional
 
-from dns.resolver import NoResolverConfiguration
-from dns.asyncresolver import Resolver
 import dns.exception
-from yarl import URL
+from asyncstdlib.functools import lru_cache
+from dns.asyncresolver import Resolver
+from dns.resolver import NoResolverConfiguration
 
-from .core import logger, cl
+from .core import cl, logger
+
 
 try:
     resolver = Resolver(configure=True)
@@ -19,36 +19,49 @@ resolver.nameservers = ns + list(resolver.nameservers)
 
 
 @lru_cache(maxsize=1024)
-async def resolve_host(host: str) -> str:  # TODO: handle multiple IPs?
+async def resolve_host(host: str) -> str:
     if dns.inet.is_address(host):
         return host
     answer = await resolver.resolve(host)
     return answer[0].to_text()
 
 
-async def resolve_url(url: str) -> str:
-    return await resolve_host(URL(url).host)
-
-
 async def safe_resolve_host(host: str) -> Optional[str]:
     try:
-        return await resolve_host(host)
-    except dns.exception.DNSException as e:
+        resolved = await resolve_host(host)
+        if resolved == '127.0.0.1':
+            raise dns.exception.DNSException('resolved to localhost')
+        return resolved
+    except dns.exception.DNSException:
         logger.warning(
             f"{cl.YELLOW}Ціль {cl.BLUE}{host}{cl.YELLOW} не доступна "
-            f"і {cl.RED}не буде атакована{cl.RESET}")
-        return None
+            f"і {cl.RED}не буде атакована{cl.RESET}"
+        )
 
 
 async def resolve_all(hosts: List[str]) -> Dict[str, str]:
-    unresolved_hosts = list(set(host for host in hosts if not dns.inet.is_address(host)))
-    answers = await gather(*[safe_resolve_host(h) for h in unresolved_hosts])
+    unresolved_hosts = list(set(
+        host
+        for host in hosts
+        if not dns.inet.is_address(host)
+    ))
+    answers = await gather(*[
+        safe_resolve_host(h)
+        for h in unresolved_hosts
+    ])
     ips = dict(zip(unresolved_hosts, answers))
-    return {host:ips.get(host, host) for host in hosts}
+    return {
+        host: ips.get(host, host)
+        for host in hosts
+    }
 
 
 async def resolve_all_targets(targets: List["Target"]) -> List["Target"]:
-    unresolved_hosts = list(set(target.url.host for target in targets if not target.is_resolved))
+    unresolved_hosts = list(set(
+        target.url.host
+        for target in targets
+        if not target.is_resolved
+    ))
     ips = await resolve_all(unresolved_hosts)
     for target in targets:
         if not target.is_resolved:

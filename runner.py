@@ -1,23 +1,23 @@
 # @formatter:off
-import colorama; colorama.init()
+try: import colorama; colorama.init()
+except:raise
 # @formatter:on
 import asyncio
-from functools import partial
 import sys
 import time
+from functools import partial
 from threading import Event, Thread
 from typing import List, Set, Union
 
 from src.cli import init_argparse
 from src.core import (
-    logger, cl,
-    IT_ARMY_CONFIG_URL, REFRESH_OVERTIME, REFRESH_RATE, ONLY_MY_IP,
-    FAILURE_BUDGET_FACTOR, FAILURE_DELAY_SECONDS, SCHEDULER_MIN_INIT_FRACTION
+    FAILURE_BUDGET_FACTOR, FAILURE_DELAY_SECONDS, IT_ARMY_CONFIG_URL, ONLY_MY_IP, REFRESH_OVERTIME,
+    REFRESH_RATE, SCHEDULER_MIN_INIT_FRACTION, cl, logger
 )
-from src.mhddos import main as mhddos_main, AsyncTcpFlood, AsyncUdpFlood, AttackSettings
-from src.output import print_progress, show_statistic, print_banner
+from src.mhddos import AsyncTcpFlood, AsyncUdpFlood, AttackSettings, main as mhddos_main
+from src.output import print_banner, print_progress, show_statistic
 from src.proxies import ProxySet
-from src.system import fix_ulimits, is_latest_version, setup_event_loop, WINDOWS_WAKEUP_SECONDS
+from src.system import WINDOWS_WAKEUP_SECONDS, fix_ulimits, is_latest_version, setup_event_loop
 from src.targets import Target, TargetsLoader
 
 
