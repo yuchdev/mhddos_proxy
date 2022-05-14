@@ -73,7 +73,7 @@ class Methods:
         # XXX: this is not HTTP method but it's easier to test this way
         "TREX" 
     }
-    TCP_METHODS: Set[str] = {"TCP", }
+    TCP_METHODS: Set[str] = {"TCP",}
     UDP_METHODS: Set[str] = {
         "UDP", "VSE", "FIVEM", "TS3", "MCPE",
         # the following methods are temporarily disabled for further investigation and testing
