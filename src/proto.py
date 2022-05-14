@@ -281,7 +281,7 @@ class TrexIO(asyncio.BufferedProtocol):
 
     INIT_BUF_SIZE = 1024
     MAX_BUF_SIZE = 1024 << 4
-    READ_CHUNK_SIZE = 1024 << 2
+    READ_CHUNK_SIZE = 1024
 
     def __init__(
         self,
@@ -312,12 +312,16 @@ class TrexIO(asyncio.BufferedProtocol):
         self._handshake()
 
     def _process_outgoing(self):
-        data = self._conn.bio_read(self.READ_CHUNK_SIZE)
-        nbytes = len(data)
-        if nbytes > 0:
-            self._nbytes_sent += nbytes
-            self._transport.write(data)
-            self._loop.call_soon(self._handshake)
+        try:
+            data = self._conn.bio_read(self.READ_CHUNK_SIZE)
+        except SSL.WantReadError:
+            pass
+        else:
+            nbytes = len(data)
+            if nbytes > 0:
+                self._nbytes_sent += nbytes
+                self._transport.write(data)
+                self._loop.call_soon(self._handshake)
 
     def get_buffer(self, n):
         want = n
@@ -333,9 +337,10 @@ class TrexIO(asyncio.BufferedProtocol):
         self._handshake()
 
     def eof_received(self):
-        if self._transport is None: return
-        self._terminate(EOFError())
+        pass
 
+    # XXX: it migbt be necessary to send a "dummy" write from time to time
+    #      to keep connection "alive"
     def _handshake(self):
         if self._transport is None: return
         try:
@@ -361,7 +366,7 @@ class TrexIO(asyncio.BufferedProtocol):
         if self._budget >= 0:
             self._handshake()
 
-    def _terminate(self, exc: Optional[Exception]) -> None:
+    def _terminate(self, exc: Optional[Exception], abort: bool = True) -> None:
         if self._transport is None: return
         self._stats.track_close_connection()
         if not self._on_connect.done():
@@ -373,10 +378,11 @@ class TrexIO(asyncio.BufferedProtocol):
                 self._on_close.set_exception(exc)
         if self._handle is not None:
             self._handle.cancel()
-        self._transport.abort()
+        if abort:
+            self._transport.abort()
         self._transport = None
 
     def connection_lost(self, exc):
         if self._transport is None: return
-        self._transport = None
+        self._terminate(exc, abort=False)
 
