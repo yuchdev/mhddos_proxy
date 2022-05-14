@@ -620,7 +620,7 @@ class AsyncTcpFlood:
                 on_connect=self._loop.create_future() # as we don't want it to fire too early
             )
             conn = self._loop.create_connection(
-                trex_proto, host=proxy.proxy_host, port=proxy.proxy_port, ssl=ssl_ctx)
+                trex_proto, host=proxy.proxy_host, port=proxy.proxy_port, ssl=None)
 
         return await self._with_safe_close(conn, on_connect, on_close)
 

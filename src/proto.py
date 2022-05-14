@@ -277,10 +277,8 @@ class TrexIOError(IOError):
     pass
 
 
-class TrexIO(asyncio.BufferedProtocol):
+class TrexIO(asyncio.Protocol):
 
-    INIT_BUF_SIZE = 1024
-    MAX_BUF_SIZE = 1024 << 4
     READ_CHUNK_SIZE = 1024
 
     def __init__(
@@ -300,13 +298,12 @@ class TrexIO(asyncio.BufferedProtocol):
         self._conn: Optional[SSL.Connection] = None
         self._on_connect = on_connect
         self._on_close = on_close
-        self._buffer = bytearray(self.INIT_BUF_SIZE)
         self._handle = None
         self._nbytes_sent = 0
 
     def connection_made(self, transport):
-        self._stats.track_open_connection()
         self._transport = transport
+        self._stats.track_open_connection()
         self._conn = SSL.Connection(self._ctx, None)
         self._conn.set_connect_state()
         self._handshake()
@@ -323,17 +320,10 @@ class TrexIO(asyncio.BufferedProtocol):
                 self._transport.write(data)
                 self._loop.call_soon(self._handshake)
 
-    def get_buffer(self, n):
-        want = n
-        if want <= 0 or want > self.MAX_BUF_SIZE:
-            want = self.MAX_BUF_SIZE
-        if len(self._buffer) < want:
-            self._buffer = bytearray(want)
-            self._buffer_view = memoryview(self._buffer)
-        return self._buffer_view
-
-    def buffer_updated(self, nbytes):
-        self._conn.bio_write(self._buffer_view[:nbytes])
+    # XXX: not sure if passing around bytes provides good enough performance
+    #      it might be beneficial to just pass memoryview over a buffer
+    def data_received(self, data):
+        self._conn.bio_write(data)
         self._handshake()
 
     def eof_received(self):
@@ -370,7 +360,7 @@ class TrexIO(asyncio.BufferedProtocol):
         if self._transport is None: return
         self._stats.track_close_connection()
         if not self._on_connect.done():
-            self._on_connect.set_done(False)
+            self._on_connect.set_result(False)
         if not self._on_close.done():
             if exc is None:
                 self._on_close.set_result(None)
