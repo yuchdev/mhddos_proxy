@@ -290,7 +290,7 @@ class AsyncTcpFlood:
         )
         server_hostname = "" if self.is_tls else None
         ssl_ctx = ctx if self.is_tls else None
-        proxy_url: str = self._proxies.pick_random()
+        proxy_url: Optional[str] = self._proxies.pick_random()
         if proxy_url is None:
             conn = self._loop.create_connection(
                 flood_proto,

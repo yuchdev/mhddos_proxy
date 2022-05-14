@@ -1,11 +1,12 @@
 import asyncio
-from enum import Enum
 import errno
 import time
-from types import GeneratorType
+from enum import Enum
 from typing import Any, Callable, Generator, Optional, Tuple
 
-from .core import logger, CONN_PROBE_PERIOD, UDP_BATCH_PACKETS, UDP_ENOBUFS_PAUSE
+from OpenSSL import SSL
+
+from .core import CONN_PROBE_PERIOD, UDP_BATCH_PACKETS, UDP_ENOBUFS_PAUSE, logger
 from .targets import TargetStats
 
 
@@ -276,9 +277,6 @@ class TrexIOError(IOError):
     pass
 
 
-from OpenSSL import SSL
-
-
 class TrexIO(asyncio.BufferedProtocol):
 
     INIT_BUF_SIZE = 1024
@@ -381,5 +379,4 @@ class TrexIO(asyncio.BufferedProtocol):
     def connection_lost(self, exc):
         if self._transport is None: return
         self._transport = None
-        self._on_close.set_excetpion(exc)
 

@@ -14,7 +14,7 @@ from .system import fetch, read_or_fetch
 _globals_before = set(globals().keys()).union({'_globals_before'})
 # noinspection PyUnresolvedReferences
 from .vendor.load_proxies import *
-decrypt_proxies = globals()[set(globals().keys()).difference(_globals_before).pop()]
+obtain_proxies = globals()[set(globals().keys()).difference(_globals_before).pop()]
 # @formatter:on
 
 
@@ -121,7 +121,7 @@ async def load_provided_proxies(proxies_file: str) -> Optional[List[str]]:
 async def load_system_proxies():
     raw = await fetch(random.choice(PROXIES_URLS))
     try:
-        proxies = decrypt_proxies(raw)
+        proxies = obtain_proxies(raw)
     except Exception:
         proxies = []
     proxies = list(map(normalize_url, proxies))
