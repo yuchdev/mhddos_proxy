@@ -311,6 +311,19 @@ class HttpTunelProtocol(ProxyProtocol):
         self._transport.write(bytes(req))
 
 
+class SockWaitProtocol(asyncio.Protocol):
+    
+    def __init__(self, on_socket: asyncio.Future):
+        self._on_socket = on_socket
+
+    def connection_made(self, transport):
+        self._on_socket.set_result(transport.get_extra_info("socket"))
+
+    def connection_lost(self, exc):
+        if not self._on_socket.done():
+            self._on_socket.set_exception(exc)
+
+
 _CONNECTORS = {
     Socks4Proxy: Socks4Protocol,
     Socks5Proxy: Socks5Protocol,

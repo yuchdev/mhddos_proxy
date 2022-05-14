@@ -271,3 +271,115 @@ class DatagramFloodIO(asyncio.Protocol):
             self._transport.abort()
             self._transport = None
 
+
+class TrexIOError(IOError):
+    pass
+
+
+from OpenSSL import SSL
+
+
+class TrexIO(asyncio.BufferedProtocol):
+
+    INIT_BUF_SIZE = 1024
+    MAX_BUF_SIZE = 1024 << 4
+    READ_CHUNK_SIZE = 1024 << 2
+
+    def __init__(
+        self,
+        ctx: SSL.Context,
+        rpc: int,
+        stats: TargetStats,
+        loop: asyncio.AbstractEventLoop,
+        on_connect: asyncio.Future,
+        on_close: asyncio.Future,
+    ):
+        self._loop = loop
+        self._ctx = ctx
+        self._budget = rpc
+        self._stats = stats
+        self._transport = None
+        self._conn: Optional[SSL.Connection] = None
+        self._on_connect = on_connect
+        self._on_close = on_close
+        self._buffer = bytearray(self.INIT_BUF_SIZE)
+        self._handle = None
+        self._nbytes_sent = 0
+
+    def connection_made(self, transport):
+        self._stats.track_open_connection()
+        self._transport = transport
+        self._conn = SSL.Connection(self._ctx, None)
+        self._conn.set_connect_state()
+        self._handshake()
+
+    def _process_outgoing(self):
+        data = self._conn.bio_read(self.READ_CHUNK_SIZE)
+        nbytes = len(data)
+        if nbytes > 0:
+            self._nbytes_sent += nbytes
+            self._transport.write(data)
+            self._loop.call_soon(self._handshake)
+
+    def get_buffer(self, n):
+        want = n
+        if want <= 0 or want > self.MAX_BUF_SIZE:
+            want = self.MAX_BUF_SIZE
+        if len(self._buffer) < want:
+            self._buffer = bytearray(want)
+            self._buffer_view = memoryview(self._buffer)
+        return self._buffer_view
+
+    def buffer_updated(self, nbytes):
+        self._conn.bio_write(self._buffer_view[:nbytes])
+        self._handshake()
+
+    def eof_received(self):
+        if self._transport is None: return
+        self._terminate(EOFError())
+
+    def _handshake(self):
+        if self._transport is None: return
+        try:
+            self._conn.do_handshake()
+        except (SSL.WantReadError, SSL.WantWriteError):
+            self._process_outgoing()
+        except Exception as e:
+            self._terminate(e)
+        else:
+            if not self._on_connect.done():
+                self._on_connect.set_result(True)
+            self._stats.track(1, self._nbytes_sent)
+            self._nbytes_sent = 0
+            self._handle = self._loop.call_soon(self._re)
+
+    def _re(self):
+        if self._transport is None: return
+        self._handle = None
+        if not self._conn.renegotiate():
+            self._terminate(TrexIOError("Unsupported operation"))
+            return
+        self._budget -= 1
+        if self._budget >= 0:
+            self._handshake()
+
+    def _terminate(self, exc: Optional[Exception]) -> None:
+        if self._transport is None: return
+        self._stats.track_close_connection()
+        if not self._on_connect.done():
+            self._on_connect.set_done(False)
+        if not self._on_close.done():
+            if exc is None:
+                self._on_close.set_result(None)
+            else:
+                self._on_close.set_exception(exc)
+        if self._handle is not None:
+            self._handle.cancel()
+        self._transport.abort()
+        self._transport = None
+
+    def connection_lost(self, exc):
+        if self._transport is None: return
+        self._transport = None
+        self._on_close.set_excetpion(exc)
+
