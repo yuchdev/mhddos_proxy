@@ -321,7 +321,7 @@ async def run_ddos(
 async def start(args, shutdown_event: Event):
     use_my_ip = min(args.use_my_ip, ONLY_MY_IP)
     print_banner(use_my_ip)
-    fix_ulimits()
+    max_conns = fix_ulimits()
 
     if args.table:
         args.debug = False
@@ -355,6 +355,15 @@ async def start(args, shutdown_event: Event):
     # XXX: with the current implementation there's no need to
     # have 2 separate functions to setups params for launching flooders
     reload_after = 300
+    connections = args.threads
+    if max_conns is not None:
+        max_conns -= 50  # keep some for other needs
+        if max_conns < connections:
+            logger.warning(
+                f"{cl.MAGENTA}Кількість потоків зменшено до {max_conns} через обмеження вашої системи{cl.RESET}"
+            )
+            connections = max_conns
+
     await run_ddos(
         proxies,
         targets_loader,
@@ -363,7 +372,7 @@ async def start(args, shutdown_event: Event):
         args.http_methods,
         args.debug,
         args.table,
-        args.threads,
+        connections,
         use_my_ip,
         args.scheduler_initial_capacity,
         args.scheduler_fork_scale,
