@@ -7,7 +7,7 @@ from asyncio import events
 from contextlib import suppress
 from typing import Optional
 
-from aiohttp import ClientSession
+from aiohttp import ClientSession, TCPConnector
 
 from src.core import CONFIG_FETCH_RETRIES, CONFIG_FETCH_TIMEOUT, VERSION_URL, logger
 
@@ -16,16 +16,23 @@ WINDOWS = sys.platform == "win32"
 WINDOWS_WAKEUP_SECONDS = 0.5
 
 
-def fix_ulimits():
+def fix_ulimits() -> Optional[int]:
     try:
         import resource
     except ImportError:
-        return
+        return None
 
+    min_hard = 2 ** 16
     soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
-    if soft < hard:
+    # Try to raise hard limit if it's too low
+    if hard < min_hard:
         with suppress(Exception):
-            resource.setrlimit(resource.RLIMIT_NOFILE, (hard, hard))
+            resource.setrlimit(resource.RLIMIT_NOFILE, (min_hard, min_hard))
+            return min_hard
+
+    # At least raise soft limit to the hard limit
+    resource.setrlimit(resource.RLIMIT_NOFILE, (hard, hard))
+    return hard
 
 
 async def read_or_fetch(path_or_url: str) -> Optional[str]:
@@ -36,7 +43,7 @@ async def read_or_fetch(path_or_url: str) -> Optional[str]:
 
 
 async def fetch(url: str) -> Optional[str]:
-    async with ClientSession(raise_for_status=True) as session:
+    async with ClientSession(connector=TCPConnector(ssl=False)) as session:
         for _ in range(CONFIG_FETCH_RETRIES):
             try:
                 async with session.get(url, timeout=CONFIG_FETCH_TIMEOUT) as response:
@@ -48,7 +55,7 @@ async def fetch(url: str) -> Optional[str]:
 
 
 async def is_latest_version():
-    latest = int((await read_or_fetch(VERSION_URL)).strip())
+    latest = int((await fetch(VERSION_URL)).strip())
     current = int((await read_or_fetch('version.txt')).strip())
     return current >= latest
 

@@ -1,11 +1,11 @@
-from hashlib import md5
 import time
+from hashlib import md5
 from typing import Dict, List, Optional, Tuple
 
 from dns import inet
 from yarl import URL
 
-from .core import logger, cl
+from .core import cl, logger
 from .dns_utils import resolve_all_targets
 from .system import read_or_fetch
 
@@ -14,6 +14,7 @@ Options = Dict[str, str]
 
 
 class Target:
+    OPTION_IP = "rpc"
     OPTION_RPC = "rpc"
     OPTION_HIGH_WATERMARK = "watermark"
 
@@ -32,7 +33,7 @@ class Target:
         self.url = url
         self.method = method
         self.options = options or {}
-        self.addr = addr
+        self.addr = self.option(Target.OPTION_IP, addr)
 
     @classmethod
     def from_string(cls, raw: str) -> "Target":
@@ -117,7 +118,8 @@ class TargetsLoader:
         if config_targets:
             logger.info(
                 f"{cl.YELLOW}Завантажено конфіг {self._config} "
-                f"на {cl.BLUE}{len(config_targets)} цілей{cl.RESET}")
+                f"на {cl.BLUE}{len(config_targets)} цілей{cl.RESET}"
+            )
         all_targets = self._targets + (config_targets or [])
         if resolve:
             all_targets = await resolve_all_targets(all_targets)

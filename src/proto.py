@@ -1,11 +1,10 @@
 import asyncio
-from enum import Enum
 import errno
 import time
-from types import GeneratorType
+from enum import Enum
 from typing import Any, Callable, Generator, Optional, Tuple
 
-from .core import logger, CONN_PROBE_PERIOD, UDP_BATCH_PACKETS, UDP_ENOBUFS_PAUSE
+from .core import CONN_PROBE_PERIOD, UDP_BATCH_PACKETS, UDP_ENOBUFS_PAUSE, logger
 from .targets import TargetStats
 
 
@@ -270,4 +269,3 @@ class DatagramFloodIO(asyncio.Protocol):
         if on_close.cancelled() and self._transport and not self._transport.is_closing():
             self._transport.abort()
             self._transport = None
-

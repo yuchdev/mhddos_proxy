@@ -4,9 +4,9 @@ from functools import lru_cache, partial
 from ssl import SSLContext
 from typing import BinaryIO, Callable, Optional, Tuple
 
-from python_socks.async_.asyncio._proxy import HttpProxy, Socks4Proxy, Socks5Proxy
+from python_socks._proto import http as http_proto, socks4, socks5
 from python_socks.async_.asyncio import Proxy
-from python_socks._proto import socks4, socks5, http as http_proto
+from python_socks.async_.asyncio._proxy import HttpProxy, Socks4Proxy, Socks5Proxy
 
 from .core import logger
 
@@ -23,7 +23,7 @@ class ProxyProtocol(asyncio.Protocol):
         ssl: Optional[SSLContext],
         downstream_factory: Callable[[], asyncio.Protocol],
         connect_timeout: int = 30,
-        on_connect = None
+        on_connect=None
     ):
         logger.debug(f"Factory called for {proxy_url}")
         self._loop = loop
@@ -174,7 +174,7 @@ class Socks4Protocol(ProxyProtocol):
 
     def _dest_connect(self):
         addr, port = self._dest
-        req = socks4.ConnectRequest(host=addr, port=port, user_id=None, rdns=False)
+        req = socks4.ConnectRequest(host=addr, port=port, user_id='', rdns=False)
         req.set_resolved_host(addr)
         self._transport.write(bytes(req))
 
@@ -204,7 +204,9 @@ class Socks5Protocol(ProxyProtocol):
             self._auth_method = res.auth_method
             if self._auth_method == socks5.AuthMethod.USERNAME_PASSWORD:
                 req = socks5.AuthRequest(
-                    username=self._proxy._username, password=self._proxy._password)
+                    username=self._proxy._username,
+                    password=self._proxy._password
+                )
                 self._transport.write(bytes(req))
                 self._auth_req_sent = True
                 logger.debug(f"Sent user/pass for {self._proxy_url}")
@@ -307,14 +309,17 @@ class HttpTunelProtocol(ProxyProtocol):
         addr, port = self._dest
         # XXX: remove user agent field?
         req = http_proto.ConnectRequest(
-            host=addr, port=port, login=self._proxy._username, password=self._proxy._password)
+            host=addr, port=port,
+            login=self._proxy._username,
+            password=self._proxy._password
+        )
         self._transport.write(bytes(req))
 
 
 _CONNECTORS = {
     Socks4Proxy: Socks4Protocol,
     Socks5Proxy: Socks5Protocol,
-    HttpProxy:   HttpTunelProtocol,
+    HttpProxy: HttpTunelProtocol,
 }
 
 
@@ -323,4 +328,3 @@ def for_proxy(proxy_url: str) -> Tuple[Proxy, Callable[[], asyncio.Protocol]]:
     proxy = Proxy.from_url(proxy_url)
     proxy_protocol = _CONNECTORS[type(proxy)]
     return proxy, partial(proxy_protocol, proxy_url, proxy)
-
