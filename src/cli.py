@@ -3,10 +3,14 @@ import random
 from multiprocessing import cpu_count
 
 from .core import (
-    THREADS_PER_CORE, MAX_DEFAULT_THREADS,
+    LOW_PROFILE_THREADS, HIGH_PROFILE_THREADS,
     SCHEDULER_INITIAL_CAPACITY, SCHEDULER_FORK_SCALE, SCHEDULER_FAILURE_DELAY,
 )
 from .mhddos import Methods
+
+
+default_threads = LOW_PROFILE_THREADS if cpu_count() == 1 else HIGH_PROFILE_THREADS
+print(default_threads)
 
 
 def init_argparse() -> argparse.ArgumentParser:
@@ -25,8 +29,8 @@ def init_argparse() -> argparse.ArgumentParser:
         '-t',
         '--threads',
         type=int,
-        default=min(THREADS_PER_CORE * cpu_count(), MAX_DEFAULT_THREADS),
-        help=f'Total number of threads to run (default is CPU * {THREADS_PER_CORE})',
+        default=default_threads,
+        help=f'Total number of threads to run (default is {default_threads})',
     )
     parser.add_argument(
         '--rpc',
