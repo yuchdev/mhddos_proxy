@@ -201,10 +201,11 @@ async def run_ddos(
 
         if tcp_flooders:
             num_flooders = len(tcp_flooders)
+            num_init = initial_capacity * num_flooders
 
-            if initial_capacity * num_flooders > total_threads:
+            if num_init > total_threads:
                 logger.warning(
-                    f"{cl.MAGENTA}Початкова кількість одночасних атак перевищує "
+                    f"{cl.MAGENTA}Початкова кількість одночасних атак ({num_init}) перевищує "
                     f"максимально дозволену параметром `-t` ({total_threads}).{cl.RESET}"
                 )
 
@@ -214,7 +215,7 @@ async def run_ddos(
             adjusted_capacity = max(
                 initial_capacity,
                 int(SCHEDULER_MIN_INIT_FRACTION * total_threads / num_flooders)
-            )
+            ) if num_flooders > 1 else total_threads
 
             tcp_task_group = GeminoCurseTaskSet(
                 loop,
