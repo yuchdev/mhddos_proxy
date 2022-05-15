@@ -1,8 +1,9 @@
-## Скрипт для DDoS-у сайтів, який автоматично шукає та підтягує робочі проксі в атаку  
+## DDoS Tool for IT Army of Ukraine 
 
-- **Не потребує VPN** - скачує і підбирає робочі проксі для атаки (доступний режим `--vpn` за бажанням)
-- Атака **декількох цілей** з автоматичним балансуванням навантаження
-- Використовує **різноманітні методи для атаки**
+- Вбудована база проксі для атаки з величезної кількості IP по всьому світу
+- Можливість атаки багатьох цілей з автоматичним балансуванням навантаження
+- Безліч різноманітних методів для атаки
+- Ефективне використання ресурсів завдяки асихронній архітектурі
 
 ### ⏱ Останні оновлення
 
@@ -105,7 +106,6 @@
       --rpc 2000             How many requests to send on a single proxy connection (default is 2000)
       --proxies URL|path     URL or local path(ex. proxies.txt) to file with proxies to use
       --http-methods GET     List of HTTP(s) attack methods to use (default is GET + POST|STRESS).
-                             Refer to MHDDoS docs for available options (https://github.com/MHProDev/MHDDoS)
 
 ### Власні проксі
 
