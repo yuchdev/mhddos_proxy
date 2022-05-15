@@ -389,6 +389,14 @@ def _main(args, uvloop):
     loop.run_until_complete(start(args))
 
 
+def _main_process(args, uvloop):
+    try:
+        _main(args, uvloop)
+    except KeyboardInterrupt:
+        logger.info(f'{cl.BLUE}Завершуємо роботу...{cl.RESET}')
+        sys.exit()
+
+
 def main():
     args = init_argparse().parse_args()
 
@@ -427,7 +435,7 @@ def main():
                     f"при запуску декількох процессів{cl.RESET}")
                 args.table = False
             for _ in range(num_processes):
-                mp.Process(target=_main, args=(args, uvloop), daemon=True).start()
+                mp.Process(target=_main_process, args=(args, uvloop), daemon=True).start()
         # we can do something smarter rather than waiting forever,
         # but as of now it's gonna be consistent with previous version
         while not shutdown_event.wait(WINDOWS_WAKEUP_SECONDS):
