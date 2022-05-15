@@ -10,7 +10,6 @@ from .mhddos import Methods
 
 
 default_threads = LOW_PROFILE_THREADS if cpu_count() == 1 else HIGH_PROFILE_THREADS
-print(default_threads)
 
 
 def init_argparse() -> argparse.ArgumentParser:
