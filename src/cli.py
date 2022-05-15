@@ -1,15 +1,11 @@
 import argparse
 import random
-from multiprocessing import cpu_count
 
 from .core import (
-    LOW_PROFILE_THREADS, HIGH_PROFILE_THREADS,
+    DEFAULT_THREADS,
     SCHEDULER_INITIAL_CAPACITY, SCHEDULER_FORK_SCALE, SCHEDULER_FAILURE_DELAY,
 )
 from .mhddos import Methods
-
-
-default_threads = LOW_PROFILE_THREADS if cpu_count() == 1 else HIGH_PROFILE_THREADS
 
 
 def init_argparse() -> argparse.ArgumentParser:
@@ -28,8 +24,8 @@ def init_argparse() -> argparse.ArgumentParser:
         '-t',
         '--threads',
         type=int,
-        default=default_threads,
-        help=f'Total number of threads to run (default is {default_threads})',
+        default=DEFAULT_THREADS,
+        help=f'Total number of threads to run (default is {DEFAULT_THREADS})',
     )
     parser.add_argument(
         '--rpc',

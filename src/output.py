@@ -3,8 +3,7 @@ from typing import List
 
 from tabulate import tabulate
 
-from .cli import default_threads
-from .core import cl, logger
+from .core import DEFAULT_THREADS, cl, logger
 from .mhddos import Tools
 from .targets import TargetStats
 
@@ -101,7 +100,7 @@ def print_progress(
 
 def print_banner(use_my_ip):
     print(f'''
-- {cl.YELLOW}Навантаження (кількість потоків){cl.RESET} - параметр `-t 5000`, за замовчуванням - {default_threads}
+- {cl.YELLOW}Навантаження (кількість потоків){cl.RESET} - параметр `-t 5000`, за замовчуванням - {DEFAULT_THREADS}
 - {cl.YELLOW}Статистика у вигляді таблиці або тексту{cl.RESET} - прапорець `--table` або `--debug`
 - {cl.YELLOW}Повна документація{cl.RESET} - https://github.com/porthole-ascend-cinnamon/mhddos_proxy
     ''')

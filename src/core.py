@@ -1,5 +1,6 @@
-import logging
 from asyncio.log import logger as asyncio_logger
+import logging
+from multiprocessing import cpu_count
 from pathlib import Path
 
 from colorama import Fore
@@ -33,6 +34,9 @@ VERSION_URL = 'https://raw.githubusercontent.com/porthole-ascend-cinnamon/mhddos
 
 LOW_PROFILE_THREADS = 1_000
 HIGH_PROFILE_THREADS = 7_500
+
+DEFAULT_THREADS = LOW_PROFILE_THREADS if cpu_count() == 1 else HIGH_PROFILE_THREADS
+
 CONFIG_FETCH_RETRIES = 3
 CONFIG_FETCH_TIMEOUT = 10
 REFRESH_OVERTIME = 2  # roughly 5 more seconds
