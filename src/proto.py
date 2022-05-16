@@ -329,7 +329,7 @@ class TrexIO(asyncio.Protocol):
     def eof_received(self):
         pass
 
-    # XXX: it migbt be necessary to send a "dummy" write from time to time
+    # XXX: it might be necessary to send a "dummy" write from time to time
     #      to keep connection "alive"
     def _handshake(self):
         if self._transport is None: return
