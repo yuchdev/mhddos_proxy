@@ -615,7 +615,7 @@ class AsyncTcpFlood:
             on_connect,
             on_close
         )
-        proxy_url: str = self._proxies.pick_random()
+        proxy_url: Optional[str] = self._proxies.pick_random()
         if proxy_url is None:
             addr, port = self._raw_target
             conn = self._loop.create_connection(trex_proto, host=addr, port=port, ssl=None)
