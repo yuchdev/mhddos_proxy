@@ -4,6 +4,8 @@ import time
 from enum import Enum
 from typing import Any, Callable, Generator, Optional, Tuple
 
+from OpenSSL import SSL
+
 from .core import CONN_PROBE_PERIOD, UDP_BATCH_PACKETS, UDP_ENOBUFS_PAUSE, logger
 from .targets import TargetStats
 
@@ -269,3 +271,108 @@ class DatagramFloodIO(asyncio.Protocol):
         if on_close.cancelled() and self._transport and not self._transport.is_closing():
             self._transport.abort()
             self._transport = None
+
+
+class TrexIOError(IOError):
+    pass
+
+
+class TrexIO(asyncio.Protocol):
+
+    READ_CHUNK_SIZE = 1024
+
+    def __init__(
+        self,
+        ctx: SSL.Context,
+        rpc: int,
+        stats: TargetStats,
+        loop: asyncio.AbstractEventLoop,
+        on_connect: asyncio.Future,
+        on_close: asyncio.Future,
+    ):
+        self._loop = loop
+        self._ctx = ctx
+        self._budget = rpc
+        self._stats = stats
+        self._transport = None
+        self._conn: Optional[SSL.Connection] = None
+        self._on_connect = on_connect
+        self._on_close = on_close
+        self._handle = None
+        self._nbytes_sent = 0
+
+    def connection_made(self, transport):
+        self._transport = transport
+        self._stats.track_open_connection()
+        self._conn = SSL.Connection(self._ctx, None)
+        self._conn.set_connect_state()
+        self._handshake()
+
+    def _process_outgoing(self):
+        try:
+            data = self._conn.bio_read(self.READ_CHUNK_SIZE)
+        except SSL.WantReadError:
+            pass
+        else:
+            nbytes = len(data)
+            if nbytes > 0:
+                self._nbytes_sent += nbytes
+                self._transport.write(data)
+                self._loop.call_soon(self._handshake)
+
+    # XXX: not sure if passing around bytes provides good enough performance
+    #      it might be beneficial to just pass memoryview over a buffer
+    def data_received(self, data):
+        self._conn.bio_write(data)
+        self._handshake()
+
+    def eof_received(self):
+        pass
+
+    # XXX: it might be necessary to send a "dummy" write from time to time
+    #      to keep connection "alive"
+    def _handshake(self):
+        if self._transport is None: return
+        try:
+            self._conn.do_handshake()
+        except (SSL.WantReadError, SSL.WantWriteError):
+            self._process_outgoing()
+        except Exception as e:
+            self._terminate(e)
+        else:
+            if not self._on_connect.done():
+                self._on_connect.set_result(True)
+            self._stats.track(1, self._nbytes_sent)
+            self._nbytes_sent = 0
+            self._handle = self._loop.call_soon(self._re)
+
+    def _re(self):
+        if self._transport is None: return
+        self._handle = None
+        if not self._conn.renegotiate():
+            self._terminate(TrexIOError("Unsupported operation"))
+            return
+        self._budget -= 1
+        if self._budget >= 0:
+            self._handshake()
+
+    def _terminate(self, exc: Optional[Exception], abort: bool = True) -> None:
+        if self._transport is None: return
+        self._stats.track_close_connection()
+        if not self._on_connect.done():
+            self._on_connect.set_result(False)
+        if not self._on_close.done():
+            if exc is None:
+                self._on_close.set_result(None)
+            else:
+                self._on_close.set_exception(exc)
+        if self._handle is not None:
+            self._handle.cancel()
+        if abort:
+            self._transport.abort()
+        self._transport = None
+
+    def connection_lost(self, exc):
+        if self._transport is None: return
+        self._terminate(exc, abort=False)
+
