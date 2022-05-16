@@ -175,6 +175,7 @@ class AttackSettings:
 
 
 class AsyncTcpFlood:
+
     BASE_HEADERS = (
         'Accept-Encoding: gzip, deflate, br\r\n'
         'Accept-Language: en-US,en;q=0.9\r\n'
@@ -213,10 +214,15 @@ class AsyncTcpFlood:
             else "GET"
         )
 
+        self._method = method
         self.SENT_FLOOD = getattr(self, method)
 
         self._loop = loop
         self._settings = settings or AttackSettings()
+
+    @property
+    def desc(self) -> Tuple[str, int, str]:
+        return (self._target.host, self._target.port, self._method)
 
     @property
     def is_tls(self):
@@ -662,6 +668,7 @@ class AsyncTcpFlood:
 
 
 class AsyncUdpFlood:
+
     def __init__(
         self,
         target: Tuple[str, int],
@@ -680,7 +687,13 @@ class AsyncUdpFlood:
         self._loop = loop
         self._settings = settings or AttackSettings()
 
+        self._method = method
         self.SENT_FLOOD = getattr(self, method)
+
+    @property
+    def desc(self) -> Tuple[str, int, str]:
+        addr, port = self.target
+        return (addr, port, self.method)
 
     async def run(self) -> bool:
         return await self.SENT_FLOOD()
