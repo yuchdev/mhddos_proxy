@@ -692,8 +692,8 @@ class AsyncUdpFlood:
 
     @property
     def desc(self) -> Tuple[str, int, str]:
-        addr, port = self.target
-        return (addr, port, self.method)
+        addr, port = self._target
+        return (addr, port, self._method)
 
     async def run(self) -> bool:
         return await self.SENT_FLOOD()
