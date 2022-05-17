@@ -1,9 +1,8 @@
 import argparse
 import random
-from multiprocessing import cpu_count
 
 from .core import (
-    THREADS_PER_CORE, MAX_DEFAULT_THREADS,
+    DEFAULT_THREADS,
     SCHEDULER_INITIAL_CAPACITY, SCHEDULER_FORK_SCALE, SCHEDULER_FAILURE_DELAY,
 )
 from .mhddos import Methods
@@ -25,8 +24,8 @@ def init_argparse() -> argparse.ArgumentParser:
         '-t',
         '--threads',
         type=int,
-        default=min(THREADS_PER_CORE * cpu_count(), MAX_DEFAULT_THREADS),
-        help=f'Total number of threads to run (default is CPU * {THREADS_PER_CORE})',
+        default=DEFAULT_THREADS,
+        help=f'Total number of threads to run (default is {DEFAULT_THREADS})',
     )
     parser.add_argument(
         '--processes',
