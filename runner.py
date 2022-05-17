@@ -3,10 +3,10 @@ try: import colorama; colorama.init()
 except:raise
 # @formatter:on
 import asyncio
-from functools import partial
 import random
 import sys
 import time
+from functools import partial
 from threading import Event, Thread
 from typing import List, Set, Union
 
@@ -299,18 +299,15 @@ async def run_ddos(
             try:
                 await asyncio.sleep(delay_seconds)
                 targets, changed = await targets_loader.load(resolve=True)
-                if not changed and not force_next:
-                    logger.info(
-                        f"{cl.YELLOW}Перелік цілей не змінився - "
-                        f"чекаємо {delay_seconds} сек до наступної перевірки{cl.RESET}"
-                    )
-                elif not targets:
+
+                if not targets:
                     logger.warning(
-                        f"{cl.MAGENTA}Завантажено порожній конфіг - "
-                        f"буде використано попередній{cl.RESET}"
+                        f"{cl.MAGENTA}Завантажено порожній конфіг - буде використано попередній{cl.RESET}"
                     )
-                else:
+
+                if targets and (changed or force_next):
                     force_next = await install_targets(targets)
+
             except asyncio.CancelledError as e:
                 raise e
             except Exception as exc:
