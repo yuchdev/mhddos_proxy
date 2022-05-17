@@ -424,9 +424,9 @@ def main():
 
     shutdown_event = Event()
     try:
-        # run event loop in a separate thread to ensure the application
-        # exists immediately after Ctrl+C
         if num_processes == 1:
+            # run event loop in a separate thread to ensure the application
+            # exists immediately after Ctrl+C
             Thread(target=_main, args=(args, uvloop), daemon=True).start()
         else:
             if args.table:
