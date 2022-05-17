@@ -13,7 +13,7 @@ from typing import List, Set, Union
 
 from src.cli import init_argparse
 from src.core import (
-    CORE_PER_PROCESS, FAILURE_BUDGET_FACTOR, FAILURE_DELAY_SECONDS,
+    CPU_PER_PROCESS, FAILURE_BUDGET_FACTOR, FAILURE_DELAY_SECONDS,
     IT_ARMY_CONFIG_URL, ONLY_MY_IP, REFRESH_OVERTIME, REFRESH_RATE,
     SCHEDULER_MIN_INIT_FRACTION, cl, logger
 )
@@ -413,7 +413,7 @@ def main():
 
     if args.processes > 1:
         cpus = mp.cpu_count()
-        max_processes = cpus//CORE_PER_PROCESS
+        max_processes = cpus//CPU_PER_PROCESS
         if args.processes > max_processes:
             logger.warning(
                 f"{cl.MAGENTA} Максимальна кількість запущенних процессів: "
