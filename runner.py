@@ -300,8 +300,7 @@ async def run_ddos(
                     logger.warning(
                         f"{cl.MAGENTA}Завантажено порожній конфіг - буде використано попередній{cl.RESET}"
                     )
-
-                if targets and (changed or force_next):
+                elif (changed or force_next):
                     force_next = await install_targets(targets)
 
             except asyncio.CancelledError as e:
