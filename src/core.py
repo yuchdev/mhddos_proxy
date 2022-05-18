@@ -34,6 +34,7 @@ VERSION_URL = 'https://raw.githubusercontent.com/porthole-ascend-cinnamon/mhddos
 
 DEFAULT_THREADS = 1000 if cpu_count() == 1 else 7500
 
+CPU_PER_PROCESS = 2
 CONFIG_FETCH_RETRIES = 3
 CONFIG_FETCH_TIMEOUT = 10
 REFRESH_OVERTIME = 2  # roughly 5 more seconds
