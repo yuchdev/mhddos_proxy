@@ -205,13 +205,11 @@ async def run_ddos(
                 if num_allowed == 0:
                     # presumably this is going to be an extreme use case
                     raise RuntimeError("Capacity initialization error")
-
                 # we need free capacity to be able to scale-up for working targets
-                adjusted_capacity = 1
+                adjusted_capacity, force_install = 1, True
                 random.shuffle(tcp_flooders)
                 tcp_flooders = tcp_flooders[:num_allowed]
                 num_flooders = len(tcp_flooders)
-                force_install = True
                 logger.info(f"{cl.MAGENTA}Обрано {num_flooders} цілей для атаки{cl.RESET}")
 
             # adjust settings to avoid situation when we have just a few
