@@ -207,11 +207,7 @@ async def run_ddos(
                 random.shuffle(tcp_flooders)
                 tcp_flooders, num_flooders = tcp_flooders[:num_allowed], num_allowed
                 force_install = True
-                logger.warning(
-                    f"{cl.MAGENTA}Початкова кількість одночасних атак ({num_init}) перевищує "
-                    f"максимально дозволену параметром -t ({total_threads}). "
-                    f"{cl.YELLOW}Обрано {num_flooders} випадкових цілей для атаки.{cl.RESET}"
-                )
+                logger.info(f"{cl.MAGENTA}Обрано {num_flooders} випадкових цілей для атаки.{cl.RESET}")
 
             # adjust settings to avoid situation when we have just a few
             # targets in the config (in this case with default CLI settings you are
