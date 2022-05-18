@@ -1,11 +1,11 @@
 FROM --platform=$TARGETPLATFORM python:3.10-alpine as builder
 RUN apk update && apk add --update cargo gcc rust make musl-dev python3-dev libffi-dev openssl-dev
 
-RUN python -m venv /opt/venv
+RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 COPY ./requirements.txt .
-RUN pip3 install --no-cache-dir -r requirements.txt
+RUN python3 -m pip install --no-cache-dir wheel -r requirements.txt
 
 FROM --platform=$TARGETPLATFORM python:3.10-alpine
 COPY --from=builder	/opt/venv /opt/venv
