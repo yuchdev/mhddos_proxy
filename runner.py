@@ -3,7 +3,6 @@ try: import colorama; colorama.init()
 except:raise
 # @formatter:on
 import asyncio
-from functools import partial
 import multiprocessing as mp
 import random
 import sys
@@ -420,37 +419,35 @@ def main():
     args = init_argparse().parse_args()
 
     if not any((args.targets, args.config, args.itarmy)):
-        logger.warning(f"{cl.MAGENTA}Не вказано цілей для атаки{cl.RESET}")
-        sys.exit(1)
+        logger.error(f'{cl.RED}Не вказано жодної цілі для атаки{cl.RESET}')
+        sys.exit()
 
-    if args.processes > 1:
-        cpus = mp.cpu_count()
-        max_processes = cpus//CPU_PER_PROCESS
-        if args.processes > max_processes:
+    num_copies = args.copies
+    if num_copies > 1:
+        max_copies = mp.cpu_count() // CPU_PER_PROCESS
+        if num_copies > max_copies:
+            num_copies = max_copies
             logger.warning(
-                f"{cl.MAGENTA} Максимальна кількість запущенних процессів: "
-                f"{max_processes}{cl.RESET}")
-        num_processes = min(args.processes, max_processes)
-    else:
-        num_processes = 1
+                f'{cl.MAGENTA}Кількість копій автоматично зменшено до {max_copies}{cl.RESET}'
+            )
 
-    shutdown_event = Event()
+        if num_copies > 1 and args.table:
+            logger.warning(
+                f'{cl.MAGENTA}Налаштування `--table` не може бути використане '
+                f'при запуску декількох копій{cl.RESET}'
+            )
+            args.table = False
+
     try:
-        if num_processes == 1:
-            # run event loop in a separate thread to ensure the application
-            # exists immediately after Ctrl+C
+        if num_copies == 1:
+            # run event loop in a separate thread to ensure the application exists immediately after Ctrl+C
             Thread(target=_main, args=(args,), daemon=True).start()
         else:
-            if args.table:
-                logger.warning(
-                    f"{cl.MAGENTA}Налаштування `--table` не може бути використанний "
-                    f"при запуску декількох процессів{cl.RESET}")
-                args.table = False
-            for _ in range(num_processes):
+            for _ in range(num_copies):
                 mp.Process(target=_main_process, args=(args,), daemon=True).start()
-        # we can do something smarter rather than waiting forever,
-        # but as of now it's gonna be consistent with previous version
-        while not shutdown_event.wait(WINDOWS_WAKEUP_SECONDS):
+
+        wakeup_event = Event()
+        while not wakeup_event.wait(WINDOWS_WAKEUP_SECONDS):
             continue
     except KeyboardInterrupt:
         logger.info(f'{cl.BLUE}Завершуємо роботу...{cl.RESET}')
