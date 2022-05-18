@@ -4,7 +4,7 @@ COPY ./requirements.txt .
 RUN pip3 install --target=/mhddos_proxy/dependencies -r requirements.txt
 COPY . .
 
-FROM python:3.10-slim-buster
+FROM python:3.10-buster
 WORKDIR mhddos_proxy
 COPY --from=builder	/mhddos_proxy .
 ENV PYTHONPATH="${PYTHONPATH}:/mhddos_proxy/dependencies" PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
