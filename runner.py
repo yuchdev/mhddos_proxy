@@ -419,6 +419,10 @@ def _main_process(args):
 def main():
     args = init_argparse().parse_args()
 
+    if not any((args.targets, args.config, args.itarmy)):
+        logger.warning(f"{cl.MAGENTA}Не вказано цілей для атаки{cl.RESET}")
+        sys.exit(1)
+
     if args.processes > 1:
         cpus = mp.cpu_count()
         max_processes = cpus//CPU_PER_PROCESS
