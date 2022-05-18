@@ -197,23 +197,26 @@ async def run_ddos(
 
         if tcp_flooders:
             num_flooders = len(tcp_flooders)
-            num_init = initial_capacity * num_flooders
+            adjusted_capacity = initial_capacity
+            num_init = adjusted_capacity * num_flooders
 
             if num_init > total_threads:
-                num_allowed = total_threads // initial_capacity
+                num_allowed = total_threads // adjusted_capacity
+                # we need free capacity to be able to scale-up for working targets
+                adjusted_capacity = 1
                 if num_allowed == 0:
                     # presumably this is going to be an extreme use case
                     raise RuntimeError("Capacity initialization error")
                 random.shuffle(tcp_flooders)
                 tcp_flooders, num_flooders = tcp_flooders[:num_allowed], num_allowed
                 force_install = True
-                logger.info(f"{cl.MAGENTA}Обрано {num_flooders} випадкових цілей для атаки.{cl.RESET}")
+                logger.info(f"{cl.MAGENTA}Обрано {num_flooders} цілей для атаки{cl.RESET}")
 
             # adjust settings to avoid situation when we have just a few
             # targets in the config (in this case with default CLI settings you are
             # going to start scaling from 3-15 tasks to 7_500)
             adjusted_capacity = max(
-                initial_capacity,
+                adjusted_capacity,
                 int(SCHEDULER_MIN_INIT_FRACTION * total_threads / num_flooders)
             ) if num_flooders > 1 else total_threads
 
