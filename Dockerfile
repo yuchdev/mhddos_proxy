@@ -1,12 +1,16 @@
-FROM --platform=$BUILDPLATFORM python:3.10-buster as builder
-WORKDIR mhddos_proxy
+FROM python:3.10-alpine as builder
+RUN apk update && apk add --update cargo gcc rust make musl-dev python3-dev libffi-dev openssl-dev
+
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
 COPY ./requirements.txt .
-RUN pip3 install --target=/mhddos_proxy/dependencies -r requirements.txt
-COPY . .
+RUN pip3 install --no-cache-dir -r requirements.txt
 
-FROM python:3.10-buster
+FROM python:3.10-alpine
+RUN apk add musl-dev
 WORKDIR mhddos_proxy
-COPY --from=builder	/mhddos_proxy .
-ENV PYTHONPATH="${PYTHONPATH}:/mhddos_proxy/dependencies" PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
-
+COPY --from=builder	/opt/venv /opt/venv
+COPY . .
+ENV PATH="/opt/venv/bin:$PATH"
 ENTRYPOINT ["python3", "./runner.py"]
