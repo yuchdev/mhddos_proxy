@@ -403,14 +403,14 @@ async def start(args):
     )
 
 
-def _main(args, uvloop):
-    loop = setup_event_loop(uvloop)
+def _main(args):
+    loop = setup_event_loop()
     loop.run_until_complete(start(args))
 
 
-def _main_process(args, uvloop):
+def _main_process(args):
     try:
-        _main(args, uvloop)
+        _main(args)
     except KeyboardInterrupt:
         logger.info(f'{cl.BLUE}Завершуємо роботу...{cl.RESET}')
         sys.exit()
@@ -418,17 +418,6 @@ def _main_process(args, uvloop):
 
 def main():
     args = init_argparse().parse_args()
-
-    uvloop = False
-    try:
-        __import__("uvloop").install()
-        uvloop = True
-        logger.info(
-            f"{cl.GREEN}'uvloop' успішно активований "
-            f"(підвищенна ефективність роботи з мережею){cl.RESET}"
-        )
-    except:
-        pass
 
     if args.processes > 1:
         cpus = mp.cpu_count()
@@ -446,7 +435,7 @@ def main():
         if num_processes == 1:
             # run event loop in a separate thread to ensure the application
             # exists immediately after Ctrl+C
-            Thread(target=_main, args=(args, uvloop), daemon=True).start()
+            Thread(target=_main, args=(args,), daemon=True).start()
         else:
             if args.table:
                 logger.warning(
@@ -454,7 +443,7 @@ def main():
                     f"при запуску декількох процессів{cl.RESET}")
                 args.table = False
             for _ in range(num_processes):
-                mp.Process(target=_main_process, args=(args, uvloop), daemon=True).start()
+                mp.Process(target=_main_process, args=(args,), daemon=True).start()
         # we can do something smarter rather than waiting forever,
         # but as of now it's gonna be consistent with previous version
         while not shutdown_event.wait(WINDOWS_WAKEUP_SECONDS):
