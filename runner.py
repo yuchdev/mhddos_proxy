@@ -130,7 +130,6 @@ async def run_ddos(
 ):
     loop = asyncio.get_event_loop()
     stats = []
-    print_stats = debug or table
 
     # initial set of proxies
     if proxies.has_proxies:
@@ -239,13 +238,12 @@ async def run_ddos(
             task = loop.create_task(run_udp_flood(flooder))
             active_flooder_tasks.append(task)
 
-        if not print_stats:
-            for flooder in tcp_flooders + udp_flooders:
-                logger.info(
-                    f"{cl.YELLOW}Атакуємо ціль:{cl.BLUE} %s,"
-                    f"{cl.YELLOW} Порт:{cl.BLUE} %s,"
-                    f"{cl.YELLOW} Метод:{cl.BLUE} %s{cl.RESET}" % flooder.desc
-                )
+        for flooder in tcp_flooders + udp_flooders:
+            logger.info(
+                f"{cl.YELLOW}Атакуємо ціль:{cl.BLUE} %s,"
+                f"{cl.YELLOW} Порт:{cl.BLUE} %s,"
+                f"{cl.YELLOW} Метод:{cl.BLUE} %s{cl.RESET}" % flooder.desc
+            )
 
         return force_install
 
@@ -261,10 +259,6 @@ async def run_ddos(
         return
 
     logger.info(f'{cl.GREEN}Запускаємо атаку...{cl.RESET}')
-    if not print_stats:
-        # Keep the docs/info on-screen for some time before outputting the logger.info above
-        await asyncio.sleep(5)
-
     force_install_targets: bool = await install_targets(initial_targets)
 
     tasks = []
@@ -289,7 +283,7 @@ async def run_ddos(
                 cycle_start = time.perf_counter()
 
     # setup coroutine to print stats
-    if print_stats:
+    if debug or table:
         tasks.append(loop.create_task(stats_printer()))
     else:
         print_progress(len(proxies), use_my_ip, False)
