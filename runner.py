@@ -428,7 +428,7 @@ def main():
         if num_copies > max_copies:
             num_copies = max_copies
             logger.warning(
-                f'{cl.MAGENTA}Кількість копій автоматично зменшено до {max_copies}{cl.RESET}'
+                f'{cl.MAGENTA}Кількість копій автоматично зменшена до {max_copies}{cl.RESET}'
             )
 
         if num_copies > 1 and args.table:
