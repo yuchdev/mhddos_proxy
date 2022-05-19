@@ -103,7 +103,7 @@ def init_argparse() -> argparse.ArgumentParser:
     parser.add_argument(
         '--lang',
         choices=['EN', 'UA'],
-        default='EN',
+        default='UA',
         required=False,
         help='Interface and report language'
     )
