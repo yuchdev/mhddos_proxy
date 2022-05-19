@@ -407,7 +407,6 @@ def _main_process(args):
 
 def main():
     args = init_argparse().parse_args()
-
     if not any((args.targets, args.config, args.itarmy)):
         logger.error(f'{cl.RED}Не вказано жодної цілі для атаки{cl.RESET}')
         sys.exit()

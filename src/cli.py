@@ -6,6 +6,7 @@ from .core import (
     SCHEDULER_INITIAL_CAPACITY, SCHEDULER_FORK_SCALE, SCHEDULER_FAILURE_DELAY,
 )
 from .mhddos import Methods
+from .app_config import read_config, save_config, CONFIG_DEFAULT_PATH
 
 
 def init_argparse() -> argparse.ArgumentParser:
@@ -99,9 +100,32 @@ def init_argparse() -> argparse.ArgumentParser:
         default=SCHEDULER_FAILURE_DELAY,
         help='Time delay before re-launching failed tasks (seconds)',
     )
+    parser.add_argument(
+        '--lang',
+        choices=['EN', 'UA'],
+        default='EN',
+        required=False,
+        help='Interface and report language'
+    )
+    parser.add_argument(
+        '--save-config',
+        action='store_true',
+        default=False,
+        required=False,
+        help=f'Save current configuration in `{CONFIG_DEFAULT_PATH}` config file'
+    )
 
     # Deprecated
     parser.add_argument('-p', '--period', type=int, help='DEPRECATED')
     parser.add_argument('--proxy-timeout', type=float, help='DEPRECATED')
     parser.add_argument('--udp-threads', type=int, help='DEPRECATED')
+
+    # Either save selected defaults config, or load it from file
+    new_config = vars(parser.parse_args())
+    if new_config['save_config']:
+        del new_config['save_config']
+        save_config(new_config)
+    elif len(defaults_config := read_config()):
+        parser.set_defaults(**defaults_config)
+
     return parser
