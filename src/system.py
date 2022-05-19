@@ -6,9 +6,7 @@ import sys
 from asyncio import events
 from contextlib import suppress
 from typing import Optional
-
-from aiohttp import ClientSession, TCPConnector
-
+import requests
 from src.core import CONFIG_FETCH_RETRIES, CONFIG_FETCH_TIMEOUT, VERSION_URL, cl, logger
 
 
@@ -51,16 +49,20 @@ async def read_or_fetch(path_or_url: str) -> Optional[str]:
     return await fetch(path_or_url)
 
 
+def sync_fetch(url: str):
+    for _ in range(CONFIG_FETCH_RETRIES):
+        try:
+            response = requests.get(url, verify=False, timeout=CONFIG_FETCH_TIMEOUT)
+            response.raise_for_status()
+            return response.text
+        except requests.RequestException:
+            pass
+    return None
+
+
 async def fetch(url: str) -> Optional[str]:
-    async with ClientSession(connector=TCPConnector(ssl=False)) as session:
-        for _ in range(CONFIG_FETCH_RETRIES):
-            try:
-                async with session.get(url, timeout=CONFIG_FETCH_TIMEOUT) as response:
-                    return await response.text()
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                pass
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, sync_fetch, url)
 
 
 async def is_latest_version() -> bool:
