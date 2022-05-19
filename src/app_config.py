@@ -1,9 +1,6 @@
 import os
 import json
-from pathlib import Path
-
-HOME_DIR = Path.home()
-CONFIG_DEFAULT_PATH = os.path.join(HOME_DIR, '.uareaper.json')
+from .path_utils import CONFIG_DEFAULT_PATH
 
 
 def read_config(config_file: str = CONFIG_DEFAULT_PATH) -> dict:

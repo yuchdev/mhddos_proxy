@@ -8,7 +8,7 @@ from yarl import URL
 from .core import cl, logger
 from .dns_utils import resolve_all_targets
 from .system import read_or_fetch
-
+from .translations import TR
 
 Options = Dict[str, str]
 
@@ -117,8 +117,8 @@ class TargetsLoader:
         config_targets = await self._load_config()
         if config_targets:
             logger.info(
-                f"{cl.YELLOW}Завантажено конфіг {self._config} "
-                f"на {cl.BLUE}{len(config_targets)} цілей{cl.RESET}"
+                f"{cl.YELLOW}{TR('Loaded config')} {self._config} "
+                f"{TR('on')} {cl.BLUE}{len(config_targets)} {TR('targets')}{cl.RESET}"
             )
         all_targets = self._targets + (config_targets or [])
         if resolve:
