@@ -410,8 +410,8 @@ def main():
     args = init_argparse().parse_args()
 
     args_dict = vars(args)
-    print(f"Args: {args_dict}")
     TR.load(args.lang)
+
     if not any((args.targets, args.config, args.itarmy)):
         logger.error(f"{cl.RED}{TR('No target is specified for the attack')}{cl.RESET}")
         sys.exit()

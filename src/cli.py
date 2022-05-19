@@ -125,6 +125,8 @@ def init_argparse() -> argparse.ArgumentParser:
     if new_config['save_config']:
         del new_config['save_config']
         save_config(new_config)
+        print("Config file `{CONFIG_DEFAULT_PATH}` has been created. It will override command-line default values")
+        print("Now you may remove unnecessary options, and leave the config with some meaningful defaults")
     elif len(defaults_config := read_config()):
         parser.set_defaults(**defaults_config)
 
