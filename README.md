@@ -172,7 +172,7 @@ socks4://isdfuser:ashd1spass@IP:PORT
 У command-line за замовчуванням встановлюється українська мова, але, ймовірно, вона буде змінена, 
 як тільки ми розширимо нашу спільноту на інші країни.
 
-There are two ways to set the language:
+Є два способи змінити мову:
 
 ### 1. За допомогою command-line
     python3 runner.py --lang EN https://ria.ru
