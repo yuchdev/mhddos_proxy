@@ -1,12 +1,12 @@
 import json
 
 
-LANGUAGES = ['EN', 'UA']
+LANGUAGES = ['UA', 'EN']
 
 
 class _Translations:
     def __init__(self):
-        self.language = LANGUAGES[0]
+        self.language = None
         with open('src/translations.json', 'r') as f:
             self.translations = json.load(f)
 

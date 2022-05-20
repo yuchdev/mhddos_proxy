@@ -69,7 +69,7 @@ def init_argparse() -> argparse.ArgumentParser:
         type=str.upper,
         default=['GET', random.choice(['POST', 'STRESS'])],
         choices=Methods.HTTP_METHODS,
-        help='List of HTTP(s) attack methods to use. Default is GET + POST|STRESS',
+        help='List of HTTP(L7) methods to use. Default is GET + POST|STRESS',
     )
     parser.add_argument(
         '--proxies',
@@ -85,8 +85,8 @@ def init_argparse() -> argparse.ArgumentParser:
         '--lang',
         type=str.upper,
         choices=LANGUAGES,
-        default='UA',
-        help='Interface and report language'
+        default=LANGUAGES[0],
+        help='Select language (default is UA)'
     )
 
     # Advanced
