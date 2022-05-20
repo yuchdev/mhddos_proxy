@@ -165,3 +165,25 @@ socks4://isdfuser:ashd1spass@IP:PORT
     python3 runner.py --proxies proxies.txt https://ria.ru
 
 де `proxies.txt` - ваша ваш файл зі списком проксі (кожен проксі з нового рядка)
+
+### Локалізація
+
+На цей час програма підтримує 2 мови: англійську та українську.
+У command-line за замовчуванням встановлюється українська мова, але, ймовірно, вона буде змінена, 
+як тільки ми розширимо нашу спільноту на інші країни.
+
+There are two ways to set the language:
+
+### 1. За допомогою command-line
+    python3 runner.py --lang EN https://ria.ru
+    python3 runner.py --lang UA https://ria.ru
+
+Швидше за все, саме так більшість користувачів Python будуть змінять мову. 
+
+### 2. За допомогою environment variable
+    export MHDDOS_LANG=EN
+    python3 runner.py https://ria.ru
+
+Environment variable легко передати в контейнер Docker за допомогою параметра `-e`
+
+    docker run -e MHDDOS_LANG=UA -it --rm --log-driver none --name multidd --pull always karboduck/multidd

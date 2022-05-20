@@ -11,7 +11,7 @@ from functools import partial
 from threading import Event, Thread
 from typing import List, Set, Union
 
-from src.cli import init_argparse
+from src.cli import init_argparse, SUPPORTED_LANGUAGES
 from src.core import (
     CPU_PER_PROCESS, FAILURE_BUDGET_FACTOR, FAILURE_DELAY_SECONDS,
     IT_ARMY_CONFIG_URL, ONLY_MY_IP, REFRESH_OVERTIME, REFRESH_RATE,
@@ -22,6 +22,7 @@ from src.output import print_banner, print_progress, show_statistic
 from src.proxies import ProxySet
 from src.system import WINDOWS_WAKEUP_SECONDS, fix_ulimits, is_latest_version, setup_event_loop
 from src.targets import Target, TargetsLoader
+from src.app_config import environment_value
 from src.translations import TR
 
 
@@ -408,6 +409,12 @@ def _main_process(args):
 
 def main():
     args = init_argparse().parse_args()
+
+    # Use environment variable `MHDDOS_LANG` to override language
+    if len(env_language := environment_value('MHDDOS_LANG')):
+        if env_language.upper() in SUPPORTED_LANGUAGES:
+            args.lang = env_language
+
     TR.load(args.lang)
 
     if not any((args.targets, args.config, args.itarmy)):

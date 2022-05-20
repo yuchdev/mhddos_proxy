@@ -168,3 +168,25 @@ Put the file in the folder with `runner.py` and add the following option to the 
     python3 runner.py --proxies proxies.txt https://ria.ru
 
 where `proxies.txt` is your proxy list file (each proxy should be on a new line)
+
+### Localization
+
+As of now, the application supports 2 languages: English and Ukrainian. 
+Default language is set by command line is Ukrainian, but it is likely to be changed as soon as we expand our community 
+on other countries.
+
+There are two ways to set the language:
+
+### 1. By command line
+    python3 runner.py --lang EN https://ria.ru
+    python3 runner.py --lang UA https://ria.ru
+
+Most likely, this is the way most Python users prefer to change it. 
+
+### 2. By environment variable
+    export MHDDOS_LANG=EN
+    python3 runner.py https://ria.ru
+
+An environment variable is easy to pass into the Docker container with the `-e` option
+
+    docker run -e MHDDOS_LANG=UA -it --rm --log-driver none --name multidd --pull always karboduck/multidd

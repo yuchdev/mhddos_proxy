@@ -7,6 +7,8 @@ from .core import (
 )
 from .mhddos import Methods
 
+SUPPORTED_LANGUAGES = ['EN', 'UA']
+
 
 def init_argparse() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
@@ -102,7 +104,7 @@ def init_argparse() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         '--lang',
-        choices=['EN', 'UA'],
+        choices=SUPPORTED_LANGUAGES,
         default='UA',
         required=False,
         help='Interface and report language'
