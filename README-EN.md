@@ -172,18 +172,17 @@ where `proxies.txt` is your proxy list file (each proxy should be on a new line)
 ### Localization
 
 As of now, the application supports 2 languages: English and Ukrainian. 
-Default language is set by command line is Ukrainian, but it is likely to be changed as soon as we expand our community 
-on other countries.
+The default language set by the command line is Ukrainian, but it is likely to be changed as soon as we expand our community to other countries.
 
 There are two ways to set the language:
 
-### 1. By command line
+### 1. Using command line
     python3 runner.py --lang EN https://ria.ru
     python3 runner.py --lang UA https://ria.ru
 
 Most likely, this is the way most Python users prefer to change it. 
 
-### 2. By environment variable
+### 2. Using environment variable
     export MHDDOS_LANG=EN
     python3 runner.py https://ria.ru
 
