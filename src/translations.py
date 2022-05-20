@@ -33,7 +33,7 @@ class Translations:
             return
         translation_file = f'{TRANSLATIONS_DIR}/{language.lower()}.json'
         if os.path.exists(translation_file):
-            logger.info(f"{cl.YELLOW}For language {language} localization file found: {translation_file}")
+            logger.debug(f"{cl.YELLOW}For language {language} localization file found: {translation_file}")
             with open(translation_file, 'r') as f:
                 self.translations = json.load(f)
 
