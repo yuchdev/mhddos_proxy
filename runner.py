@@ -408,8 +408,6 @@ def _main_process(args):
 
 def main():
     args = init_argparse().parse_args()
-
-    args_dict = vars(args)
     TR.load(args.lang)
 
     if not any((args.targets, args.config, args.itarmy)):
