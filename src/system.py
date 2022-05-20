@@ -35,11 +35,6 @@ def fix_ulimits() -> Optional[int]:
             resource.setrlimit(resource.RLIMIT_NOFILE, (hard, hard))
             soft = hard
 
-    if soft < min_limit:
-        logger.warning(
-            f"{cl.RED}{TR('Unable to raise opened file limit - the current limit is')} {soft}{cl.RESET}"
-        )
-
     return soft
 
 
