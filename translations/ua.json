@@ -44,5 +44,5 @@
   "(increased network efficiency)": "(підвищенна ефективність роботи з мережею)",
   "on": "на",
   "targets": "цілей",
-  "Unable to raise opened file limit - current limit is": "Не вдалося підняти ліміт відкритих файлів - поточний ліміт"
+  "Unable to raise opened file limit - the current limit is": "Не вдалося підняти ліміт відкритих файлів - поточний ліміт"
 }
