@@ -113,5 +113,5 @@ def print_banner(use_my_ip):
 
     if not use_my_ip:
         print(
-            f"        {cl.MAGENTA}{TR('Use your IP or VPN')} {cl.YELLOW}{TR('in addition to the proxy use flag `--vpn` to enable your IP or VPN')}{cl.RESET}\n"
+            f"\t{cl.MAGENTA}{TR('Use your IP or VPN')} {cl.YELLOW}{TR('in addition to the proxy use flag `--vpn` to enable your IP or VPN')}{cl.RESET}\n"
         )
