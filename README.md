@@ -142,11 +142,11 @@
     protocol://IP:PORT:username:password
     protocol://username:password@IP:PORT
 де `protocol` може бути одним з 3-ох: http | socks4 | socks5, якщо `protocol`не вказувати, то буде обрано за замовчуванням - http  
-наприклад для публічного проксі: protocol=socks4 IP=114.231.123.38 PORT=3065 формат буде таким:  
+наприклад для публічного проксі: `protocol=socks4 IP=114.231.123.38 PORT=3065` формат буде таким:  
 ```shell
 socks4://114.231.123.38:3065
 ```
-а для приватного: protocol=socks4 IP=114.231.123.38 PORT=3065 username=isdfuser password=ashd1spass формат може бути одним з таких:  
+а для приватного: `protocol=socks4 IP=114.231.123.38 PORT=3065 username=isdfuser password=ashd1spass` формат може бути одним з таких:  
 ```shell
 socks4://114.231.123.38:3065:isdfuser:ashd1spass
 socks4://isdfuser:ashd1spass@IP:PORT
