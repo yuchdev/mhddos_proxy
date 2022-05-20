@@ -1,0 +1,137 @@
+{
+  "Downloading proxies...": {
+    "ua": "Завантажуємо проксі..."
+  },
+  "No working proxies found - stopping the attack": {
+    "ua": "Не знайдено робочих проксі - зупиняємо атаку"
+  },
+  "Selected": {
+    "ua": "Обрано"
+  },
+  "targets to attack": {
+    "ua": "цілей для атаки"
+  },
+  "Attacking the target:": {
+    "ua": "Атакуємо ціль:"
+  },
+  "Target": {
+    "ua": "Ціль"
+  },
+  "Port": {
+    "ua": "Порт"
+  },
+  "Method": {
+    "ua": "Метод"
+  },
+  "Connections": {
+    "ua": "З'єднань"
+  },
+  "Requests": {
+    "ua": "Запити"
+  },
+  "Traffic": {
+    "ua": "Трафік"
+  },
+  "Total": {
+    "ua": "Усього"
+  },
+  "Loading targets...": {
+    "ua": "Завантажуємо цілі..."
+  },
+  "Loaded config": {
+    "ua": "Завантажено конфіг"
+  },
+  "Targets loading failed": {
+    "ua": "Завантаження цілей завершилося помилкою:"
+  },
+  "No targets specified for the attack": {
+    "ua": "Не вказано жодної цілі для атаки"
+  },
+  "Launching the attack ...": {
+    "ua": "Запускаємо атаку..."
+  },
+  "Empty config loaded - the previous one will be used": {
+    "ua": "Завантажено порожній конфіг - буде використано попередній"
+  },
+  "Failed to (re)load targets config:": {
+    "ua": "Не вдалося (пере)завантажити конфіг цілей:"
+  },
+  "Failed to reload proxy list - the previous one will be used": {
+    "ua": "Не вдалося перезавантажити список проксі - буде використано попередній"
+  },
+  "A new version is available, update is recommended": {
+    "ua": "Доступна нова версія, рекомендуємо оновити"
+  },
+  "The number of threads has been reduced to": {
+    "ua": "Кількість потоків зменшено до"
+  },
+  "due to the limitations of your system": {
+    "ua": "через обмеження вашої системи"
+  },
+  "Shutting down...": {
+    "ua": "Завершуємо роботу..."
+  },
+  "The number of copies is automatically reduced to": {
+    "ua": "Кількість копій автоматично зменшена до"
+  },
+  "The `--table` flag cannot be used when running multiple copies": {
+    "ua": "Прапорець `--table` не може бути використане при запуску декількох копій"
+  },
+  "Amount of proxies": {
+    "ua": "Кількість проксі"
+  },
+  "The attack also uses": {
+    "ua": "Атака також використовує"
+  },
+  "your IP alongside with proxies": {
+    "ua": "ваш IP разом з проксі"
+  },
+  "Attack": {
+    "ua": "Атака"
+  },
+  "without proxies": {
+    "ua": "без проксі"
+  },
+  "only your IP is used": {
+    "ua": "використовується тільки ваш IP"
+  },
+  "Delay in execution of operations detected": {
+    "ua": "Зафіксована затримка у виконанні операцій"
+  },
+  "the attack continues, but we recommend reducing the workload": {
+    "ua": "атака продовжується, але рекомендуємо зменшити значення навантаження"
+  },
+  "Workload (number of threads)": {
+    "ua": "Навантаження (кількість потоків)"
+  },
+  "use flag `-t XXXX`, default is": {
+    "ua": "параметр `-t XXXX`, за замовчуванням -"
+  },
+  "Show statistics as a table or text": {
+    "ua": "Показати статистику у вигляді таблиці або тексту"
+  },
+  "use flags `--table` or` --debug`": {
+    "ua": "прапорець `--table` або `--debug`"
+  },
+  "Complete documentation": {
+    "ua": "Повна документація"
+  },
+  "Use your IP or VPN": {
+    "ua": "Використовувати свій IP або VPN"
+  },
+  "in addition to the proxies - use flag `--vpn`": {
+    "ua": "на додачу до проксі, прапорець `--vpn`"
+  },
+  "`uvloop` activated successfully": {
+    "ua": "`uvloop` успішно активовано"
+  },
+  "(increased network efficiency)": {
+    "ua": "(підвищенна ефективність роботи з мережею)"
+  },
+  "for": {
+    "ua": "на"
+  },
+  "targets": {
+    "ua": "цілей"
+  }
+}

@@ -1,11 +1,12 @@
 import os
 from typing import List
+
 from tabulate import tabulate
 
 from .core import DEFAULT_THREADS, cl, logger
+from .i18n import translate as t
 from .mhddos import Tools
 from .targets import TargetStats
-from .translations import TR
 
 
 def cls():
@@ -39,18 +40,18 @@ def show_statistic(
             ))
         else:
             logger.info(
-                f"{cl.YELLOW}{TR('Target')}:{cl.BLUE} {target.human_repr()}, "
-                f"{cl.YELLOW}{TR('Port')}:{cl.BLUE} {target.url.port}, "
-                f"{cl.YELLOW}{TR('Method')}:{cl.BLUE} {method}{method_sig}, "
-                f"{cl.YELLOW}{TR('Connections')}:{cl.BLUE} {Tools.humanformat(in_flight_conn)}, "
-                f"{cl.YELLOW}{TR('Requests')}:{cl.BLUE} {Tools.humanformat(pps)}/s, "
-                f"{cl.YELLOW}{TR('Traffic')}:{cl.BLUE} {Tools.humanbits(bps)}/s"
+                f"{cl.YELLOW}{t('Target')}:{cl.BLUE} {target.human_repr()}, "
+                f"{cl.YELLOW}{t('Port')}:{cl.BLUE} {target.url.port}, "
+                f"{cl.YELLOW}{t('Method')}:{cl.BLUE} {method}{method_sig}, "
+                f"{cl.YELLOW}{t('Connections')}:{cl.BLUE} {Tools.humanformat(in_flight_conn)}, "
+                f"{cl.YELLOW}{t('Requests')}:{cl.BLUE} {Tools.humanformat(pps)}/s, "
+                f"{cl.YELLOW}{t('Traffic')}:{cl.BLUE} {Tools.humanbits(bps)}/s"
                 f"{cl.RESET}"
             )
 
     if table:
         tabulate_text.append((
-            f"{cl.GREEN}{TR('Total')}",
+            f"{cl.GREEN}{t('Total')}",
             '',
             '',
             Tools.humanformat(total_in_flight),
@@ -62,21 +63,22 @@ def show_statistic(
         print(tabulate(
             tabulate_text,
             headers=[
-                f"{cl.BLUE}{TR('Target')}",
-                {TR('Port')},
-                {TR('Method')},
-                {TR('Connections')},
-                {TR('Requests')},
-                f"{TR('Traffic')}{cl.RESET}"],
+                f"{cl.BLUE}{t('Target')}",
+                t('Port'),
+                t('Method'),
+                t('Connections'),
+                t('Requests'),
+                f"{t('Traffic')}{cl.RESET}"
+            ],
             tablefmt='fancy_grid'
         ))
         print_banner(use_my_ip)
     else:
         logger.info(
-            f"{cl.GREEN}{TR('Total')}: "
-            f"{cl.YELLOW}{TR('Connections')}:{cl.GREEN} {Tools.humanformat(total_in_flight)}, "
-            f"{cl.YELLOW}{TR('Requests')}:{cl.GREEN} {Tools.humanformat(total_pps)}/s, "
-            f"{cl.YELLOW}{TR('Traffic')}:{cl.GREEN} {Tools.humanbits(total_bps)}/s{cl.RESET}"
+            f"{cl.GREEN}{t('Total')}: "
+            f"{cl.YELLOW}{t('Connections')}:{cl.GREEN} {Tools.humanformat(total_in_flight)}, "
+            f"{cl.YELLOW}{t('Requests')}:{cl.GREEN} {Tools.humanformat(total_pps)}/s, "
+            f"{cl.YELLOW}{t('Traffic')}:{cl.GREEN} {Tools.humanbits(total_bps)}/s{cl.RESET}"
         )
 
     print_progress(num_proxies, use_my_ip, overtime)
@@ -88,30 +90,30 @@ def print_progress(
     overtime: bool,
 ):
     if num_proxies:
-        logger.info(f"{cl.YELLOW}{TR('Number of proxies')}: {cl.BLUE}{num_proxies}{cl.RESET}")
+        logger.info(f"{cl.YELLOW}{t('Amount of proxies')}: {cl.BLUE}{num_proxies}{cl.RESET}")
         if use_my_ip:
             logger.info(
-                f"{cl.YELLOW}{TR('The attack also uses')} {cl.MAGENTA}"
-                f"{TR('your IP alongside with the proxy')}{cl.RESET}")
+                f"{cl.YELLOW}{t('The attack also uses')} {cl.MAGENTA}"
+                f"{t('your IP alongside with proxies')}{cl.RESET}")
     else:
         logger.info(
-            f"{cl.YELLOW}{TR('Attack')} {cl.MAGENTA}{TR('without a proxy')}{cl.YELLOW} - "
-            f"{TR('only your IP is used')}{cl.RESET}")
+            f"{cl.YELLOW}{t('Attack')} {cl.MAGENTA}{t('without proxies')}{cl.YELLOW} - "
+            f"{t('only your IP is used')}{cl.RESET}")
 
     if overtime:
         logger.warning(
-            f"{cl.MAGENTA}{TR('Delay in execution of operations detected')} - "
-            f"{TR('the attack continues, but we recommend reducing the workload')} `-t`{cl.RESET}")
+            f"{cl.MAGENTA}{t('Delay in execution of operations detected')} - "
+            f"{t('the attack continues, but we recommend reducing the workload')} `-t`{cl.RESET}")
 
 
 def print_banner(use_my_ip):
     print(f'''
-- {cl.YELLOW}{TR('Workload (number of threads)')}{cl.RESET} - {TR('parameter `-t 5000` is default')} - {DEFAULT_THREADS}
-- {cl.YELLOW}{TR('Show statistics as a table or text')}{cl.RESET} - {TR('the `--table` or` --debug` flags')}
-- {cl.YELLOW}{TR('Complete documentation')}{cl.RESET} - https://github.com/porthole-ascend-cinnamon/mhddos_proxy
+- {cl.YELLOW}{t('Workload (number of threads)')}{cl.RESET} - {t('use flag `-t XXXX`, default is')} {DEFAULT_THREADS}
+- {cl.YELLOW}{t('Show statistics as a table or text')}{cl.RESET} - {t('use flags `--table` or` --debug`')}
+- {cl.YELLOW}{t('Complete documentation')}{cl.RESET} - https://github.com/porthole-ascend-cinnamon/mhddos_proxy
     ''')
 
     if not use_my_ip:
         print(
-            f"\t{cl.MAGENTA}{TR('Use your IP or VPN')} {cl.YELLOW}{TR('in addition to the proxy use flag `--vpn` to enable your IP or VPN')}{cl.RESET}\n"
+            f"\t{cl.MAGENTA}{t('Use your IP or VPN')} {cl.YELLOW}{t('in addition to the proxies - use flag `--vpn`')}{cl.RESET}\n"
         )

@@ -2,12 +2,11 @@ import argparse
 import random
 
 from .core import (
-    DEFAULT_THREADS,
-    SCHEDULER_INITIAL_CAPACITY, SCHEDULER_FORK_SCALE, SCHEDULER_FAILURE_DELAY,
+    DEFAULT_THREADS, SCHEDULER_FAILURE_DELAY,
+    SCHEDULER_FORK_SCALE, SCHEDULER_INITIAL_CAPACITY
 )
+from .i18n import LANGUAGES
 from .mhddos import Methods
-
-SUPPORTED_LANGUAGES = ['EN', 'UA']
 
 
 def init_argparse() -> argparse.ArgumentParser:
@@ -82,6 +81,13 @@ def init_argparse() -> argparse.ArgumentParser:
         default=False,
         help='Attack targets from https://t.me/itarmyofukraine2022'
     )
+    parser.add_argument(
+        '--lang',
+        type=str.upper,
+        choices=LANGUAGES,
+        default='UA',
+        help='Interface and report language'
+    )
 
     # Advanced
     parser.add_argument(
@@ -101,13 +107,6 @@ def init_argparse() -> argparse.ArgumentParser:
         type=float,
         default=SCHEDULER_FAILURE_DELAY,
         help='Time delay before re-launching failed tasks (seconds)',
-    )
-    parser.add_argument(
-        '--lang',
-        choices=SUPPORTED_LANGUAGES,
-        default='UA',
-        required=False,
-        help='Interface and report language'
     )
 
     # Deprecated

@@ -11,19 +11,18 @@ from functools import partial
 from threading import Event, Thread
 from typing import List, Set, Union
 
-from src.cli import init_argparse, SUPPORTED_LANGUAGES
+from src.cli import init_argparse
 from src.core import (
     CPU_PER_PROCESS, FAILURE_BUDGET_FACTOR, FAILURE_DELAY_SECONDS,
     IT_ARMY_CONFIG_URL, ONLY_MY_IP, REFRESH_OVERTIME, REFRESH_RATE,
     SCHEDULER_MAX_INIT_FRACTION, SCHEDULER_MIN_INIT_FRACTION, cl, logger
 )
+from src.i18n import set_language, translate as t
 from src.mhddos import AsyncTcpFlood, AsyncUdpFlood, AttackSettings, main as mhddos_main
 from src.output import print_banner, print_progress, show_statistic
 from src.proxies import ProxySet
 from src.system import WINDOWS_WAKEUP_SECONDS, fix_ulimits, is_latest_version, setup_event_loop
 from src.targets import Target, TargetsLoader
-from src.app_config import environment_value
-from src.translations import TR
 
 
 class GeminoCurseTaskSet:
@@ -134,10 +133,10 @@ async def run_ddos(
 
     # initial set of proxies
     if proxies.has_proxies:
-        logger.info(f"{cl.YELLOW}{TR('Downloading a proxy...')}{cl.RESET}")
+        logger.info(f"{cl.YELLOW}{t('Downloading proxies...')}{cl.RESET}")
         num_proxies = await proxies.reload()
         if num_proxies == 0:
-            logger.error(f"{cl.RED}{TR('No working proxies found - stop the attack')}{cl.RESET}")
+            logger.error(f"{cl.RED}{t('No working proxies found - stopping the attack')}{cl.RESET}")
             return
 
     def prepare_flooder(target: Target, method: str) -> Union[AsyncUdpFlood, AsyncTcpFlood]:
@@ -208,7 +207,7 @@ async def run_ddos(
                 if num_flooders > num_allowed_flooders:
                     random.shuffle(tcp_flooders)
                     tcp_flooders, num_flooders = tcp_flooders[:num_allowed_flooders], num_allowed_flooders
-                    logger.info(f"{cl.MAGENTA}{TR('Selected')} {num_flooders} {TR('targets to attack')}{cl.RESET}")
+                    logger.info(f"{cl.MAGENTA}{t('Selected')} {num_flooders} {t('targets for the attack')}{cl.RESET}")
                     force_install = True
 
             # adjust settings to avoid situation when we have just a few
@@ -238,25 +237,25 @@ async def run_ddos(
 
         for flooder in tcp_flooders + udp_flooders:
             logger.info(
-                f"{cl.YELLOW}{TR('Attacking the target:')}{cl.BLUE} %s,"
-                f"{cl.YELLOW} {TR('Port')}:{cl.BLUE} %s,"
-                f"{cl.YELLOW} {TR('Method')}:{cl.BLUE} %s{cl.RESET}" % flooder.desc
+                f"{cl.YELLOW}{t('Attacking the target:')}{cl.BLUE} %s,"
+                f"{cl.YELLOW} {t('Port')}:{cl.BLUE} %s,"
+                f"{cl.YELLOW} {t('Method')}:{cl.BLUE} %s{cl.RESET}" % flooder.desc
             )
 
         return force_install
 
     try:
-        logger.info(f"{cl.YELLOW}{TR('Loading targets...')}{cl.RESET}")
+        logger.info(f"{cl.YELLOW}{t('Loading targets...')}{cl.RESET}")
         initial_targets, _ = await targets_loader.load(resolve=True)
     except Exception as exc:
-        logger.error(f"{cl.RED}{TR('Target upload failed')} {exc}{cl.RESET}")
+        logger.error(f"{cl.RED}{t('Targets loading failed')} {exc}{cl.RESET}")
         initial_targets = []
 
     if not initial_targets:
-        logger.error(f"{cl.RED}{TR('No target is specified for the attack')}{cl.RESET}")
+        logger.error(f"{cl.RED}{t('No targets specified for the attack')}{cl.RESET}")
         return
 
-    logger.info(f"{cl.GREEN}{TR('Launching the attack ...')}{cl.RESET}")
+    logger.info(f"{cl.GREEN}{t('Launching the attack ...')}{cl.RESET}")
     force_install_targets: bool = await install_targets(initial_targets)
 
     tasks = []
@@ -275,8 +274,6 @@ async def run_ddos(
                     num_proxies,
                     passed > REFRESH_RATE * REFRESH_OVERTIME,
                 )
-                if len(tcp_task_group):
-                    logger.debug(f"Task group size: {len(tcp_task_group)}")
             finally:
                 cycle_start = time.perf_counter()
 
@@ -295,7 +292,7 @@ async def run_ddos(
 
                 if not targets:
                     logger.warning(
-                        f"{cl.MAGENTA}{TR('Empty config loaded - the previous one will be used')}{cl.RESET}"
+                        f"{cl.MAGENTA}{t('Empty config loaded - the previous one will be used')}{cl.RESET}"
                     )
 
                 if targets and (changed or force_next):
@@ -304,7 +301,7 @@ async def run_ddos(
             except asyncio.CancelledError as e:
                 raise e
             except Exception as exc:
-                logger.warning(f"{cl.MAGENTA}{TR('Failed to (re)load targets config:')} {exc}{cl.RESET}")
+                logger.warning(f"{cl.MAGENTA}{t('Failed to (re)load targets config:')} {exc}{cl.RESET}")
 
     # setup coroutine to reload targets
     targets_reloader = loop.create_task(
@@ -317,7 +314,7 @@ async def run_ddos(
                 await asyncio.sleep(delay_seconds)
                 if (await proxies.reload()) == 0:
                     logger.warning(
-                        f"{cl.MAGENTA}{TR('Failed to reload proxy list - the previous will be used')}{cl.RESET}"
+                        f"{cl.MAGENTA}{t('Failed to reload proxy list - the previous one will be used')}{cl.RESET}"
                     )
 
             except asyncio.CancelledError:
@@ -343,7 +340,7 @@ async def start(args):
     is_old_version = not await is_latest_version()
     if is_old_version:
         logger.warning(
-            f"{cl.RED}{TR('A new version is available, upgrade recommended')}{cl.RESET}: "
+            f"{cl.RED}{t('A new version is available, update is recommended')}{cl.RESET}: "
             "https://telegra.ph/Onovlennya-mhddos-proxy-04-16\n"
         )
 
@@ -374,7 +371,8 @@ async def start(args):
         max_conns -= 50  # keep some for other needs
         if max_conns < connections:
             logger.warning(
-                f"{cl.MAGENTA}{TR('The number of threads has been reduced to')} {max_conns} {TR('due to the limitations of your system')}{cl.RESET}"
+                f"{cl.MAGENTA}{t('The number of threads has been reduced to')} {max_conns} "
+                f"{t('due to the limitations of your system')}{cl.RESET}"
             )
             connections = max_conns
 
@@ -403,22 +401,17 @@ def _main_process(args):
     try:
         _main(args)
     except KeyboardInterrupt:
-        logger.info(f"{cl.BLUE}{TR('Finishing job...')}{cl.RESET}")
+        logger.info(f"{cl.BLUE}{t('Shutting down...')}{cl.RESET}")
         sys.exit()
 
 
 def main():
     args = init_argparse().parse_args()
 
-    # Use environment variable `MHDDOS_LANG` to override language
-    if len(env_language := environment_value('MHDDOS_LANG')):
-        if env_language.upper() in SUPPORTED_LANGUAGES:
-            args.lang = env_language
-
-    TR.load(args.lang)
+    set_language(args.lang)
 
     if not any((args.targets, args.config, args.itarmy)):
-        logger.error(f"{cl.RED}{TR('No target is specified for the attack')}{cl.RESET}")
+        logger.error(f"{cl.RED}{t('No targets specified for the attack')}{cl.RESET}")
         sys.exit()
 
     num_copies = args.copies
@@ -427,12 +420,12 @@ def main():
         if num_copies > max_copies:
             num_copies = max_copies
             logger.warning(
-                f"{cl.MAGENTA}{TR('The number of copies is automatically reduced to')} {max_copies}{cl.RESET}"
+                f"{cl.MAGENTA}{t('The number of copies is automatically reduced to')} {max_copies}{cl.RESET}"
             )
 
         if num_copies > 1 and args.table:
             logger.warning(
-                f"{cl.MAGENTA}{TR('The `--table` flag cannot be used when running multiple copies')}{cl.RESET}"
+                f"{cl.MAGENTA}{t('The `--table` flag cannot be used when running multiple copies')}{cl.RESET}"
             )
             args.table = False
 
@@ -448,7 +441,7 @@ def main():
         while not wakeup_event.wait(WINDOWS_WAKEUP_SECONDS):
             continue
     except KeyboardInterrupt:
-        logger.info(f"{cl.BLUE}{TR('Finishing job...')}{cl.RESET}")
+        logger.info(f"{cl.BLUE}{t('Shutting down...')}{cl.RESET}")
         sys.exit()
 
 
