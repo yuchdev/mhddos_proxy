@@ -10,8 +10,8 @@ trap 'shutdown' SIGINT SIGQUIT SIGTERM ERR
 
 function shutdown() {
     echo "Exiting..."
-  	stop_script
-  	exit
+    stop_script
+    exit
 }
 
 function stop_script() {
@@ -37,7 +37,7 @@ do
 
   if [ -n "$(git diff --name-only origin/$BRANCH)" ]
   then
-    echo "New version available, updating the script..."
+    echo -e "\n[\033[1;32m$(date +"%d-%m-%Y %T")\033[1;0m] - New version available, updating the script!\033[0m\n"
     stop_script
     update_script
   fi
