@@ -4,7 +4,7 @@ BRANCH="main"
 PID=""
 
 PYTHON=$1
-SCRIPT_ARGS="${@:1}"
+SCRIPT_ARGS="${@:2}"
 
 trap 'shutdown' SIGINT SIGQUIT SIGTERM ERR
 
