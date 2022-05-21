@@ -116,10 +116,7 @@ def setup_event_loop() -> asyncio.AbstractEventLoop:
     try:
         __import__("uvloop").install()
         uvloop = True
-        logger.info(
-            f"{cl.GREEN}{t('`uvloop` activated successfully')} "
-            f"{t('(increased network efficiency)')}{cl.RESET}"
-        )
+        logger.info(f"{t('`uvloop` activated successfully')} {t('(increased network efficiency)')}")
     except:
         pass
 

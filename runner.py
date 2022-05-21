@@ -376,6 +376,8 @@ async def start(args):
             )
             connections = max_conns
 
+    # Give user some time to read the info above
+    await asyncio.sleep(5)
     await run_ddos(
         proxies,
         targets_loader,
