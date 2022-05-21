@@ -344,7 +344,7 @@ async def start(args):
     is_old_version = not await is_latest_version()
     if is_old_version:
         logger.warning(
-            f"{cl.RED}{t('A new version is available, update is recommended')}{cl.RESET}: "
+            f"{cl.CYAN}{t('A new version is available, update is recommended')}{cl.RESET}: "
             "https://telegra.ph/Onovlennya-mhddos-proxy-04-16\n"
         )
 
