@@ -1,3 +1,4 @@
+import os
 import time
 from hashlib import md5
 from typing import Dict, List, Optional, Tuple
@@ -118,7 +119,7 @@ class TargetsLoader:
         config_targets = await self._load_config()
         if config_targets:
             logger.info(
-                f"{cl.YELLOW}{t('Loaded config')} {self._config} "
+                f"{cl.YELLOW}{t('Loaded config')} {cl.BLUE}{os.path.basename(self._config)}{cl.YELLOW} "
                 f"{t('for')} {cl.BLUE}{len(config_targets)} {t('targets')}{cl.RESET}"
             )
         all_targets = self._targets + (config_targets or [])
