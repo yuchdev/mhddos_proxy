@@ -17,6 +17,7 @@ def show_statistic(
     statistics: List[TargetStats],
     table: bool,
     use_my_ip: int,
+    num_threads: int,
     num_proxies: int,
     overtime: bool,
 ):
@@ -50,6 +51,17 @@ def show_statistic(
             )
 
     if table:
+        headers = [
+            f"{cl.BLUE}{t('Target')}",
+            t('Port'),
+            t('Method'),
+            t('Connections'),
+            t('Requests'),
+            f"{t('Traffic')}{cl.RESET}"
+        ]
+
+        tabulate_text.append(headers)
+
         tabulate_text.append((
             f"{cl.GREEN}{t('Total')}",
             '',
@@ -62,14 +74,7 @@ def show_statistic(
         cls()
         print(tabulate(
             tabulate_text,
-            headers=[
-                f"{cl.BLUE}{t('Target')}",
-                t('Port'),
-                t('Method'),
-                t('Connections'),
-                t('Requests'),
-                f"{t('Traffic')}{cl.RESET}"
-            ],
+            headers=headers,
             tablefmt='fancy_grid'
         ))
         print_banner(use_my_ip)
@@ -81,21 +86,25 @@ def show_statistic(
             f"{cl.YELLOW}{t('Traffic')}:{cl.GREEN} {Tools.humanbits(total_bps)}/s{cl.RESET}"
         )
 
-    print_progress(num_proxies, use_my_ip, overtime)
+    print_progress(num_threads, num_proxies, use_my_ip, overtime)
 
 
 def print_progress(
+    num_threads: int,
     num_proxies: int,
     use_my_ip: int,
     overtime: bool,
 ):
+    message = f"{cl.YELLOW}{t('Threads')}: {cl.BLUE}{num_threads}{cl.RESET} | "
     if num_proxies:
-        message = f"{cl.YELLOW}{t('Amount of proxies')}: {cl.BLUE}{num_proxies}{cl.RESET}"
+        message += f"{cl.YELLOW}{t('Proxies')}: {cl.BLUE}{num_proxies}{cl.RESET}"
         if use_my_ip:
             message += f" | {cl.MAGENTA}{t('The attack also uses your IP/VPN')} {cl.RESET}"
         logger.info(message)
     else:
-        logger.info(f"{cl.MAGENTA}{t('Only your IP/VPN is used (no proxies)')}{cl.RESET}")
+        logger.info(
+            message + f"{cl.MAGENTA}{t('Only your IP/VPN is used (no proxies)')}{cl.RESET}"
+        )
 
     if overtime:
         logger.warning(
@@ -109,10 +118,10 @@ def print_banner(use_my_ip):
 - {cl.YELLOW}{t('Workload (number of threads)')}:{cl.RESET} {t('use flag `-t XXXX`, default is')} {DEFAULT_THREADS}
 - {cl.YELLOW}{t('Show statistics as a table or text')}:{cl.RESET} {t('use flags `--table` or `--debug`')}
 - {cl.YELLOW}{t('Complete documentation')}:{cl.RESET} - https://github.com/porthole-ascend-cinnamon/mhddos_proxy
-- {cl.CYAN}Change language / Зміна мови:{cl.YELLOW} `--lang EN` / `--lang UA`{cl.RESET} 
-    ''')
+- {cl.CYAN}Change language / Зміна мови:{cl.YELLOW} `--lang EN` / `--lang UA`{cl.RESET}''')
 
     if not use_my_ip:
         print(
-            f"\t{cl.MAGENTA}{t('Consider using your IP or VPN in addition to proxies - use flag `--vpn`')}{cl.RESET}\n"
+            f"- {cl.MAGENTA}{t('Consider using your IP or VPN in addition to proxies - use flag `--vpn`')}{cl.RESET}"
         )
+    print()

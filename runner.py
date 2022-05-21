@@ -130,6 +130,7 @@ async def run_ddos(
 ):
     loop = asyncio.get_event_loop()
     stats = []
+    print_stats = debug or table
 
     # initial set of proxies
     if proxies.has_proxies:
@@ -235,12 +236,13 @@ async def run_ddos(
             task = loop.create_task(run_udp_flood(flooder))
             active_flooder_tasks.append(task)
 
-        for flooder in tcp_flooders + udp_flooders:
-            logger.info(
-                f"{cl.YELLOW}{t('Attacking the target:')}{cl.BLUE} %s,"
-                f"{cl.YELLOW} {t('Port')}:{cl.BLUE} %s,"
-                f"{cl.YELLOW} {t('Method')}:{cl.BLUE} %s{cl.RESET}" % flooder.desc
-            )
+        if not print_stats:
+            for flooder in tcp_flooders + udp_flooders:
+                logger.info(
+                    f"{cl.YELLOW}{t('Target')}:{cl.BLUE} %s,"
+                    f"{cl.YELLOW} {t('Port')}:{cl.BLUE} %s,"
+                    f"{cl.YELLOW} {t('Method')}:{cl.BLUE} %s{cl.RESET}" % flooder.desc
+                )
 
         return force_install
 
@@ -256,6 +258,7 @@ async def run_ddos(
         return
 
     logger.info(f"{cl.GREEN}{t('Launching the attack ...')}{cl.RESET}")
+    await asyncio.sleep(5)
     force_install_targets: bool = await install_targets(initial_targets)
 
     tasks = []
@@ -271,6 +274,7 @@ async def run_ddos(
                     stats,
                     table,
                     use_my_ip,
+                    total_threads,
                     num_proxies,
                     passed > REFRESH_RATE * REFRESH_OVERTIME,
                 )
@@ -278,10 +282,10 @@ async def run_ddos(
                 cycle_start = time.perf_counter()
 
     # setup coroutine to print stats
-    if debug or table:
+    if print_stats:
         tasks.append(loop.create_task(stats_printer()))
     else:
-        print_progress(len(proxies), use_my_ip, False)
+        print_progress(total_threads, len(proxies), use_my_ip, False)
 
     async def reload_targets(delay_seconds: int = 30, force_install: bool = False):
         force_next = force_install
@@ -377,7 +381,6 @@ async def start(args):
             connections = max_conns
 
     # Give user some time to read the info above
-    await asyncio.sleep(5)
     await run_ddos(
         proxies,
         targets_loader,

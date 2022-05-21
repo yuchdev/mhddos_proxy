@@ -11,9 +11,6 @@
   "targets to attack": {
     "ua": "цілей для атаки"
   },
-  "Attacking the target:": {
-    "ua": "Атакуємо ціль:"
-  },
   "Target": {
     "ua": "Ціль"
   },
@@ -77,7 +74,10 @@
   "The `--table` flag cannot be used when running multiple copies": {
     "ua": "Параметр `--table` не може бути використане при запуску декількох копій"
   },
-  "Amount of proxies": {
+  "Threads": {
+    "ua": "Кількість потоків"
+  },
+  "Proxies": {
     "ua": "Кількість проксі"
   },
   "The attack also uses your IP/VPN": {
@@ -121,5 +121,11 @@
   },
   "targets": {
     "ua": "цілей"
+  },
+  "targets for the attack": {
+    "ua": "цілей для атаки"
+  },
+  "is not available and won't be attacked": {
+    "ua": "не доступна і не буде атакована"
   }
 }
