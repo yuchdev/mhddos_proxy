@@ -90,26 +90,24 @@ def print_progress(
     overtime: bool,
 ):
     if num_proxies:
-        logger.info(f"{cl.YELLOW}{t('Amount of proxies')}: {cl.BLUE}{num_proxies}{cl.RESET}")
+        message = f"{cl.YELLOW}{t('Amount of proxies')}: {cl.BLUE}{num_proxies}{cl.RESET}"
         if use_my_ip:
-            logger.info(
-                f"{cl.YELLOW}{t('The attack also uses')} {cl.MAGENTA}"
-                f"{t('your IP alongside with proxies')}{cl.RESET}")
+            message += f" | {cl.MAGENTA}{t('The attack also uses your IP/VPN')} {cl.RESET}"
+        logger.info(message)
     else:
-        logger.info(
-            f"{cl.YELLOW}{t('Attack')} {cl.MAGENTA}{t('without proxies')}{cl.YELLOW} - "
-            f"{t('only your IP is used')}{cl.RESET}")
+        logger.info(f"{cl.MAGENTA}{t('Only your IP/VPN is used (no proxies)')}{cl.RESET}")
 
     if overtime:
         logger.warning(
             f"{cl.MAGENTA}{t('Delay in execution of operations detected')} - "
-            f"{t('the attack continues, but we recommend reducing the workload')} `-t`{cl.RESET}")
+            f"{t('the attack continues, but we recommend reducing the workload')} `-t`{cl.RESET}"
+        )
 
 
 def print_banner(use_my_ip):
     print(f'''
 - {cl.YELLOW}{t('Workload (number of threads)')}:{cl.RESET} {t('use flag `-t XXXX`, default is')} {DEFAULT_THREADS}
-- {cl.YELLOW}{t('Show statistics as a table or text')}:{cl.RESET} {t('use flags `--table` or` --debug`')}
+- {cl.YELLOW}{t('Show statistics as a table or text')}:{cl.RESET} {t('use flags `--table` or `--debug`')}
 - {cl.YELLOW}{t('Complete documentation')}:{cl.RESET} - https://github.com/porthole-ascend-cinnamon/mhddos_proxy
 - {cl.CYAN}Change language / Зміна мови:{cl.YELLOW} `--lang EN` / `--lang UA`{cl.RESET} 
     ''')
