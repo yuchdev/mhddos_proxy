@@ -115,13 +115,13 @@ def print_progress(
 
 def print_banner(use_my_ip):
     print(f'''
+- {cl.CYAN}Change language / Зміна мови:{cl.YELLOW} `--lang EN` / `--lang UA`{cl.RESET}
 - {cl.YELLOW}{t('Workload (number of threads)')}:{cl.RESET} {t('use flag `-t XXXX`, default is')} {DEFAULT_THREADS}
 - {cl.YELLOW}{t('Show statistics as a table or text')}:{cl.RESET} {t('use flags `--table` or `--debug`')}
-- {cl.YELLOW}{t('Complete documentation')}:{cl.RESET} - https://github.com/porthole-ascend-cinnamon/mhddos_proxy
-- {cl.CYAN}Change language / Зміна мови:{cl.YELLOW} `--lang EN` / `--lang UA`{cl.RESET}''')
+- {cl.YELLOW}{t('Complete documentation')}:{cl.RESET} - https://github.com/porthole-ascend-cinnamon/mhddos_proxy''')
 
     if not use_my_ip:
         print(
-            f"- {cl.MAGENTA}{t('Consider using your IP or VPN in addition to proxies - use flag `--vpn`')}{cl.RESET}"
+            f"- {cl.MAGENTA}{t('Consider adding your IP or VPN to the attack - use flag `--vpn`')}{cl.RESET}"
         )
     print()

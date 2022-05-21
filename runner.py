@@ -132,9 +132,10 @@ async def run_ddos(
     stats = []
     print_stats = debug or table
 
+    logger.info(f"{cl.GREEN}{t('Launching the attack ...')}{cl.RESET}")
+
     # initial set of proxies
     if proxies.has_proxies:
-        logger.info(f"{cl.YELLOW}{t('Downloading proxies...')}{cl.RESET}")
         num_proxies = await proxies.reload()
         if num_proxies == 0:
             logger.error(f"{cl.RED}{t('No working proxies found - stopping the attack')}{cl.RESET}")
@@ -247,7 +248,6 @@ async def run_ddos(
         return force_install
 
     try:
-        logger.info(f"{cl.YELLOW}{t('Loading targets...')}{cl.RESET}")
         initial_targets, _ = await targets_loader.load(resolve=True)
     except Exception as exc:
         logger.error(f"{cl.RED}{t('Targets loading failed')} {exc}{cl.RESET}")
@@ -257,7 +257,7 @@ async def run_ddos(
         logger.error(f"{cl.RED}{t('No targets specified for the attack')}{cl.RESET}")
         return
 
-    logger.info(f"{cl.GREEN}{t('Launching the attack ...')}{cl.RESET}")
+    # Give user some time to read the output
     await asyncio.sleep(5)
     force_install_targets: bool = await install_targets(initial_targets)
 
