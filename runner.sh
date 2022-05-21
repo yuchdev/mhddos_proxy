@@ -3,7 +3,10 @@
 BRANCH="main"
 PID=""
 
-trap 'shutdown' SIGINT SIGQUIT SIGTERM
+PYTHON=$1
+SCRIPT_ARGS="${@:1}"
+
+trap 'shutdown' SIGINT SIGQUIT SIGTERM ERR
 
 function shutdown() {
     echo "Exiting..."
@@ -24,7 +27,7 @@ function update_script() {
     git reset -q --hard
     git checkout -q $BRANCH
     git pull -q
-    $1 -m pip install -q -r requirements.txt
+    $PYTHON -m pip install -q -r requirements.txt
 }
 
 while true
@@ -39,7 +42,7 @@ do
     update_script
   fi
 
-  $1 runner.py "${@:1}" & PID=$!
+  $PYTHON runner.py $SCRIPT_ARGS & PID=$!
 
   sleep 60
 
