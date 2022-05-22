@@ -196,7 +196,7 @@ async def run_ddos(
                 for method in http_methods:
                     tcp_flooders.append(prepare_flooder(target, method))
             else:
-                logger.error(f"Unsupported scheme given: {target.url.scheme}")
+                logger.error(f"{cl.RED}Unsupported scheme given: {target.url.scheme}{cl.RESET}")
 
         force_install = False
         if tcp_flooders:
@@ -375,7 +375,7 @@ async def start(args):
         max_conns -= 50  # keep some for other needs
         if max_conns < connections:
             logger.warning(
-                f"{cl.MAGENTA}{t('The number of threads has been reduced to')} {max_conns} "
+                f"{cl.RED}{t('The number of threads has been reduced to')} {max_conns} "
                 f"{t('due to the limitations of your system')}{cl.RESET}"
             )
             connections = max_conns
@@ -425,7 +425,7 @@ def main():
         if num_copies > max_copies:
             num_copies = max_copies
             logger.warning(
-                f"{cl.MAGENTA}{t('The number of copies is automatically reduced to')} {max_copies}{cl.RESET}"
+                f"{cl.RED}{t('The number of copies is automatically reduced to')} {max_copies}{cl.RESET}"
             )
 
         if num_copies > 1 and args.table:
