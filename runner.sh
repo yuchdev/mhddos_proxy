@@ -3,9 +3,9 @@
 BRANCH="main"
 PID=""
 
-RED="\e[31m"
-GREEN="\e[32m"
-RESET="\e[0m"
+RED="\033[0;31m"
+GREEN="\033[0;32m"
+RESET="\033[0m"
 
 PYTHON=$1
 SCRIPT_ARGS="${@:2}"
@@ -41,7 +41,7 @@ do
 
   if [ -n "$(git diff --name-only origin/$BRANCH)" ]
   then
-    echo -e "\n${GREEN}[$(date +"%d-%m-%Y %T")]${RESET} - New version available, updating the script!\n"
+    echo -e "\n${GREEN}[$(date +"%d-%m-%Y %T")] - New version available, updating the script!${RESET}\n"
     stop_script
     update_script
     exec ./runner.sh $PYTHON $SCRIPT_ARGS
