@@ -54,7 +54,7 @@ do
     if ! kill -0 $PID
     then
       PID=""
-      echo -e "\n${RED}Error starting - retry in 30 seconds! Ctrl+C to abort${RESET}\n"
+      echo -e "\n${RED}Error starting - retry in 30 seconds! Ctrl+C to exit${RESET}\n"
       sleep 30
     fi
   done
