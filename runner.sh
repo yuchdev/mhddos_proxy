@@ -3,6 +3,10 @@
 BRANCH="main"
 PID=""
 
+RED="\e[31m"
+GREEN="\e[32m"
+RESET="\e[0m"
+
 PYTHON=$1
 SCRIPT_ARGS="${@:2}"
 
@@ -37,16 +41,23 @@ do
 
   if [ -n "$(git diff --name-only origin/$BRANCH)" ]
   then
-    echo -e "\n[\033[1;32m$(date +"%d-%m-%Y %T")\033[1;0m] - New version available, updating the script!\033[0m\n"
+    echo -e "\n${GREEN}[$(date +"%d-%m-%Y %T")]${RESET} - New version available, updating the script!\n"
     stop_script
     update_script
     exec ./runner.sh $PYTHON $SCRIPT_ARGS
   fi
 
-  if [ -z "$PID" ];
-  then
+  while [ -z "$PID" ]
+  do
     $PYTHON runner.py $SCRIPT_ARGS & PID=$!
-  fi
+    sleep 1
+    if ! kill -0 $PID
+    then
+      PID=""
+      echo -e "\n${RED}Error starting - retry in 30 seconds! Ctrl+C to abort${RESET}\n"
+      sleep 30
+    fi
+  done
 
   sleep 666
 
