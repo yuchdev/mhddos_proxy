@@ -23,7 +23,7 @@ Update versions for | Mac | Linux | Android | Docker (UA only so far): https://t
   - A brand-new algorithm for load balancing between targets in order to achieve maximum efficiency
   - Attack types `RGET`, `RHEAD`, `RHEX` and `STOMP` added
 
-### 💽 Installation
+### 1. 💽 Installation
 
 #### Python (If it doesn't work, try `python` or `python3.10` instead of `python3`)
 
@@ -33,15 +33,11 @@ Update versions for | Mac | Linux | Android | Docker (UA only so far): https://t
 
 #### Docker
 
-Install Docker and use instructions for running Docker below
-
-- Windows: https://docs.docker.com/desktop/windows/install/
-- Mac: https://docs.docker.com/desktop/mac/install/
-- Ubuntu: https://docs.docker.com/engine/install/ubuntu/
+Install and start Docker: https://docs.docker.com/desktop/#download-and-install
 
 #### Extended instructions (UA only so far) - [click here](/docs/installation.md)
 
-### 🕹 Running (different options for targets are given)
+### 2. 🕹 Running (different options for targets are given)
 
 #### Python (If it doesn't work, try `python` or `python3.10` instead of `python3`)
 
@@ -51,7 +47,7 @@ Install Docker and use instructions for running Docker below
 
     docker run -it --rm --pull always ghcr.io/porthole-ascend-cinnamon/mhddos_proxy https://ria.ru 5.188.56.124:80 tcp://194.54.14.131:4477
 
-### 🛠 Settings (check out more in the [CLI](#cli) section)
+### 3. 🛠 Options (check out more in the [CLI](#cli) section)
 
 **All options can be combined**, you can specify them either before and after the list of targets
 
@@ -71,17 +67,17 @@ To use targets provided by https://t.me/itarmyofukraine2022 add the `--itarmy` o
 
     python3 runner.py --itarmy --debug
 
-### 📌 New automatic proxy finder for mhddos_proxy
+### 4. 📌 Help with finding new proxies for mhddos_proxy
 The script itself and installation instructions are here: https://github.com/porthole-ascend-cinnamon/proxy_finder
 
-### 🐳 Community (mostly in Ukrainian)
+### 5. 🐳 Community (mostly in Ukrainian)
 - [Detailed analysis of mhddos_proxy and installation instructions](docs/installation.md)
 - [Analysis of mhddos_proxy](https://telegra.ph/Anal%D1%96z-zasobu-mhddos-proxy-04-01)
 - [Example of running via docker on OpenWRT](https://youtu.be/MlL6fuDcWlI)
 - [Create a botnet of 30+ free and standalone Linux servers](https://auto-ddos.notion.site/dd91326ed30140208383ffedd0f13e5c)
 - [VPN](https://auto-ddos.notion.site/VPN-5e45e0aadccc449e83fea45d56385b54)
 
-### CLI
+### 6. CLI
 
     usage: runner.py target [target ...]
                      [-t THREADS] 
@@ -108,7 +104,7 @@ The script itself and installation instructions are here: https://github.com/por
       --copies 1             Number of copies to run (default is 1)
       --lang {en,ua}         Select language (default is ua)
 
-### Custom proxies
+### 7. Custom proxies
 
 #### File format:
 
