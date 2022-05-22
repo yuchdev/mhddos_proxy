@@ -42,7 +42,10 @@ do
     update_script
   fi
 
-  $PYTHON runner.py $SCRIPT_ARGS & PID=$!
+  if [ -z "$PID" ];
+  then
+    $PYTHON runner.py $SCRIPT_ARGS & PID=$!
+  fi
 
   sleep 60
 
