@@ -40,7 +40,8 @@ do
     echo -e "\n[\033[1;32m$(date +"%d-%m-%Y %T")\033[1;0m] - New version available, updating the script!\033[0m\n"
     stop_script
     update_script
-    bash $(basename $0) $PYTHON $SCRIPT_ARGS & shutdown
+    bash runner.sh $PYTHON $SCRIPT_ARGS
+    return 0
   fi
 
   if [ -z "$PID" ];
