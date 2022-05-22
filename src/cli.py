@@ -83,10 +83,10 @@ def init_argparse() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         '--lang',
-        type=str.upper,
+        type=str.lower,
         choices=LANGUAGES,
         default=LANGUAGES[0],
-        help='Select language (default is UA)'
+        help='Select language (default is ua)'
     )
 
     # Advanced

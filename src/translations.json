@@ -95,7 +95,7 @@
   "Show statistics as a table or text": {
     "ua": "Показати статистику у вигляді таблиці або тексту"
   },
-  "use flags `--table` or `--debug`": {
+  "use flag `--table` or `--debug`": {
     "ua": "параметр `--table` або `--debug`"
   },
   "Complete documentation": {

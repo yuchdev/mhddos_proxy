@@ -1,7 +1,7 @@
 import json
 
 
-LANGUAGES = ['UA', 'EN']
+LANGUAGES = ['ua', 'en']
 
 
 class _Translations:
@@ -12,7 +12,7 @@ class _Translations:
 
     def set_language(self, language: str):
         assert language in LANGUAGES
-        self.language = language.lower()
+        self.language = language
 
     def translate(self, key: str) -> str:
         try:

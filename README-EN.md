@@ -89,7 +89,7 @@ The script itself and installation instructions are here: https://github.com/por
       --http-methods GET     List of HTTP(L7) methods to use (default is GET + POST|STRESS).
       --itarmy               Attack targets from https://t.me/itarmyofukraine2022  
       --copies 1             Number of copies to run (default is 1)
-      --lang {EN,UA}         Select language (default is UA)
+      --lang {en,ua}         Select language (default is ua)
 
 ### Custom proxies
 

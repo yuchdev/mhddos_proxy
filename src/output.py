@@ -115,9 +115,9 @@ def print_progress(
 
 def print_banner(use_my_ip):
     print(f'''
-- {cl.CYAN}Change language / Зміна мови:{cl.YELLOW} `--lang EN` / `--lang UA`{cl.RESET}
+- {cl.CYAN}Change language / Зміна мови:{cl.YELLOW} `--lang en` / `--lang ua`{cl.RESET}
 - {cl.YELLOW}{t('Workload (number of threads)')}:{cl.RESET} {t('use flag `-t XXXX`, default is')} {DEFAULT_THREADS}
-- {cl.YELLOW}{t('Show statistics as a table or text')}:{cl.RESET} {t('use flags `--table` or `--debug`')}
+- {cl.YELLOW}{t('Show statistics as a table or text')}:{cl.RESET} {t('use flag `--table` or `--debug`')}
 - {cl.YELLOW}{t('Complete documentation')}:{cl.RESET} - https://github.com/porthole-ascend-cinnamon/mhddos_proxy''')
 
     if not use_my_ip:
