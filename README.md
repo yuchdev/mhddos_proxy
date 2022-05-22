@@ -69,10 +69,10 @@
 Сам скрипт та інструкції по встановленню тут: https://github.com/porthole-ascend-cinnamon/proxy_finder
 
 ### 5. 🐳 Комьюніті
+- [Створення ботнету з 30+ безкоштовних та автономних(працюють навіть при вимкненому ПК) Linux-серверів](https://auto-ddos.notion.site/dd91326ed30140208383ffedd0f13e5c)
 - [Детальний розбір mhddos_proxy та інструкції по встановленню](docs/installation.md)
 - [Аналіз засобу mhddos_proxy](https://telegra.ph/Anal%D1%96z-zasobu-mhddos-proxy-04-01)
 - [Приклад запуску через docker на OpenWRT](https://youtu.be/MlL6fuDcWlI)
-- [Створення ботнету з 30+ безкоштовних та автономних(працюють навіть при вимкненому ПК) Linux-серверів](https://auto-ddos.notion.site/dd91326ed30140208383ffedd0f13e5c)
 - [VPN](https://auto-ddos.notion.site/VPN-5e45e0aadccc449e83fea45d56385b54)
 - [Docker-image](https://github.com/alexnest-ua/auto_mhddos_alexnest/tree/docker), який запускає одночасно mhddos_proxy та [proxy_finder](https://github.com/porthole-ascend-cinnamon/proxy_finder) (для Linux / Mac додайте sudo на початку):
 

@@ -66,10 +66,10 @@ All options can be combined, you can specify them either before and after the li
 The script itself and installation instructions are here: https://github.com/porthole-ascend-cinnamon/proxy_finder
 
 ### 5. 🐳 Community (mostly in Ukrainian)
+- [Create a botnet of 30+ free and standalone Linux servers](https://auto-ddos.notion.site/dd91326ed30140208383ffedd0f13e5c)
 - [Detailed analysis of mhddos_proxy and installation instructions](docs/installation.md)
 - [Analysis of mhddos_proxy](https://telegra.ph/Anal%D1%96z-zasobu-mhddos-proxy-04-01)
 - [Example of running via docker on OpenWRT](https://youtu.be/MlL6fuDcWlI)
-- [Create a botnet of 30+ free and standalone Linux servers](https://auto-ddos.notion.site/dd91326ed30140208383ffedd0f13e5c)
 - [VPN](https://auto-ddos.notion.site/VPN-5e45e0aadccc449e83fea45d56385b54)
 
 ### 6. CLI
