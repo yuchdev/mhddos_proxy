@@ -25,7 +25,11 @@ Update versions for | Mac | Linux | Android | Docker (UA only so far): https://t
 
 ### 1. 💽 Installation
 
+#### Extended instructions (UA only so far) - [click here](/docs/installation.md)
+
 #### Python (if it doesn't work, try `python` or `python3.10` instead of `python3`)
+
+Requires python >= 3.8 and git
 
     git clone https://github.com/porthole-ascend-cinnamon/mhddos_proxy.git
     cd mhddos_proxy
@@ -34,8 +38,6 @@ Update versions for | Mac | Linux | Android | Docker (UA only so far): https://t
 #### Docker
 
 Install and start Docker: https://docs.docker.com/desktop/#download-and-install
-
-#### Extended instructions (UA only so far) - [click here](/docs/installation.md)
 
 ### 2. 🕹 Running (different options for targets are given)
 
