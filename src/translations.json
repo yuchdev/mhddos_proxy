@@ -101,8 +101,8 @@
   "Complete documentation": {
     "ua": "Повна документація"
   },
-  "Consider adding your IP or VPN to the attack - use flag `--vpn`": {
-    "ua": "Щоб використовувати ваш IP або VPN на додачу до проксі: параметр `--vpn`"
+  "Consider adding your IP/VPN to the attack - use flag `--vpn`": {
+    "ua": "Щоб використовувати ваш IP/VPN на додачу до проксі: параметр `--vpn`"
   },
   "`uvloop` activated successfully": {
     "ua": "`uvloop` успішно активовано"

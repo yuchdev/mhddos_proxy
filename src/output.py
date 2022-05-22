@@ -122,6 +122,6 @@ def print_banner(use_my_ip):
 
     if not use_my_ip:
         print(
-            f"- {cl.MAGENTA}{t('Consider adding your IP or VPN to the attack - use flag `--vpn`')}{cl.RESET}"
+            f"- {cl.MAGENTA}{t('Consider adding your IP/VPN to the attack - use flag `--vpn`')}{cl.RESET}"
         )
     print()
