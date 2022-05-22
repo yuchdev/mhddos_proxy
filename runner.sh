@@ -48,6 +48,6 @@ do
     $PYTHON runner.py $SCRIPT_ARGS & PID=$!
   fi
 
-  sleep 60
+  sleep 666
 
 done
