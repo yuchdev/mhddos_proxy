@@ -1,6 +1,6 @@
 ## IT Army of Ukraine Official Tool
 
-### Use flag `--lang EN` to enable English translation
+### Use flag `--lang en` to enable English translation
 
 - Built-in proxy server database with a wide range of IPs around the world
 - Possibility to set a huge number of targets with automatic load balancing
@@ -23,7 +23,23 @@ Update versions for | Mac | Linux | Android | Docker (UA only so far): https://t
   - A brand-new algorithm for load balancing between targets in order to achieve maximum efficiency
   - Attack types `RGET`, `RHEAD`, `RHEX` and `STOMP` added
 
-### 💽 Installation - [instructions are here](/docs/installation.md)
+### 💽 Installation
+
+#### Python (If it doesn't work, try `python` or `python3.10` instead of `python3`)
+
+    git clone https://github.com/porthole-ascend-cinnamon/mhddos_proxy.git
+    cd mhddos_proxy
+    python3 -m pip install -r requirements.txt
+
+#### Docker
+
+Install Docker and use instructions for running Docker below
+
+- Windows: https://docs.docker.com/desktop/windows/install/
+- Mac: https://docs.docker.com/desktop/mac/install/
+- Ubuntu: https://docs.docker.com/engine/install/ubuntu/
+
+#### Extended instructions (UA only so far) - [click here](/docs/installation.md)
 
 ### 🕹 Running (different options for targets are given)
 
