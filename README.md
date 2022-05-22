@@ -57,7 +57,7 @@
 
 Усі параметри можна комбінувати, можна вказувати і до і після переліку цілей
 
-- Змінити навантаження - `-t XXXX` - максимальна кількість одночасно відкритих зʼєднань, за замовчуванням 7500 (або 1500 якщо на машині лише 1 CPU)
+- Змінити навантаження - `-t XXXX` - максимальна кількість одночасно відкритих зʼєднань, за замовчуванням 7500 (або 1000 якщо на машині лише 1 CPU)
 
 - Щоб переглянути інформацію про хід роботи, додайте параметр  `--debug` для тексту, `--table` для таблиці
 
@@ -94,7 +94,7 @@
     optional arguments:
       -h, --help             show this help message and exit
       -c, --config URL|path  URL or local path to file with targets list
-      -t, --threads 7500     Total number of threads to run (default is 7500 if CPU > 1, 1500 otherwise)
+      -t, --threads 7500     Total number of threads to run (default is 7500 if CPU > 1, 1000 otherwise)
       --table / --debug      Print log as table / as text
       --vpn                  Use both my IP and proxies. Optionally, specify a percent of using my IP (default is 10%)
       --proxies URL|path     URL or local path(ex. proxies.txt) to file with proxies to use
