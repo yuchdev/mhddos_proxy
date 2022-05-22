@@ -55,9 +55,9 @@ Install Docker and use instructions for running Docker below
 
 **All options can be combined**, you can specify them either before and after the list of targets
 
-Change the workload: `-t XXXX`; the maximum number of simultaneously open connections; the default is 7500 (or 1000 if the machine has only one CPU).
+Change the workload: `-t XXXX`; the maximum number of simultaneously open connections; the default is 7500 (or 1500 if the machine has only one CPU).
 
-    python3 runner.py -t 5000 https://ria.ru https://tass.ru
+    python3 runner.py -t 7500 https://ria.ru https://tass.ru
 
 To monitor information about the progress, add the `--debug` flag for the text, `--table` for the table-style display
 
@@ -99,7 +99,7 @@ The script itself and installation instructions are here: https://github.com/por
      optional arguments:
       -h, --help             show this help message and exit
       -c, --config URL|path  URL or local path to file with targets list
-      -t, --threads 2000     Total number of threads to run (default is CPU * 1000)
+      -t, --threads 7500     Total number of threads to run (default is 7500 if CPU > 1, 1500 otherwise)
       --table / --debug      Print log as table / as text
       --vpn                  Use both my IP and proxies. Optionally, specify a percent of using my IP (default is 10%)
       --proxies URL|path     URL or local path(ex. proxies.txt) to file with proxies to use

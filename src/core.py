@@ -36,7 +36,7 @@ PROXIES_URLS = (
 IT_ARMY_CONFIG_URL = 'https://gist.githubusercontent.com/ddosukraine2022/f739250dba308a7a2215617b17114be9/raw/mhdos_targets_tcp_v2.txt'
 VERSION_URL = 'https://raw.githubusercontent.com/porthole-ascend-cinnamon/mhddos_proxy/main/version.txt'
 
-DEFAULT_THREADS = 1000 if cpu_count() == 1 else 7500
+DEFAULT_THREADS = 7500 if cpu_count() > 1 else 1500
 
 CPU_PER_PROCESS = 2
 CONFIG_FETCH_RETRIES = 5
