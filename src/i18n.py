@@ -104,6 +104,9 @@ TRANSLATIONS = {
     'Consider adding your IP/VPN to the attack - use flag `--vpn`': {
         'ua': 'Щоб використовувати ваш IP/VPN на додачу до проксі: параметр `--vpn`'
     },
+    'Instead of high `-t` value consider using': {
+        'ua': 'Замість високого значення `-t` краще використати'
+    },
     '`uvloop` activated successfully': {
         'ua': '`uvloop` успішно активовано'
     },
@@ -125,6 +128,7 @@ TRANSLATIONS = {
 }
 
 LANGUAGES = ['ua', 'en']
+DEFAULT_LANGUAGE = LANGUAGES[0]
 
 
 class _Translations:
