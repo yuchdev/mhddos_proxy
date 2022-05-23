@@ -5,6 +5,7 @@ except:raise
 import asyncio
 import multiprocessing as mp
 import random
+import signal
 import sys
 import time
 from functools import partial
@@ -396,8 +397,13 @@ async def start(args):
     )
 
 
+def _sigint_handler(*args):
+    raise KeyboardInterrupt
+
+
 def _main_process(args):
     try:
+        signal.signal(signal.SIGINT, _sigint_handler)
         set_language(args.lang)  # set language again for the subprocess
         loop = setup_event_loop()
         loop.run_until_complete(start(args))
