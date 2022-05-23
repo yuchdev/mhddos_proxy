@@ -397,12 +397,12 @@ async def start(args):
     )
 
 
-def _sigint_handler(ps, *args):
-    print("Got interrupted")
+def _main_signal_handler(ps, *args):
+    logger.info(f"{cl.BLUE}{t('Shutting down...')}{cl.RESET}")
     for p in ps:
         if p.is_alive():
             p.terminate()
-    raise KeyboardInterrupt
+    sys.exit()
 
 
 def _main_process(args):
@@ -439,12 +439,13 @@ def main():
             args.table = False
 
     processes = []
+    mp.set_start_method("spawn")
     for _ in range(num_copies):
         p = mp.Process(target=_main_process, args=(args,), daemon=True)
         processes.append(p)
 
-    signal.signal(signal.SIGINT, partial(_sigint_handler, processes))
-    signal.signal(signal.SIGTERM, partial(_sigint_handler, processes))
+    signal.signal(signal.SIGINT, partial(_main_signal_handler, processes, logger))
+    signal.signal(signal.SIGTERM, partial(_main_signal_handler, processes, logger))
 
     for p in processes:
         p.start()
