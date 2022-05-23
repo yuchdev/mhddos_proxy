@@ -19,7 +19,7 @@ from src.core import (
 )
 from src.i18n import DEFAULT_LANGUAGE, set_language, translate as t
 from src.mhddos import AsyncTcpFlood, AsyncUdpFlood, AttackSettings, main as mhddos_main
-from src.output import print_banner, print_progress, show_statistic
+from src.output import print_banner, print_status, show_statistic
 from src.proxies import ProxySet
 from src.system import WINDOWS_WAKEUP_SECONDS, fix_ulimits, is_latest_version, setup_event_loop
 from src.targets import Target, TargetsLoader
@@ -266,6 +266,7 @@ async def run_ddos(args):
                     f"{cl.YELLOW} {t('Port')}:{cl.BLUE} %s,"
                     f"{cl.YELLOW} {t('Method')}:{cl.BLUE} %s{cl.RESET}" % flooder.desc
                 )
+            print()
 
         return force_install
 
@@ -285,6 +286,7 @@ async def run_ddos(args):
         return
 
     # Give user some time to read the output
+    print_status(threads, len(proxies), use_my_ip, False)
     await asyncio.sleep(5)
     force_install_targets: bool = await install_targets(initial_targets)
 
@@ -292,28 +294,28 @@ async def run_ddos(args):
 
     async def stats_printer():
         it, cycle_start = 0, time.perf_counter()
+        refresh_rate = REFRESH_RATE * (1 if print_stats else 3)
         while True:
-            await asyncio.sleep(REFRESH_RATE)
             try:
                 passed = time.perf_counter() - cycle_start
                 show_statistic(
                     stats,
+                    debug,
                     table,
                     use_my_ip,
                     threads,
                     num_proxies=len(proxies),
-                    overtime=bool(passed > REFRESH_RATE * REFRESH_OVERTIME),
-                    print_banner_args=args if bool(table or it >= 10) else None
+                    overtime=bool(passed > refresh_rate * REFRESH_OVERTIME),
+                    print_banner_args=args if bool(table or debug and it >= 10) else None
                 )
             finally:
                 it = it + 1 if it < 10 else 0
                 cycle_start = time.perf_counter()
 
+            await asyncio.sleep(refresh_rate)
+
     # setup coroutine to print stats
-    if print_stats:
-        tasks.append(loop.create_task(stats_printer()))
-    else:
-        print_progress(threads, len(proxies), use_my_ip, False)
+    tasks.append(loop.create_task(stats_printer()))
 
     async def reload_targets(delay_seconds: int = 30, force_install: bool = False):
         force_next = force_install

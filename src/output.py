@@ -15,6 +15,7 @@ def cls():
 
 def show_statistic(
     statistics: List[TargetStats],
+    debug: bool,
     table: bool,
     use_my_ip: int,
     num_threads: int,
@@ -26,7 +27,6 @@ def show_statistic(
     total_pps, total_bps, total_in_flight = 0, 0, 0
     for stats in statistics:
         (target, method, sig) = stats.target
-        method_sig = f" ({sig})" if sig is not None else ""
         pps, bps, in_flight_conn = stats.reset()
         total_pps += pps
         total_bps += bps
@@ -40,7 +40,8 @@ def show_statistic(
                 Tools.humanformat(pps) + "/s",
                 f'{Tools.humanbits(bps)}/s{cl.RESET}'
             ))
-        else:
+        elif debug:
+            method_sig = f" ({sig})" if sig is not None else ""
             logger.info(
                 f"{cl.YELLOW}{t('Target')}:{cl.BLUE} {target.human_repr()}, "
                 f"{cl.YELLOW}{t('Port')}:{cl.BLUE} {target.url.port}, "
@@ -88,11 +89,10 @@ def show_statistic(
 
     if print_banner_args:
         print_banner(print_banner_args)
+        print_status(num_threads, num_proxies, use_my_ip, overtime)
 
-    print_progress(num_threads, num_proxies, use_my_ip, overtime)
 
-
-def print_progress(
+def print_status(
     num_threads: int,
     num_proxies: int,
     use_my_ip: int,
@@ -114,6 +114,7 @@ def print_progress(
             f"{cl.MAGENTA}{t('Delay in execution of operations detected')} - "
             f"{t('the attack continues, but we recommend reducing the workload')} `-t`{cl.RESET}"
         )
+    print()
 
 
 def print_banner(args):
