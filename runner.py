@@ -443,6 +443,7 @@ def main():
         processes.append(p)
 
     signal.signal(signal.SIGINT, partial(_sigint_handler, processes))
+    signal.signal(signal.SIGTERM, partial(_sigint_handler, processes))
 
     for p in processes:
         p.start()
