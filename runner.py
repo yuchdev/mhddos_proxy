@@ -165,8 +165,6 @@ async def run_ddos(args):
     stats = []
 
     def prepare_flooder(target: Target, method: str) -> Union[AsyncUdpFlood, AsyncTcpFlood]:
-        target_stats = target.create_stats(method)
-        stats.append(target_stats)
         if target.has_options:
             target_rpc = int(target.option(Target.OPTION_RPC, "0"))
             settings = attack_settings.with_options(
@@ -181,7 +179,7 @@ async def run_ddos(args):
             'ip': target.addr,
             'method': method,
             'event': None,
-            'stats': target_stats,
+            'stats': target.create_stats(method),
             'proxies': proxies,
             'loop': loop,
             'settings': settings,
@@ -231,7 +229,8 @@ async def run_ddos(args):
                 # If adjusting capacity is not enough, select random tcp_flooders
                 if num_flooders > num_allowed_flooders:
                     random.shuffle(tcp_flooders)
-                    tcp_flooders, num_flooders = tcp_flooders[:num_allowed_flooders], num_allowed_flooders
+                    tcp_flooders = tcp_flooders[:num_allowed_flooders]
+                    num_flooders = num_allowed_flooders
                     logger.info(f"{cl.MAGENTA}{t('Selected')} {num_flooders} {t('targets for the attack')}{cl.RESET}")
                     force_install = True
 
@@ -242,6 +241,9 @@ async def run_ddos(args):
                 adjusted_capacity,
                 int(SCHEDULER_MIN_INIT_FRACTION * threads / num_flooders)
             ) if num_flooders > 1 else threads
+
+            for flooder in tcp_flooders:
+                stats.append(flooder.stats)
 
             tcp_task_group = GeminoCurseTaskSet(
                 loop,
@@ -256,6 +258,7 @@ async def run_ddos(args):
             tcp_task_group = None
 
         for flooder in udp_flooders:
+            stats.append(flooder.stats)
             task = loop.create_task(run_udp_flood(flooder))
             active_flooder_tasks.append(task)
 

@@ -221,6 +221,10 @@ class AsyncTcpFlood:
         self._settings = settings or AttackSettings()
 
     @property
+    def stats(self) -> TargetStats:
+        return self._stats
+
+    @property
     def desc(self) -> Tuple[str, int, str]:
         return (self._target.host, self._target.port, self._method)
 
@@ -689,6 +693,10 @@ class AsyncUdpFlood:
 
         self._method = method
         self.SENT_FLOOD = getattr(self, method)
+
+    @property
+    def stats(self) -> TargetStats:
+        return self._stats
 
     @property
     def desc(self) -> Tuple[str, int, str]:
