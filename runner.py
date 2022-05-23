@@ -8,7 +8,6 @@ import random
 import sys
 import time
 from functools import partial
-from threading import Event, Thread
 from typing import List, Set, Union
 
 from src.cli import init_argparse
@@ -397,14 +396,11 @@ async def start(args):
     )
 
 
-def _main(args):
-    loop = setup_event_loop()
-    loop.run_until_complete(start(args))
-
-
 def _main_process(args):
     try:
-        _main(args)
+        set_language(args.lang)  # set language again for the subprocess
+        loop = setup_event_loop()
+        loop.run_until_complete(start(args))
     except KeyboardInterrupt:
         logger.info(f"{cl.BLUE}{t('Shutting down...')}{cl.RESET}")
         sys.exit()
@@ -412,7 +408,6 @@ def _main_process(args):
 
 def main():
     args = init_argparse().parse_args()
-
     set_language(args.lang)
 
     if not any((args.targets, args.config, args.itarmy)):
@@ -434,21 +429,18 @@ def main():
             )
             args.table = False
 
-    try:
-        if num_copies == 1:
-            # run event loop in a separate thread to ensure the application exists immediately after Ctrl+C
-            Thread(target=_main, args=(args,), daemon=True).start()
-        else:
-            for _ in range(num_copies):
-                mp.Process(target=_main_process, args=(args,), daemon=True).start()
+    processes = []
+    for _ in range(num_copies):
+        p = mp.Process(target=_main_process, args=(args,))
+        p.start()
+        processes.append(p)
 
-        wakeup_event = Event()
-        while not wakeup_event.wait(WINDOWS_WAKEUP_SECONDS):
-            continue
-    except KeyboardInterrupt:
-        logger.info(f"{cl.BLUE}{t('Shutting down...')}{cl.RESET}")
-        sys.exit()
+    for p in processes:
+        p.join()
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        sys.exit()
