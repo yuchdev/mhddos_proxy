@@ -9,16 +9,10 @@
 
 ### ⏱ Recent updates
 
-Update versions for | Mac | Linux | Android | Docker (UA only so far): https://telegra.ph/Onovlennya-mhddos-proxy-04-16
-
-- **21.05.2022**
-  - Added english localization - use flag `--lang EN` (more languages may be added later)
-
-- **18.05.2022**
-  - Added `--copies` option in order to run multiple copies (recommended for use with 4+ CPUs and network > 100 Mb / s).
-
-- **15.05.2022**
-  - Completely updated asynchronous version, which ensures maximum efficiency and minimum load on the system
+- **24.05.2022** Added auto-update option - see [Running](#2--running-different-options-for-targets-are-given)
+- **21.05.2022** Added english localization - use flag `--lang EN` (more languages may be added later)
+- **18.05.2022** Added `--copies` option in order to run multiple copies (recommended for use with 4+ CPUs and network > 100 Mb / s).
+- **15.05.2022** Completely updated asynchronous version, which ensures maximum efficiency and minimum load on the system
 
 ### 1. 💽 Installation
 
@@ -57,8 +51,8 @@ All options can be combined, you can specify them either before and after the li
 - To monitor information about the progress, add the `--debug` flag for the text, `--table` for the table-style display
 - Consider adding your IP/VPN to the attack (especially when running on dedicated server), add flag `--vpn`
 - To use targets provided by https://t.me/itarmyofukraine2022, add the `--itarmy` flag  
-- Number of threads - `-t XXXX` - the default is 7500 (or 1000 if the machine has only one CPU).
-- Number of copies - `--copies X` - in case you have 4+ CPU and stable network > 100 Mb/s
+- Number of threads: `-t XXXX` - the default is 7500 (or 1000 if the machine has only one CPU).
+- Number of copies: `--copies X` - in case you have 4+ CPU and stable network > 100 Mb/s
 
 ### 4. 📌 Help with finding new proxies for mhddos_proxy
 The script itself and installation instructions are here: https://github.com/porthole-ascend-cinnamon/proxy_finder
