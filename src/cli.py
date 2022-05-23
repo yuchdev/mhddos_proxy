@@ -26,13 +26,13 @@ def init_argparse() -> argparse.ArgumentParser:
         '--threads',
         type=int,
         default=DEFAULT_THREADS,
-        help=f'Total number of threads to run (default is {DEFAULT_THREADS})',
+        help=f'Number of threads (default is {DEFAULT_THREADS})',
     )
     parser.add_argument(
         '--copies',
         type=int,
         default=1,
-        help='Number of copies to run (default is 1)',
+        help='Number of copies (default is 1)',
     )
     parser.add_argument(
         '--debug',
