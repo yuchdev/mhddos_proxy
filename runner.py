@@ -5,10 +5,10 @@ except:raise
 import asyncio
 import multiprocessing as mp
 import random
+import signal
 import sys
 import time
 from functools import partial
-from threading import Event, Thread
 from typing import List, Set, Union
 
 from src.cli import init_argparse
@@ -397,14 +397,19 @@ async def start(args):
     )
 
 
-def _main(args):
-    loop = setup_event_loop()
-    loop.run_until_complete(start(args))
+def _main_signal_handler(ps, *args):
+    logger.info(f"{cl.BLUE}{t('Shutting down...')}{cl.RESET}")
+    for p in ps:
+        if p.is_alive():
+            p.terminate()
+    sys.exit()
 
 
 def _main_process(args):
     try:
-        _main(args)
+        set_language(args.lang)  # set language again for the subprocess
+        loop = setup_event_loop()
+        loop.run_until_complete(start(args))
     except KeyboardInterrupt:
         logger.info(f"{cl.BLUE}{t('Shutting down...')}{cl.RESET}")
         sys.exit()
@@ -412,7 +417,6 @@ def _main_process(args):
 
 def main():
     args = init_argparse().parse_args()
-
     set_language(args.lang)
 
     if not any((args.targets, args.config, args.itarmy)):
@@ -434,21 +438,24 @@ def main():
             )
             args.table = False
 
-    try:
-        if num_copies == 1:
-            # run event loop in a separate thread to ensure the application exists immediately after Ctrl+C
-            Thread(target=_main, args=(args,), daemon=True).start()
-        else:
-            for _ in range(num_copies):
-                mp.Process(target=_main_process, args=(args,), daemon=True).start()
+    processes = []
+    mp.set_start_method("spawn")
+    for _ in range(num_copies):
+        p = mp.Process(target=_main_process, args=(args,), daemon=True)
+        processes.append(p)
 
-        wakeup_event = Event()
-        while not wakeup_event.wait(WINDOWS_WAKEUP_SECONDS):
-            continue
-    except KeyboardInterrupt:
-        logger.info(f"{cl.BLUE}{t('Shutting down...')}{cl.RESET}")
-        sys.exit()
+    signal.signal(signal.SIGINT, partial(_main_signal_handler, processes, logger))
+    signal.signal(signal.SIGTERM, partial(_main_signal_handler, processes, logger))
+
+    for p in processes:
+        p.start()
+
+    for p in processes:
+        p.join()
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        sys.exit()
