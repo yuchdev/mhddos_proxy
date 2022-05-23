@@ -113,8 +113,6 @@ async def run_udp_flood(runnable: AsyncUdpFlood) -> None:
 
 
 async def run_ddos(args):
-    print_banner(args)
-
     is_old_version = not await is_latest_version()
     if is_old_version:
         logger.warning(
@@ -406,6 +404,8 @@ def main():
                 f"{cl.MAGENTA}{t('The `--table` flag cannot be used when running multiple copies')}{cl.RESET}"
             )
             args.table = False
+
+    print_banner(args)
 
     processes = []
     mp.set_start_method("spawn")
