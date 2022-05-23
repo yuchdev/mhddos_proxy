@@ -1,6 +1,6 @@
 #!/bin/bash
 
-BRANCH="always-subprocess"
+BRANCH="main"
 PID=""
 
 RED="\033[1;31m"
