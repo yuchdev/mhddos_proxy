@@ -36,7 +36,8 @@ PROXIES_URLS = (
 IT_ARMY_CONFIG_URL = 'https://gist.githubusercontent.com/ddosukraine2022/f739250dba308a7a2215617b17114be9/raw/mhdos_targets_tcp_v2.txt'
 VERSION_URL = 'https://raw.githubusercontent.com/porthole-ascend-cinnamon/mhddos_proxy/main/version.txt'
 
-DEFAULT_THREADS = 7500 if cpu_count() > 1 else 1000
+CPU_COUNT = cpu_count()
+DEFAULT_THREADS = 7500 if CPU_COUNT > 1 else 1000
 
 CPU_PER_PROCESS = 2
 CONFIG_FETCH_RETRIES = 5
@@ -50,7 +51,6 @@ SCHEDULER_INITIAL_CAPACITY = 3
 SCHEDULER_MIN_INIT_FRACTION = 0.1
 SCHEDULER_MAX_INIT_FRACTION = 0.5
 SCHEDULER_FORK_SCALE = 3
-SCHEDULER_FAILURE_DELAY = 0.5
 CONN_PROBE_PERIOD = 5
 UDP_BATCH_PACKETS = 16
 UDP_ENOBUFS_PAUSE = 0.5

@@ -3,7 +3,7 @@ from typing import List
 
 from tabulate import tabulate
 
-from .core import DEFAULT_THREADS, cl, logger
+from .core import CPU_COUNT, CPU_PER_PROCESS, DEFAULT_THREADS, cl, logger
 from .i18n import translate as t
 from .mhddos import Tools
 from .targets import TargetStats
@@ -20,6 +20,7 @@ def show_statistic(
     num_threads: int,
     num_proxies: int,
     overtime: bool,
+    print_banner_args,
 ):
     tabulate_text = []
     total_pps, total_bps, total_in_flight = 0, 0, 0
@@ -77,7 +78,6 @@ def show_statistic(
             headers=headers,
             tablefmt='fancy_grid'
         ))
-        print_banner(use_my_ip)
     else:
         logger.info(
             f"{cl.GREEN}{t('Total')}: "
@@ -85,6 +85,9 @@ def show_statistic(
             f"{cl.YELLOW}{t('Requests')}:{cl.GREEN} {Tools.humanformat(total_pps)}/s, "
             f"{cl.YELLOW}{t('Traffic')}:{cl.GREEN} {Tools.humanbits(total_bps)}/s{cl.RESET}"
         )
+
+    if print_banner_args:
+        print_banner(print_banner_args)
 
     print_progress(num_threads, num_proxies, use_my_ip, overtime)
 
@@ -113,15 +116,32 @@ def print_progress(
         )
 
 
-def print_banner(use_my_ip):
-    print(f'''
-- {cl.CYAN}Change language / Зміна мови:{cl.YELLOW} `--lang en` / `--lang ua`{cl.RESET}
-- {cl.YELLOW}{t('Workload (number of threads)')}:{cl.RESET} {t('use flag `-t XXXX`, default is')} {DEFAULT_THREADS}
-- {cl.YELLOW}{t('Show statistics as a table or text')}:{cl.RESET} {t('use flag `--table` or `--debug`')}
-- {cl.YELLOW}{t('Complete documentation')}:{cl.RESET} - https://github.com/porthole-ascend-cinnamon/mhddos_proxy''')
-
-    if not use_my_ip:
-        print(
+def print_banner(args):
+    rows = []
+    if not args.lang:
+        rows.append(
+            f"- {cl.YELLOW}Change language / Зміна мови:{cl.BLUE} `--lang en` / `--lang ua`{cl.RESET}"
+        )
+    if not args.threads:
+        rows.append(
+            f"- {cl.YELLOW}{t('Workload (number of threads)')}:{cl.BLUE} {t('use flag `-t XXXX`, default is')} {DEFAULT_THREADS}"
+        )
+    elif args.threads > 10000 and args.copies == 1 and CPU_COUNT > CPU_PER_PROCESS:
+        rows.append(
+            f"- {cl.CYAN}{t('Instead of high `-t` value consider using')} {cl.YELLOW}`--copies 2`{cl.RESET}"
+        )
+    if not (args.debug or args.table):
+        rows.append(
+            f"- {cl.YELLOW}{t('Show statistics as a table or text')}:{cl.BLUE} {t('use flag `--table` or `--debug`')}"
+        )
+    if not args.use_my_ip:
+        rows.append(
             f"- {cl.MAGENTA}{t('Consider adding your IP/VPN to the attack - use flag `--vpn`')}{cl.RESET}"
         )
+    rows.append(
+        f"- {cl.YELLOW}{t('Complete documentation')}:{cl.RESET} - https://github.com/porthole-ascend-cinnamon/mhddos_proxy"
+    )
+
+    print()
+    print(*rows, sep='\n')
     print()
