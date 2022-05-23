@@ -373,13 +373,12 @@ def _main_signal_handler(ps, *args):
     sys.exit()
 
 
-def _main_process(args, lang):
+def _worker_process(args, lang):
     try:
         set_language(lang)  # set language again for the subprocess
         loop = setup_event_loop()
         loop.run_until_complete(run_ddos(args))
     except KeyboardInterrupt:
-        logger.info(f"{cl.BLUE}{t('Shutting down...')}{cl.RESET}")
         sys.exit()
 
 
@@ -411,7 +410,7 @@ def main():
     processes = []
     mp.set_start_method("spawn")
     for _ in range(num_copies):
-        p = mp.Process(target=_main_process, args=(args, lang), daemon=True)
+        p = mp.Process(target=_worker_process, args=(args, lang), daemon=True)
         processes.append(p)
 
     signal.signal(signal.SIGINT, partial(_main_signal_handler, processes, logger))

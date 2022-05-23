@@ -13,7 +13,6 @@ SCRIPT_ARGS="${@:2}"
 trap 'shutdown' SIGINT SIGQUIT SIGTERM ERR
 
 function shutdown() {
-    echo "Exiting..."
     stop_script
     exit
 }
