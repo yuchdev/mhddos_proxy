@@ -397,13 +397,15 @@ async def start(args):
     )
 
 
-def _sigint_handler(*args):
+def _sigint_handler(ps, *args):
+    print("Got interrupted")
+    for p in ps:
+        p.terminate()
     raise KeyboardInterrupt
 
 
 def _main_process(args):
     try:
-        signal.signal(signal.SIGINT, _sigint_handler)
         set_language(args.lang)  # set language again for the subprocess
         loop = setup_event_loop()
         loop.run_until_complete(start(args))
@@ -438,8 +440,12 @@ def main():
     processes = []
     for _ in range(num_copies):
         p = mp.Process(target=_main_process, args=(args,), daemon=True)
-        p.start()
         processes.append(p)
+
+    signal.signal(signal.SIGINT, partial(_sigint_handler, processes))
+
+    for p in processes:
+        p.start()
 
     for p in processes:
         p.join()
