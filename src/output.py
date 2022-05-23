@@ -124,15 +124,15 @@ def print_banner(args):
         )
     if not args.threads:
         rows.append(
-            f"- {cl.YELLOW}{t('Workload (number of threads)')}:{cl.RESET} {t('use flag `-t XXXX`, default is')} {DEFAULT_THREADS}"
+            f"- {cl.YELLOW}{t('Workload (number of threads)')}:{cl.BLUE} {t('use flag `-t XXXX`, default is')} {DEFAULT_THREADS}"
         )
-    if args.threads > 10000 and args.copies == 1 and CPU_COUNT > CPU_PER_PROCESS:
+    elif args.threads > 10000 and args.copies == 1 and CPU_COUNT > CPU_PER_PROCESS:
         rows.append(
             f"- {cl.CYAN}{t('Instead of high `-t` value consider using')} {cl.YELLOW}`--copies 2`{cl.RESET}"
         )
     if not (args.debug or args.table):
         rows.append(
-            f"- {cl.YELLOW}{t('Show statistics as a table or text')}:{cl.RESET} {t('use flag `--table` or `--debug`')}"
+            f"- {cl.YELLOW}{t('Show statistics as a table or text')}:{cl.BLUE} {t('use flag `--table` or `--debug`')}"
         )
     if not args.use_my_ip:
         rows.append(
