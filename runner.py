@@ -400,7 +400,8 @@ async def start(args):
 def _sigint_handler(ps, *args):
     print("Got interrupted")
     for p in ps:
-        p.terminate()
+        if p.is_alive():
+            p.terminate()
     raise KeyboardInterrupt
 
 
