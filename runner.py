@@ -437,7 +437,7 @@ def main():
 
     processes = []
     for _ in range(num_copies):
-        p = mp.Process(target=_main_process, args=(args,))
+        p = mp.Process(target=_main_process, args=(args,), daemon=True)
         p.start()
         processes.append(p)
 
