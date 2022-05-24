@@ -54,7 +54,6 @@ Install and start Docker: https://docs.docker.com/desktop/#download-and-install
 
 All options can be combined, you can specify them either before and after the list of targets
 
-- To monitor information about the progress, add the `--debug` flag for the text, `--table` for the table-style display
 - Consider adding your IP/VPN to the attack (especially when running on dedicated server), add flag `--vpn`
 - To use targets provided by https://t.me/itarmyofukraine2022, add the `--itarmy` flag  
 - Number of threads - `-t XXXX` - the default is 7500 (or 1000 if the machine has only one CPU).
@@ -75,7 +74,6 @@ The script itself and installation instructions are here: https://github.com/por
     usage: runner.py target [target ...]
                      [-t THREADS] 
                      [-c URL]
-                     [--table]
                      [--debug]
                      [--vpn]
                      [--http-methods METHOD [METHOD ...]]
@@ -89,10 +87,10 @@ The script itself and installation instructions are here: https://github.com/por
       -h, --help             show this help message and exit
       -c, --config URL|path  URL or local path to file with targets list
       -t, --threads 7500     Number of threads (default is 7500 if CPU > 1, 1000 otherwise)
-      --table / --debug      Print log as table / as text
       --vpn                  Use both my IP and proxies. Optionally, specify a percent of using my IP (default is 10%)
       --proxies URL|path     URL or local path(ex. proxies.txt) to file with proxies to use
       --http-methods GET     List of HTTP(L7) methods to use (default is GET + POST|STRESS).
+      --debug                Detailed log for each target
       --itarmy               Attack targets from https://t.me/itarmyofukraine2022  
       --copies 1             Number of copies to run (default is 1)
       --lang {en,ua}         Select language (default is ua)

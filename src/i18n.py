@@ -65,9 +65,6 @@ TRANSLATIONS = {
     'The number of copies is automatically reduced to': {
         'ua': 'Кількість копій автоматично зменшена до'
     },
-    'The `--table` flag cannot be used when running multiple copies': {
-        'ua': 'Параметр `--table` не може бути використане при запуску декількох копій'
-    },
     'Threads': {
         'ua': 'Кількість потоків'
     },
@@ -91,12 +88,6 @@ TRANSLATIONS = {
     },
     'use flag `-t XXXX`, default is': {
         'ua': 'параметр `-t XXXX`, за замовчуванням -'
-    },
-    'Show statistics as a table or text': {
-        'ua': 'Показати статистику у вигляді таблиці або тексту'
-    },
-    'use flag `--table` or `--debug`': {
-        'ua': 'параметр `--table` або `--debug`'
     },
     'Complete documentation': {
         'ua': 'Повна документація'

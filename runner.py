@@ -120,13 +120,10 @@ async def run_ddos(args):
             "https://telegra.ph/Onovlennya-mhddos-proxy-04-16\n"
         )
 
-    table, debug, http_methods, initial_capacity, fork_scale = (
-        args.table, args.debug, args.http_methods,
+    debug, http_methods, initial_capacity, fork_scale = (
+        args.debug, args.http_methods,
         args.scheduler_initial_capacity, args.scheduler_fork_scale
     )
-    if table:
-        debug = False
-    print_stats = debug or table
 
     # we are going to fetch proxies even in case we have only UDP
     # targets because the list of targets might change at any point in time
@@ -262,7 +259,7 @@ async def run_ddos(args):
             task = loop.create_task(run_udp_flood(flooder))
             active_flooder_tasks.append(task)
 
-        if not print_stats:
+        if not debug:
             for flooder in tcp_flooders + udp_flooders:
                 logger.info(
                     f"{cl.YELLOW}{t('Target')}:{cl.BLUE} %s,"
@@ -297,24 +294,18 @@ async def run_ddos(args):
 
     async def stats_printer():
         it, cycle_start = 0, time.perf_counter()
-        refresh_rate = REFRESH_RATE * (1 if print_stats else 3)
+        refresh_rate = REFRESH_RATE
         while True:
-            try:
-                passed = time.perf_counter() - cycle_start
-                show_statistic(
-                    stats,
-                    debug,
-                    table,
-                    use_my_ip,
-                    threads,
-                    num_proxies=len(proxies),
-                    overtime=bool(passed > refresh_rate * REFRESH_OVERTIME),
-                    print_banner_args=args if bool(table or debug and it >= 10) else None
-                )
-            finally:
-                it = it + 1 if it < 10 else 0
-                cycle_start = time.perf_counter()
+            show_statistic(stats, debug)
 
+            if it >= 20:
+                it = 0
+                passed = time.perf_counter() - cycle_start
+                overtime = bool(passed > refresh_rate * REFRESH_OVERTIME)
+                print_banner(args)
+                print_status(threads, len(proxies), use_my_ip, overtime)
+
+            it, cycle_start = it + 1, time.perf_counter()
             await asyncio.sleep(refresh_rate)
 
     # setup coroutine to print stats
@@ -395,6 +386,18 @@ def main():
         logger.error(f"{cl.RED}{t('No targets specified for the attack')}{cl.RESET}")
         sys.exit()
 
+    if args.table:
+        print()
+        logger.warning(
+            f'{cl.RED}Параметр `--table` видалено - спробуйте покращений вивід за замовчуванням, або скористайтеся параметром `--debug`{cl.RESET}'
+        )
+
+    if args.debug:
+        print(cl.CYAN)
+        logger.warning(
+            f'Параметр `--debug` більше не потрібен для звичайного використання - спробуйте покращений вивід за замовчуванням забравши параметр --debug{cl.RESET}'
+        )
+
     num_copies = args.copies
     if num_copies > 1:
         max_copies = CPU_COUNT // CPU_PER_PROCESS
@@ -403,12 +406,6 @@ def main():
             logger.warning(
                 f"{cl.RED}{t('The number of copies is automatically reduced to')} {max_copies}{cl.RESET}"
             )
-
-        if num_copies > 1 and args.table:
-            logger.warning(
-                f"{cl.MAGENTA}{t('The `--table` flag cannot be used when running multiple copies')}{cl.RESET}"
-            )
-            args.table = False
 
     print_banner(args)
 

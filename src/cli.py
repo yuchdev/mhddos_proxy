@@ -34,13 +34,7 @@ def init_argparse() -> argparse.ArgumentParser:
         '--debug',
         action='store_true',
         default=False,
-        help='Print log as text',
-    )
-    parser.add_argument(
-        '--table',
-        action='store_true',
-        default=False,
-        help='Print log as table',
+        help='Detailed log for each target',
     )
     parser.add_argument(
         '--vpn',
@@ -97,4 +91,8 @@ def init_argparse() -> argparse.ArgumentParser:
         default=SCHEDULER_FORK_SCALE,
         help='How many tasks to fork on successful connect to the target',
     )
+
+    # Deprecated
+    parser.add_argument('--table', action='store_true', default=False)
+
     return parser
