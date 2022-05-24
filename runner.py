@@ -379,18 +379,6 @@ def main():
         logger.error(f"{cl.RED}{t('No targets specified for the attack')}{cl.RESET}")
         sys.exit()
 
-    if args.table:
-        print()
-        logger.warning(
-            f'{cl.RED}Параметр `--table` видалено - спробуйте покращений вивід за замовчуванням, або скористайтеся параметром `--debug`{cl.RESET}'
-        )
-
-    if args.debug:
-        print(cl.CYAN)
-        logger.warning(
-            f'Параметр `--debug` більше не потрібен для звичайного використання - спробуйте покращений вивід за замовчуванням прибравши параметр --debug{cl.RESET}'
-        )
-
     num_copies = args.copies
     if num_copies > 1:
         max_copies = CPU_COUNT // CPU_PER_PROCESS
@@ -401,6 +389,18 @@ def main():
             )
 
     print_banner(args)
+
+    if args.table:
+        logger.warning(
+            f'{cl.RED}Параметр `--table` видалено - спробуйте покращений вивід за замовчуванням, або скористайтеся параметром `--debug`{cl.RESET}'
+        )
+        print()
+
+    if args.debug:
+        logger.warning(
+            f'{cl.CYAN}Параметр `--debug` більше не потрібен для звичайного використання - спробуйте покращений вивід за замовчуванням прибравши параметр --debug{cl.RESET}'
+        )
+        print()
 
     processes = []
     mp.set_start_method("spawn")
