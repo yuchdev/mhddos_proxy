@@ -66,6 +66,7 @@
 - [Приклад запуску через docker на OpenWRT](https://youtu.be/MlL6fuDcWlI)
 - [VPN](https://auto-ddos.notion.site/VPN-5e45e0aadccc449e83fea45d56385b54)
 - [Docker-image](https://github.com/alexnest-ua/auto_mhddos_alexnest/tree/docker), який запускає одночасно mhddos_proxy та [proxy_finder](https://github.com/porthole-ascend-cinnamon/proxy_finder) (для Linux / Mac додайте sudo на початку):
+- [Налаштування з нотифікаціями у Телеграм](https://github.com/sadviq99/mhddos_proxy-setup)
 
 ### 6. CLI
 
