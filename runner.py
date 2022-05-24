@@ -140,15 +140,6 @@ async def run_ddos(args):
 
     logger.info(f"{cl.GREEN}{t('Launching the attack ...')}{cl.RESET}")
 
-    # initial set of proxies
-    use_my_ip = min(args.use_my_ip, ONLY_MY_IP)
-    proxies = ProxySet(args.proxies, use_my_ip)
-    if proxies.has_proxies:
-        num_proxies = await proxies.reload()
-        if num_proxies == 0:
-            logger.error(f"{cl.RED}{t('No working proxies found - stopping the attack')}{cl.RESET}")
-            return
-
     attack_settings = AttackSettings(
         requests_per_connection=args.rpc,
         dest_connect_timeout_seconds=10.0,
@@ -186,7 +177,8 @@ async def run_ddos(args):
     active_flooder_tasks = []
     tcp_task_group = None
 
-    async def install_targets(targets) -> bool:
+    async def install_targets(targets):
+        print()
         nonlocal tcp_task_group
 
         # cancel running flooders
@@ -216,7 +208,6 @@ async def run_ddos(args):
             else:
                 logger.error(f"{cl.RED}Unsupported scheme given: {target.url.scheme}{cl.RESET}")
 
-        force_install = False
         if tcp_flooders:
             num_allowed_flooders = max(int(threads * SCHEDULER_MAX_INIT_FRACTION), 1)
             adjusted_capacity = initial_capacity
@@ -229,7 +220,6 @@ async def run_ddos(args):
                     tcp_flooders = tcp_flooders[:num_allowed_flooders]
                     num_flooders = num_allowed_flooders
                     logger.info(f"{cl.MAGENTA}{t('Selected')} {num_flooders} {t('targets for the attack')}{cl.RESET}")
-                    force_install = True
 
             # adjust settings to avoid situation when we have just a few
             # targets in the config (in this case with default CLI settings you are
@@ -259,16 +249,13 @@ async def run_ddos(args):
             task = loop.create_task(run_udp_flood(flooder))
             active_flooder_tasks.append(task)
 
-        if not debug:
-            for flooder in tcp_flooders + udp_flooders:
-                logger.info(
-                    f"{cl.YELLOW}{t('Target')}:{cl.BLUE} %s,"
-                    f"{cl.YELLOW} {t('Port')}:{cl.BLUE} %s,"
-                    f"{cl.YELLOW} {t('Method')}:{cl.BLUE} %s{cl.RESET}" % flooder.desc
-                )
-            print()
-
-        return force_install
+        for flooder in tcp_flooders + udp_flooders:
+            logger.info(
+                f"{cl.YELLOW}{t('Target')}:{cl.BLUE} %s,"
+                f"{cl.YELLOW} {t('Port')}:{cl.BLUE} %s,"
+                f"{cl.YELLOW} {t('Method')}:{cl.BLUE} %s{cl.RESET}" % flooder.desc
+            )
+        print()
 
     if args.itarmy:
         targets_loader = TargetsLoader([], IT_ARMY_CONFIG_URL)
@@ -276,6 +263,7 @@ async def run_ddos(args):
         targets_loader = TargetsLoader(args.targets, args.config)
 
     try:
+        print()
         initial_targets, _ = await targets_loader.load(resolve=True)
     except Exception as exc:
         logger.error(f"{cl.RED}{t('Targets loading failed')} {exc}{cl.RESET}")
@@ -285,63 +273,68 @@ async def run_ddos(args):
         logger.error(f"{cl.RED}{t('No targets specified for the attack')}{cl.RESET}")
         return
 
+    # initial set of proxies
+    use_my_ip = min(args.use_my_ip, ONLY_MY_IP)
+    proxies = ProxySet(args.proxies, use_my_ip)
+    if proxies.has_proxies:
+        num_proxies = await proxies.reload()
+        if num_proxies == 0:
+            logger.error(f"{cl.RED}{t('No working proxies found - stopping the attack')}{cl.RESET}")
+            return
+
     # Give user some time to read the output
-    print_status(threads, len(proxies), use_my_ip, False)
     await asyncio.sleep(5)
-    force_install_targets: bool = await install_targets(initial_targets)
+    await install_targets(initial_targets)
 
     tasks = []
 
     async def stats_printer():
         it, cycle_start = 0, time.perf_counter()
         refresh_rate = REFRESH_RATE
+
+        print_status(threads, len(proxies), len(stats), use_my_ip, False)
         while True:
+            await asyncio.sleep(refresh_rate)
             show_statistic(stats, debug)
 
-            if it >= 30:
+            if it >= 20:
                 it = 0
                 passed = time.perf_counter() - cycle_start
                 overtime = bool(passed > refresh_rate * REFRESH_OVERTIME)
                 print_banner(args)
-                print_status(threads, len(proxies), use_my_ip, overtime)
+                print_status(threads, len(proxies), len(stats), use_my_ip, overtime)
 
             it, cycle_start = it + 1, time.perf_counter()
-            await asyncio.sleep(refresh_rate)
 
     # setup coroutine to print stats
     tasks.append(loop.create_task(stats_printer()))
 
-    async def reload_targets(delay_seconds: int = 30, force_install: bool = False):
-        force_next = force_install
+    async def reload_targets():
         while True:
             try:
-                await asyncio.sleep(delay_seconds)
-                targets, changed = await targets_loader.load(resolve=True)
+                await asyncio.sleep(reload_after)
+                targets, _changed = await targets_loader.load(resolve=True)
 
-                if not targets:
+                if targets:
+                    await install_targets(targets)
+                else:
                     logger.warning(
                         f"{cl.MAGENTA}{t('Empty config loaded - the previous one will be used')}{cl.RESET}"
                     )
-
-                if targets and (changed or force_next):
-                    force_next = await install_targets(targets)
 
             except asyncio.CancelledError as e:
                 raise e
             except Exception as exc:
                 logger.warning(f"{cl.MAGENTA}{t('Failed to (re)load targets config:')} {exc}{cl.RESET}")
 
-    reload_after = 300
+    reload_after = 5 * 60
     # setup coroutine to reload targets
-    targets_reloader = loop.create_task(
-        reload_targets(delay_seconds=reload_after, force_install=force_install_targets)
-    )
-    tasks.append(targets_reloader)
+    tasks.append(loop.create_task(reload_targets()))
 
-    async def reload_proxies(delay_seconds: int = 30):
+    async def reload_proxies():
         while True:
             try:
-                await asyncio.sleep(delay_seconds)
+                await asyncio.sleep(reload_after)
                 if (await proxies.reload()) == 0:
                     logger.warning(
                         f"{cl.MAGENTA}{t('Failed to reload proxy list - the previous one will be used')}{cl.RESET}"
@@ -354,7 +347,7 @@ async def run_ddos(args):
 
     # setup coroutine to reload proxies
     if proxies.has_proxies:
-        tasks.append(loop.create_task(reload_proxies(delay_seconds=reload_after)))
+        tasks.append(loop.create_task(reload_proxies()))
 
     await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -395,7 +388,7 @@ def main():
     if args.debug:
         print(cl.CYAN)
         logger.warning(
-            f'Параметр `--debug` більше не потрібен для звичайного використання - спробуйте покращений вивід за замовчуванням забравши параметр --debug{cl.RESET}'
+            f'Параметр `--debug` більше не потрібен для звичайного використання - спробуйте покращений вивід за замовчуванням прибравши параметр --debug{cl.RESET}'
         )
 
     num_copies = args.copies

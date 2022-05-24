@@ -1,14 +1,9 @@
-import os
 from typing import List
 
 from .core import CPU_COUNT, CPU_PER_PROCESS, DEFAULT_THREADS, cl, logger
 from .i18n import translate as t
 from .mhddos import Tools
 from .targets import TargetStats
-
-
-def cls():
-    os.system('cls' if os.name == 'nt' else 'clear')
 
 
 def show_statistic(statistics: List[TargetStats], debug: bool):
@@ -39,13 +34,15 @@ def show_statistic(statistics: List[TargetStats], debug: bool):
         f"{cl.YELLOW}{t('Traffic')}:{cl.GREEN} {Tools.humanbits(total_bps)}/s{cl.RESET}"
     )
 
+
 def print_status(
     num_threads: int,
     num_proxies: int,
+    num_targets: int,
     use_my_ip: int,
     overtime: bool,
 ):
-    message = f"{cl.YELLOW}{t('Threads')}: {cl.BLUE}{num_threads}{cl.RESET} | "
+    message = f"{cl.YELLOW}{t('Threads')}: {cl.BLUE}{num_threads}{cl.RESET} | {cl.YELLOW}{t('Targets')}: {cl.BLUE}{num_targets}{cl.RESET} | "
     if num_proxies:
         message += f"{cl.YELLOW}{t('Proxies')}: {cl.BLUE}{num_proxies}{cl.RESET}"
         if use_my_ip:
