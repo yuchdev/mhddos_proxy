@@ -298,7 +298,7 @@ async def run_ddos(args):
         while True:
             show_statistic(stats, debug)
 
-            if it >= 20:
+            if it >= 30:
                 it = 0
                 passed = time.perf_counter() - cycle_start
                 overtime = bool(passed > refresh_rate * REFRESH_OVERTIME)

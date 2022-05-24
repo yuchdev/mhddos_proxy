@@ -201,7 +201,6 @@ class AsyncTcpFlood:
         loop,
         settings: Optional[AttackSettings] = None
     ) -> None:
-        self.SENT_FLOOD = None
         self._event = event
         self._target = target
         self._addr = addr
@@ -683,7 +682,6 @@ class AsyncUdpFlood:
         loop,
         settings: Optional[AttackSettings] = None,
     ):
-        self.SENT_FLOOD = None
         self._target = target
         self._event = event
         self._stats = stats

@@ -14,12 +14,13 @@ def cls():
 def show_statistic(statistics: List[TargetStats], debug: bool):
     total_pps, total_bps, total_in_flight = 0, 0, 0
     for stats in statistics:
-        (target, method, sig) = stats.target
         pps, bps, in_flight_conn = stats.reset()
         total_pps += pps
         total_bps += bps
         total_in_flight += in_flight_conn
+
         if debug:
+            (target, method, sig) = stats.target
             method_sig = f" ({sig})" if sig is not None else ""
             logger.info(
                 f"{cl.YELLOW}{t('Target')}:{cl.BLUE} {target.human_repr()}, "
