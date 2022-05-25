@@ -9,13 +9,13 @@ import signal
 import sys
 import time
 from functools import partial
-from typing import List, Set, Union
+from typing import List, Optional, Set, Tuple, Union
 
 from src.cli import init_argparse
 from src.core import (
     CPU_COUNT, CPU_PER_PROCESS, DEFAULT_THREADS, FAILURE_BUDGET_FACTOR, FAILURE_DELAY_SECONDS,
     IT_ARMY_CONFIG_URL, ONLY_MY_IP, REFRESH_OVERTIME, REFRESH_RATE,
-    SCHEDULER_MAX_INIT_FRACTION, SCHEDULER_MIN_INIT_FRACTION, cl, logger
+    SCHEDULER_MAX_INIT_FRACTION, SCHEDULER_MIN_INIT_FRACTION, cl, logger, setup_worker_logger
 )
 from src.i18n import DEFAULT_LANGUAGE, set_language, translate as t
 from src.mhddos import AsyncTcpFlood, AsyncUdpFlood, AttackSettings, main as mhddos_main
@@ -359,10 +359,12 @@ def _main_signal_handler(ps, *args):
             p.terminate()
     sys.exit()
 
+import sys
 
-def _worker_process(args, lang):
+def _worker_process(args, lang: Optional[str], process_index: Optional[Tuple[int, int]]):
     try:
         set_language(lang)  # set language again for the subprocess
+        setup_worker_logger(process_index)
         loop = setup_event_loop()
         loop.run_until_complete(run_ddos(args))
     except KeyboardInterrupt:
@@ -404,8 +406,9 @@ def main():
 
     processes = []
     mp.set_start_method("spawn")
-    for _ in range(num_copies):
-        p = mp.Process(target=_worker_process, args=(args, lang), daemon=True)
+    for ind in range(num_copies):
+        pos = (ind+1, num_copies) if num_copies > 1 else None
+        p = mp.Process(target=_worker_process, args=(args, lang, pos), daemon=True)
         processes.append(p)
 
     signal.signal(signal.SIGINT, partial(_main_signal_handler, processes, logger))

@@ -1,8 +1,10 @@
-import logging
-import warnings
 from asyncio.log import logger as asyncio_logger
+from contextlib import suppress
+import logging
 from multiprocessing import cpu_count
 from pathlib import Path
+from typing import Optional, Tuple
+import warnings
 
 from colorama import Fore
 
@@ -18,12 +20,25 @@ class RemoveUselessWarnings(logging.Filter):
         ))
 
 
-logging.basicConfig(format='[%(asctime)s - %(levelname)s] %(message)s', datefmt="%H:%M:%S")
+LOGGER_MSG_FORMAT = '[%(asctime)s - %(levelname)s] %(message)s'
+LOGGER_DATE_FORMAT = "%H:%M:%S"
+
+logging.basicConfig(format=LOGGER_MSG_FORMAT, datefmt=LOGGER_DATE_FORMAT)
 logger = logging.getLogger('mhddos_proxy')
 logger.setLevel('INFO')
 
 # Make asyncio logger a little bit less noisy
 asyncio_logger.addFilter(RemoveUselessWarnings())
+
+
+def setup_worker_logger(process_index: Optional[Tuple[int, int]]) -> None:
+    if process_index is None: return
+    ind, total = process_index
+    formatter = logging.Formatter(
+        f"[{ind}/{total}] {LOGGER_MSG_FORMAT}", datefmt=LOGGER_DATE_FORMAT)
+    with suppress(Exception):
+        logger.parent.handlers[0].setFormatter(formatter)
+
 
 ROOT_DIR = Path(__file__).parent.parent
 
