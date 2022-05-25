@@ -99,8 +99,10 @@
 #### Формат файлу (будь який на вибір):
 
     IP:PORT
+    IP:PORT:username:password
     username:password@IP:PORT
     protocol://IP:PORT
+    protocol://IP:PORT:username:password
     protocol://username:password@IP:PORT
 
 де `protocol` може бути одним з 3-ох: `http`|`socks4`|`socks5`, якщо `protocol`не вказувати, то буде обрано `http`  
@@ -108,8 +110,9 @@
 
     socks4://114.231.123.38:3065
 
-а для приватного `socks4` формат буде таким:
+а для приватного `socks4` формат може бути одним з таких:
 
+    socks4://114.231.123.38:3065:username:password
     socks4://username:password@114.231.123.38:3065
   
 **URL - Віддалений файл для Python та Docker**

@@ -95,9 +95,10 @@ The script itself and installation instructions are here: https://github.com/por
 #### File format (any of the following):
 
     IP:PORT
+    IP:PORT:username:password
     username:password@IP:PORT
     protocol://IP:PORT
-    protocol://username:password@IP:PORT
+    protocol://IP:PORT:username:password
 
 where `protocol` can be one of 3 options: `http`|`socks4`|`socks5`. 
 If `protocol` is not specified, default value `http` is used.
@@ -105,8 +106,9 @@ For example, for a public `socks4` proxy the format will be fhe following:
 
     socks4://114.231.123.38:3065
 
-and for the private `socks4` proxy format will be the following:
+and for the private `socks4` proxy format can be one of the following:
 
+    socks4://114.231.123.38:3065:username:password
     socks4://username:password@114.231.123.38:3065
 
 **URL of the remote file for Python and Docker**
