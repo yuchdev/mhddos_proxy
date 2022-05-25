@@ -65,7 +65,7 @@ def print_banner(args):
     rows = []
     if not args.lang:
         rows.append(
-            f"- {cl.YELLOW}Change language / Зміна мови:{cl.BLUE} `--lang en` / `--lang ua`{cl.RESET}"
+            f"- {cl.YELLOW}Change language:{cl.BLUE} `--lang en` / `--lang ua`{cl.RESET}"
         )
     if not args.threads:
         rows.append(
