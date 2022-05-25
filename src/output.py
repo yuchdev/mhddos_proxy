@@ -42,7 +42,7 @@ def print_status(
     use_my_ip: int,
     overtime: bool,
 ):
-    message = f"{cl.YELLOW}{t('Threads')}: {cl.BLUE}{num_threads}{cl.RESET} | {cl.YELLOW}{t('Targets')}: {cl.BLUE}{num_targets}{cl.RESET} | "
+    message = f"{cl.YELLOW}{t('Threads')}: {cl.BLUE}{num_threads}{cl.RESET} | "
     if num_proxies:
         message += f"{cl.YELLOW}{t('Proxies')}: {cl.BLUE}{num_proxies}{cl.RESET}"
         if use_my_ip:
