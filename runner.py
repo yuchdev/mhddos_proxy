@@ -361,7 +361,7 @@ def _main_signal_handler(ps, *args):
     sys.exit()
 
 
-def _worker_process(args, lang: Optional[str], process_index: Optional[Tuple[int, int]]):
+def _worker_process(args, lang: str, process_index: Optional[Tuple[int, int]]):
     try:
         set_language(lang)  # set language again for the subprocess
         setup_worker_logger(process_index)
