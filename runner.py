@@ -309,6 +309,8 @@ async def run_ddos(args):
     # setup coroutine to print stats
     tasks.append(loop.create_task(stats_printer()))
 
+    reload_after = 5 * 60
+
     async def reload_targets():
         while True:
             try:
@@ -327,7 +329,6 @@ async def run_ddos(args):
             except Exception as exc:
                 logger.warning(f"{cl.MAGENTA}{t('Failed to (re)load targets config:')} {exc}{cl.RESET}")
 
-    reload_after = 5 * 60
     # setup coroutine to reload targets
     tasks.append(loop.create_task(reload_targets()))
 
@@ -360,7 +361,7 @@ def _main_signal_handler(ps, *args):
     sys.exit()
 
 
-def _worker_process(args, lang: Optional[str], process_index: Optional[Tuple[int, int]]):
+def _worker_process(args, lang: str, process_index: Optional[Tuple[int, int]]):
     try:
         set_language(lang)  # set language again for the subprocess
         setup_worker_logger(process_index)
