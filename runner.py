@@ -359,7 +359,6 @@ def _main_signal_handler(ps, *args):
             p.terminate()
     sys.exit()
 
-import sys
 
 def _worker_process(args, lang: Optional[str], process_index: Optional[Tuple[int, int]]):
     try:
