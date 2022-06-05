@@ -68,9 +68,6 @@ TRANSLATIONS = {
     'Threads': {
         'ua': 'Потоків'
     },
-    'Targets': {
-        'ua': 'Цілей'
-    },
     'Proxies': {
         'ua': 'Проксі'
     },
