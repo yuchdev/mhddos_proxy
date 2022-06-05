@@ -42,7 +42,7 @@ do
 
   if [ -n "$(git diff --name-only origin/$BRANCH)" ]
   then
-    echo -e "\n${GREEN}[$(date +"%d-%m-%Y %T")] - New version available, updating the script!${RESET}\n"
+    echo -e "\n${GREEN}[$(date +"%d-%m-%Y %T")] - New version available, updating the script!${RESET}"
     stop_script
     update_script
     exec ./runner.sh $PYTHON $SCRIPT_ARGS
@@ -55,7 +55,7 @@ do
     if ! kill -0 $PID
     then
       PID=""
-      echo -e "\n${RED}Error starting - retry in 30 seconds! Ctrl+C to exit${RESET}\n"
+      echo -e "\n${RED}Error starting - retry in 30 seconds! Ctrl+C to exit${RESET}"
       sleep 30
     fi
   done
