@@ -29,14 +29,14 @@ function stop_script() {
 function update_script() {
     git reset -q --hard
     git checkout -q $BRANCH
-    git pull -q
+    git pull -q || echo -e "${RED}git pull failed${RESET}"
     $PYTHON -m pip install -q -r requirements.txt
 }
 
 while true
 do
 
-  git fetch -q origin $BRANCH
+  git fetch -q origin $BRANCH || echo -e "${RED}git fetch failed${RESET}"
 
   if [ -n "$(git diff --name-only origin/$BRANCH)" ]
   then
