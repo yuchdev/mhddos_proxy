@@ -33,6 +33,8 @@ function update_script() {
     $PYTHON -m pip install -q -r requirements.txt
 }
 
+echo -e "\n${GREEN}---------------------Auto-update enabled---------------------${RESET}"
+
 while true
 do
 
