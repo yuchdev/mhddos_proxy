@@ -48,7 +48,7 @@ do
 
   while [ -z "$PID" ]
   do
-    $PYTHON runner.py $SCRIPT_ARGS & PID=$!
+    AUTO_MH=1 $PYTHON runner.py $SCRIPT_ARGS & PID=$!
     sleep 1
     if ! kill -0 $PID
     then

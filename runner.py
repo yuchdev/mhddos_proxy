@@ -7,6 +7,7 @@ import multiprocessing as mp
 import random
 import signal
 import sys
+import os
 import time
 from functools import partial
 from typing import List, Optional, Set, Tuple, Union
@@ -400,7 +401,14 @@ def main():
 
     if args.debug:
         logger.warning(
-            f'{cl.CYAN}Параметр `--debug` більше не потрібен для звичайного використання - спробуйте покращений вивід за замовчуванням прибравши параметр --debug{cl.RESET}'
+            f"{cl.CYAN}{t('The `--debug` option is not needed for common usage and may impact performance')}{cl.RESET}"
+        )
+        print()
+
+    if not os.getenv('AUTO_MH'):
+        new_command = f'./runner.sh {os.path.basename(sys.executable)} ' + ' '.join(sys.argv[1:])
+        logger.warning(
+            f"{cl.CYAN}{t('Try running with automatic updates: ')}{new_command}{cl.RESET}"
         )
         print()
 

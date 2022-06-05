@@ -98,6 +98,12 @@ TRANSLATIONS = {
     'Instead of high `-t` value consider using': {
         'ua': 'Замість високого значення `-t` краще використати'
     },
+    'The `--debug` option is not needed for common usage and may impact performance': {
+        'ua': 'Параметр `--debug` не потрібен для звичайного використання і може впливати на продуктивність'
+    },
+    'Try running with automatic updates: ': {
+        'ua': 'Радимо запускати скрипт з автоматичним оновленням: '
+    },
     '`uvloop` activated successfully': {
         'ua': '`uvloop` успішно активовано'
     },
