@@ -382,7 +382,7 @@ def main():
         logger.error(f"{cl.RED}{t('No targets specified for the attack')}{cl.RESET}")
         sys.exit()
 
-    num_copies = args.copies
+    num_copies = args.copies if not args.copies_auto else float("inf")
     if num_copies > 1:
         max_copies = CPU_COUNT // CPU_PER_PROCESS
         if num_copies > max_copies:

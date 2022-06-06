@@ -31,6 +31,12 @@ def init_argparse() -> argparse.ArgumentParser:
         help='Number of copies (default is 1)',
     )
     parser.add_argument(
+        '--copies-auto',
+        action='store_true',
+        default=False,
+        help='When set, automatically identifies the max possible value for --copies',
+    )
+    parser.add_argument(
         '--debug',
         action='store_true',
         default=False,
