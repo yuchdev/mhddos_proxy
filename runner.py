@@ -14,9 +14,11 @@ from typing import List, Optional, Set, Tuple, Union
 
 from src.cli import init_argparse
 from src.core import (
-    CPU_COUNT, CPU_PER_PROCESS, DEFAULT_THREADS, FAILURE_BUDGET_FACTOR, FAILURE_DELAY_SECONDS,
+    COPIES_AUTO, CPU_COUNT, CPU_PER_PROCESS, DEFAULT_THREADS,
+    FAILURE_BUDGET_FACTOR, FAILURE_DELAY_SECONDS,
     IT_ARMY_CONFIG_URL, ONLY_MY_IP, REFRESH_OVERTIME, REFRESH_RATE,
-    SCHEDULER_MAX_INIT_FRACTION, SCHEDULER_MIN_INIT_FRACTION, cl, logger, setup_worker_logger
+    SCHEDULER_MAX_INIT_FRACTION, SCHEDULER_MIN_INIT_FRACTION,
+    cl, logger, setup_worker_logger
 )
 from src.i18n import DEFAULT_LANGUAGE, set_language, translate as t
 from src.mhddos import AsyncTcpFlood, AsyncUdpFlood, AttackSettings, main as mhddos_main
@@ -382,9 +384,9 @@ def main():
         logger.error(f"{cl.RED}{t('No targets specified for the attack')}{cl.RESET}")
         sys.exit()
 
-    num_copies = args.copies if not args.copies_auto else float("inf")
+    max_copies = CPU_COUNT // CPU_PER_PROCESS
+    num_copies = args.copies if not args.copies != COPIES_AUTO else max(1, max_copies)
     if num_copies > 1:
-        max_copies = CPU_COUNT // CPU_PER_PROCESS
         if num_copies > max_copies:
             num_copies = max_copies
             logger.warning(

@@ -1,7 +1,8 @@
 import argparse
 import random
+from typing import Union
 
-from .core import DEFAULT_THREADS, SCHEDULER_FORK_SCALE, SCHEDULER_INITIAL_CAPACITY
+from .core import COPIES_AUTO, DEFAULT_THREADS, SCHEDULER_FORK_SCALE, SCHEDULER_INITIAL_CAPACITY
 from .i18n import LANGUAGES
 from .mhddos import Methods
 
@@ -26,15 +27,10 @@ def init_argparse() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         '--copies',
-        type=int,
+        type=lambda val: val if val == COPIES_AUTO else int(val),
         default=1,
-        help='Number of copies (default is 1)',
-    )
-    parser.add_argument(
-        '--copies-auto',
-        action='store_true',
-        default=False,
-        help='When set, automatically identifies the max possible value for --copies',
+        help='Number of copies (default is 1). '
+             'Use "auto" to adjust the value based on the resources available.',
     )
     parser.add_argument(
         '--debug',
