@@ -30,7 +30,7 @@ def init_argparse() -> argparse.ArgumentParser:
         type=lambda val: val if val == COPIES_AUTO else int(val),
         default=1,
         help='Number of copies (default is 1). '
-             'Use "auto" to adjust the value based on the resources available.',
+             'Use "auto" to set the value automatically based on the resources available.',
     )
     parser.add_argument(
         '--debug',
