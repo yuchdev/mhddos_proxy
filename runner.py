@@ -385,7 +385,7 @@ def main():
         sys.exit()
 
     max_copies = CPU_COUNT // CPU_PER_PROCESS
-    num_copies = args.copies if not args.copies != COPIES_AUTO else max(1, max_copies)
+    num_copies = args.copies if args.copies != COPIES_AUTO else max(1, max_copies)
     if num_copies > 1:
         if num_copies > max_copies:
             num_copies = max_copies
