@@ -1,3 +1,4 @@
+import time
 from asyncio import gather
 from typing import Dict, List, Optional
 
@@ -18,9 +19,11 @@ except NoResolverConfiguration:
 ns = ['1.1.1.1', '1.0.0.1', '8.8.8.8', '8.8.4.4', '208.67.222.222', '208.67.220.220']
 resolver.nameservers = ns + list(resolver.nameservers)
 
+CACHE_FOR = 30 * 60
+
 
 @lru_cache(maxsize=1024)
-async def resolve_host(host: str) -> str:
+async def _resolve_host(host: str, ttl_hash=None) -> str:
     if dns.inet.is_address(host):
         return host
     answer = await resolver.resolve(host)
@@ -29,7 +32,7 @@ async def resolve_host(host: str) -> str:
 
 async def safe_resolve_host(host: str) -> Optional[str]:
     try:
-        resolved = await resolve_host(host)
+        resolved = await _resolve_host(host, int(time.time() / CACHE_FOR))
         if resolved == '127.0.0.1':
             raise dns.exception.DNSException('resolved to localhost')
         return resolved

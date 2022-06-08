@@ -1,6 +1,5 @@
 import os
 import time
-from hashlib import md5
 from typing import Dict, List, Optional, Tuple
 
 from dns import inet
@@ -20,7 +19,7 @@ class Target:
     OPTION_RPC = "rpc"
     OPTION_HIGH_WATERMARK = "watermark"
 
-    __slots__ = ['url', 'method', 'options', 'addr']
+    __slots__ = ['url', 'method', 'options', 'addr', 'hash']
 
     def __init__(
         self,
@@ -33,6 +32,14 @@ class Target:
         self.method = method
         self.options = options or {}
         self.addr = self.option(Target.OPTION_IP, addr)
+
+        self.hash = hash((self.url, self.method, tuple(self.options.items()), self.addr))
+
+    def __eq__(self, other):
+        return self.hash == other.hash
+
+    def __hash__(self):
+        return self.hash
 
     @classmethod
     def from_string(cls, raw: str) -> "Target":
@@ -92,52 +99,33 @@ class Target:
 
 
 class TargetsLoader:
-
     def __init__(self, targets, config):
-        self._targets = [Target.from_string(t) for t in targets]
+        self._targets = [Target.from_string(raw) for raw in targets]
         self._config = config
-        self._tag: Optional[str] = None
-        self._last_loaded_at: Optional[float] = None
-        self._cached_targets = None
+        self._cached_targets = []
 
-    @property
-    def dynamic(self):
-        return self._config is not None
-
-    @property
-    def age(self) -> Optional[float]:
-        if not self._config:
-            return None
-        if not self._last_loaded_at:
-            return 0
-        return time.time() - self._last_loaded_at
-
-    async def load(self, resolve: bool = False) -> Tuple[List[Target], bool]:
+    async def reload(self) -> Tuple[List[Target], bool]:
         config_targets = await self._load_config()
         if config_targets:
             logger.info(
                 f"{cl.YELLOW}{t('Loaded config')} {cl.BLUE}{os.path.basename(self._config)}{cl.YELLOW} "
                 f"{t('for')} {cl.BLUE}{len(config_targets)} {t('targets')}{cl.RESET}"
             )
-        all_targets = self._targets + (config_targets or [])
-        if resolve:
-            all_targets = await resolve_all_targets(all_targets)
-            all_targets = [target for target in all_targets if target.is_resolved]
-        changed = (all_targets == self._cached_targets)
-        self._cached_targets = all_targets
-        self._last_loaded_at = time.time()
-        return all_targets, changed
 
-    # XXX: fix this to work properly with ETag
-    async def _load_config(self) -> List[Target]:
+        all_targets = await resolve_all_targets(self._targets + config_targets)
+        all_targets = [target for target in all_targets if target.is_resolved]
+
+        is_changed = (set(all_targets) != set(self._cached_targets))
+        self._cached_targets = all_targets
+        return all_targets, is_changed
+
+    async def _load_config(self):
         if not self._config:
             return []
 
         config_content = await read_or_fetch(self._config)
         if config_content is None:
-            raise RuntimeError("Failed to load configuration")
-
-        self._tag = md5(config_content.encode()).hexdigest()
+            raise RuntimeError('Failed to load configuration')
 
         targets = []
         for row in config_content.splitlines():
