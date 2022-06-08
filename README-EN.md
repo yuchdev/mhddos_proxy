@@ -8,12 +8,10 @@
 - Effective utilization of your resources due to the asynchronous architecture
 
 ### ⏱ Recent updates
-
+- **08.06.2020** Added `--copies auto` option to set the value automatically based on the resources available
 - **25.05.2022** Improved default output - the `--debug` option is no longer required 
 - **24.05.2022** Added auto-update option - see [Running](#2--running-different-options-for-targets-are-given)
 - **21.05.2022** Added english localization - use flag `--lang EN` (more languages may be added later)
-- **18.05.2022** Added `--copies` option in order to run multiple copies (recommended for use with 4+ CPUs and network > 100 Mb / s).
-- **15.05.2022** Completely updated asynchronous version, which ensures maximum efficiency and minimum load on the system
 
 ### 1. 💽 Installation
 
@@ -52,7 +50,7 @@ All options can be combined, you can specify them either before and after the li
 - Consider adding your IP/VPN to the attack (especially when running on dedicated server), add flag `--vpn`
 - To use targets provided by https://t.me/itarmyofukraine2022, add the `--itarmy` flag  
 - Number of threads: `-t XXXX` - the default is 7500 (or 1000 if the machine has only one CPU).
-- Number of copies: `--copies X` - in case you have 4+ CPU and stable network > 100 Mb/s
+- Number of copies: `--copies X` or `--copies auto` - in case you have 4+ CPU and stable network 100+ Mb/s
 
 ### 4. 📌 Help with finding new proxies for mhddos_proxy
 The script itself and installation instructions are here: https://github.com/porthole-ascend-cinnamon/proxy_finder
@@ -87,7 +85,7 @@ The script itself and installation instructions are here: https://github.com/por
       --http-methods GET     List of HTTP(L7) methods to use (default is GET + POST|STRESS).
       --debug                Detailed log for each target
       --itarmy               Attack targets from https://t.me/itarmyofukraine2022  
-      --copies 1             Number of copies to run (default is 1)
+      --copies 1             Number of copies to run (default is 1). Use "auto" to set the value automatically
       --lang {en,ua}         Select language (default is ua)
 
 ### 7. Custom proxies

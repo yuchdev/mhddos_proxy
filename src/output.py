@@ -1,6 +1,6 @@
 from typing import List
 
-from .core import CPU_COUNT, CPU_PER_PROCESS, DEFAULT_THREADS, cl, logger, ONLY_MY_IP
+from .core import CPU_COUNT, CPU_PER_COPY, DEFAULT_THREADS, cl, logger, ONLY_MY_IP
 from .i18n import translate as t
 from .mhddos import Tools
 from .targets import TargetStats
@@ -70,7 +70,7 @@ def print_banner(args):
         rows.append(
             f"- {cl.YELLOW}{t('Workload (number of threads)')}:{cl.BLUE} {t('use flag `-t XXXX`, default is')} {DEFAULT_THREADS}"
         )
-    elif args.threads > 10000 and args.copies == 1 and CPU_COUNT > CPU_PER_PROCESS:
+    elif args.threads > 10000 and args.copies == 1 and CPU_COUNT > CPU_PER_COPY:
         rows.append(
             f"- {cl.CYAN}{t('Instead of high `-t` value consider using')} {cl.YELLOW}`--copies 2`{cl.RESET}"
         )

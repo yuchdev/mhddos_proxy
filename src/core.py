@@ -1,10 +1,10 @@
+import logging
+import warnings
 from asyncio.log import logger as asyncio_logger
 from contextlib import suppress
-import logging
 from multiprocessing import cpu_count
 from pathlib import Path
 from typing import Optional, Tuple
-import warnings
 
 from colorama import Fore
 
@@ -32,7 +32,8 @@ asyncio_logger.addFilter(RemoveUselessWarnings())
 
 
 def setup_worker_logger(process_index: Optional[Tuple[int, int]]) -> None:
-    if process_index is None: return
+    if process_index is None:
+        return
     ind, total = process_index
     formatter = logging.Formatter(
         f"[{ind}/{total}] {LOGGER_MSG_FORMAT}", datefmt=LOGGER_DATE_FORMAT)
@@ -54,7 +55,10 @@ VERSION_URL = 'https://raw.githubusercontent.com/porthole-ascend-cinnamon/mhddos
 CPU_COUNT = cpu_count()
 DEFAULT_THREADS = 7500 if CPU_COUNT > 1 else 1000
 
-CPU_PER_PROCESS = 2
+CPU_PER_COPY = 2
+COPIES_AUTO = "auto"
+MAX_COPIES_AUTO = 4
+
 CONFIG_FETCH_RETRIES = 5
 CONFIG_FETCH_TIMEOUT = 15
 REFRESH_OVERTIME = 2  # roughly 5 more seconds
