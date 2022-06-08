@@ -1,6 +1,5 @@
 import os
 import time
-from hashlib import md5
 from typing import Dict, List, Optional, Tuple
 
 from dns import inet
@@ -20,7 +19,7 @@ class Target:
     OPTION_RPC = "rpc"
     OPTION_HIGH_WATERMARK = "watermark"
 
-    __slots__ = ['url', 'method', 'options', 'addr']
+    __slots__ = ['url', 'method', 'options', 'addr', 'hash']
 
     def __init__(
         self,
@@ -33,6 +32,14 @@ class Target:
         self.method = method
         self.options = options or {}
         self.addr = self.option(Target.OPTION_IP, addr)
+
+        self.hash = hash((self.url, self.method, tuple(self.options.items()), self.addr))
+
+    def __eq__(self, other):
+        return self.hash == other.hash
+
+    def __hash__(self):
+        return self.hash
 
     @classmethod
     def from_string(cls, raw: str) -> "Target":
