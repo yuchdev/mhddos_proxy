@@ -312,19 +312,24 @@ async def run_ddos(args):
     tasks.append(loop.create_task(stats_printer()))
 
     reload_after = 5 * 60
+    reinstall_after_iter = 3
 
     async def reload_targets():
+        it = 0
         while True:
             try:
                 await asyncio.sleep(reload_after)
-                targets, _changed = await targets_loader.load(resolve=True)
+                it += 1
 
-                if targets:
-                    await install_targets(targets)
-                else:
+                targets, changed = await targets_loader.load(resolve=True)
+
+                if not targets:
                     logger.warning(
                         f"{cl.MAGENTA}{t('Empty config loaded - the previous one will be used')}{cl.RESET}"
                     )
+                elif changed or it >= reinstall_after_iter:
+                    it = 0
+                    await install_targets(targets)
 
             except asyncio.CancelledError as e:
                 raise e
