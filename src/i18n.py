@@ -38,7 +38,7 @@ TRANSLATIONS = {
     'No targets specified for the attack': {
         'ua': 'Не вказано жодної цілі для атаки'
     },
-    'Launching the attack ...': {
+    'Launching the attack...': {
         'ua': 'Запускаємо атаку...'
     },
     'Empty config loaded - the previous one will be used': {
@@ -68,14 +68,14 @@ TRANSLATIONS = {
     'Threads': {
         'ua': 'Потоків'
     },
-    'Proxies': {
-        'ua': 'Проксі'
+    'Using only proxies': {
+        'ua': 'Атака тільки через проксі'
     },
-    'The attack also uses your IP/VPN': {
-        'ua': 'Атака також використовує ваш IP/VPN'
+    'Using both proxies and your IP/VPN': {
+        'ua': 'Атака через проксі та ваш IP/VPN'
     },
-    'Only your IP/VPN is used (no proxies)': {
-        'ua': 'Атака використовує тільки ваш IP/VPN (без проксі)'
+    'Using only your IP/VPN (no proxies)': {
+        'ua': 'Атака тільки через ваш IP/VPN (без проксі)'
     },
     'Delay in execution of operations detected': {
         'ua': 'Зафіксована затримка у виконанні операцій'
