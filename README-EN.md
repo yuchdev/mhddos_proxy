@@ -50,7 +50,7 @@ All options can be combined, you can specify them either before and after the li
 - Consider adding your IP/VPN to the attack (especially when running on dedicated server), add flag `--vpn`
 - To use targets provided by https://t.me/itarmyofukraine2022, add the `--itarmy` flag  
 - Number of threads: `-t XXXX` - the default is 7500 (or 1000 if the machine has only one CPU).
-- Number of copies: `--copies X` or `--copies auto` - in case you have 2+ CPU and stable network 100+ Mb/s
+- Number of copies: `--copies X` or `--copies auto` - in case you have 4+ CPU and stable network 100+ Mb/s
 
 ### 4. 📌 Help with finding new proxies for mhddos_proxy
 The script itself and installation instructions are here: https://github.com/porthole-ascend-cinnamon/proxy_finder
