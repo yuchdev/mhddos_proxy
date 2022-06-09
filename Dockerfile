@@ -9,7 +9,7 @@ RUN python3 -m pip install --no-cache-dir --only-binary=:all: -r requirements.tx
 
 FROM --platform=$TARGETPLATFORM python:3.10-slim
 COPY --from=builder	/opt/venv /opt/venv
-ENV AUTO_MH=1 PATH="/opt/venv/bin:$PATH"
+ENV IS_DOCKER=1 AUTO_MH=1 PATH="/opt/venv/bin:$PATH"
 WORKDIR mhddos_proxy
 COPY . .
 ENTRYPOINT ["python3", "./runner.py"]

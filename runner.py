@@ -420,6 +420,9 @@ def main():
         )
         print()
 
+    if os.getenv('IS_DOCKER'):
+        random.seed(time.time())
+
     processes = []
     mp.set_start_method("spawn")
     for ind in range(num_copies):
