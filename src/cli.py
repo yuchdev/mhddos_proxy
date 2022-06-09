@@ -61,6 +61,11 @@ def init_argparse() -> argparse.ArgumentParser:
         help='URL or local path to file with proxies to use',
     )
     parser.add_argument(
+        '--proxy',
+        nargs='*',
+        help='List of proxies to use, separated by spaces',
+    )
+    parser.add_argument(
         '--itarmy',
         action='store_true',
         default=False,
