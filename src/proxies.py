@@ -124,7 +124,9 @@ async def load_provided_proxies(
 ) -> Optional[List[str]]:
     proxies = provided or []
     if proxies_file:
-        proxies.extend(await read_or_fetch(proxies_file).split())
+        content = await read_or_fetch(proxies_file)
+        if content:
+            proxies.extend(content.split())
     proxies = list(map(normalize_url, proxies))
     return proxies
 
