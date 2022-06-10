@@ -277,7 +277,7 @@ async def run_ddos(args):
 
     # initial set of proxies
     use_my_ip = min(args.use_my_ip, ONLY_MY_IP)
-    proxies = ProxySet(args.proxies, use_my_ip)
+    proxies = ProxySet(args.proxy, args.proxies, use_my_ip)
     if proxies.has_proxies:
         num_proxies = await proxies.reload()
         if num_proxies == 0:

@@ -11,7 +11,8 @@
   
 Оновлення версії для Windows | Mac | Linux | Android | Docker: https://telegra.ph/Onovlennya-mhddos-proxy-04-16  
 
-- **08.06.2020** Додано налаштування `--copies auto` для автоматичного вибору значення з врахуванням доступних ресурсів
+- **10.06.2022** Додано зручний спосіб вказати власний проксі напряму в команді запуску (параметр `--proxy`)
+- **08.06.2022** Додано налаштування `--copies auto` для автоматичного вибору значення з врахуванням доступних ресурсів
 - **25.05.2022** Покращено вивід за замовчуванням - більше нема потреби в параметрі `--debug`
 - **24.05.2022** Додано можливість запуску з автоматичним оновленням - див. пункт [Запуск](#2--запуск-наведено-різні-варіанти-цілей)
 - **21.05.2022** Додано англійську локалізацію - параметр `--lang EN` (в майбутньому можуть бути додані інші мови)
@@ -87,6 +88,7 @@
       -t, --threads 7500     Number of threads (default is 7500 if CPU > 1, 1000 otherwise)
       --vpn                  Use both my IP and proxies. Optionally, specify a percent of using my IP (default is 10%)
       --proxies URL|path     URL or local path(ex. proxies.txt) to file with proxies to use
+      --proxy [PROXY ...]    List of proxies to use, separated by spaces
       --http-methods GET     List of HTTP(L7) methods to use (default is GET + POST|STRESS).
       --itarmy               Attack targets from https://t.me/itarmyofukraine2022  
       --debug                Detailed log for each target
@@ -94,6 +96,18 @@
       --lang {en,ua}         Select language (default is ua)
 
 ### 7. Власні проксі
+
+#### Командний рядок
+
+Для того щоб вказати власний проксі (або декілька) через командний рядок, використовуйте опцію `--proxy`:
+
+    python3 runner.py --proxy socks4://114.231.123.38:3065
+
+Можна вказати декілька проксі розділених пробілом:
+
+    python3 runner.py --proxy socks4://114.231.123.38:3065 socks5://114.231.123.38:1080
+
+Якщо перелік проксей занадто великий, скористайтеся опцією передачі налаштувань через файл (дивіться наступний розділ).
 
 #### Формат файлу (будь який на вибір):
 

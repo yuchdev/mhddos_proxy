@@ -8,7 +8,8 @@
 - Effective utilization of your resources due to the asynchronous architecture
 
 ### ⏱ Recent updates
-- **08.06.2020** Added `--copies auto` option to set the value automatically based on the resources available
+- **10.06.2022** Introduced `--proxy` option for providing custom proxies directly from command args
+- **08.06.2022** Added `--copies auto` option to set the value automatically based on the resources available
 - **25.05.2022** Improved default output - the `--debug` option is no longer required 
 - **24.05.2022** Added auto-update option - see [Running](#2--running-different-options-for-targets-are-given)
 - **21.05.2022** Added english localization - use flag `--lang EN` (more languages may be added later)
@@ -82,6 +83,7 @@ The script itself and installation instructions are here: https://github.com/por
       -t, --threads 7500     Number of threads (default is 7500 if CPU > 1, 1000 otherwise)
       --vpn                  Use both my IP and proxies. Optionally, specify a percent of using my IP (default is 10%)
       --proxies URL|path     URL or local path(ex. proxies.txt) to file with proxies to use
+      --proxy [PROXY ...]    List of proxies to use, separated by spaces
       --http-methods GET     List of HTTP(L7) methods to use (default is GET + POST|STRESS).
       --debug                Detailed log for each target
       --itarmy               Attack targets from https://t.me/itarmyofukraine2022  
@@ -89,6 +91,18 @@ The script itself and installation instructions are here: https://github.com/por
       --lang {en,ua}         Select language (default is ua)
 
 ### 7. Custom proxies
+
+#### CLI
+
+To specify custom proxy use `--proxy` option:
+
+    python3 runner.py --proxy socks4://114.231.123.38:3065
+
+Multiple proxies are allowed (space separated):
+
+    python3 runner.py --proxy socks4://114.231.123.38:3065 socks5://114.231.123.38:1080
+
+If the list of custom proxies gets too long, consider switching to file-based configuration (see the next section).
 
 #### File format (any of the following):
 
