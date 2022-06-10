@@ -1,6 +1,5 @@
 import argparse
 import random
-from typing import Union
 
 from .core import COPIES_AUTO, DEFAULT_THREADS, SCHEDULER_FORK_SCALE, SCHEDULER_INITIAL_CAPACITY
 from .i18n import LANGUAGES

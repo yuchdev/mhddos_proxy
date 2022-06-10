@@ -370,6 +370,8 @@ def _main_signal_handler(ps, *args):
 
 def _worker_process(args, lang: str, process_index: Optional[Tuple[int, int]]):
     try:
+        if os.getenv('IS_DOCKER'):
+            random.seed(int(time.time() // 100))
         set_language(lang)  # set language again for the subprocess
         setup_worker_logger(process_index)
         loop = setup_event_loop()
@@ -419,9 +421,6 @@ def main():
             f"{cl.CYAN}{t('Try running with automatic updates: ')}{new_command}{cl.RESET}"
         )
         print()
-
-    if os.getenv('IS_DOCKER'):
-        random.seed(time.time())
 
     processes = []
     mp.set_start_method("spawn")
