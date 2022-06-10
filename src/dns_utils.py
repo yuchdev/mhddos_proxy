@@ -1,3 +1,4 @@
+import asyncio
 import time
 from asyncio import gather
 from typing import Dict, List, Optional
@@ -30,9 +31,10 @@ async def _resolve_host(host: str, ttl_hash=None) -> str:
     return answer[0].to_text()
 
 
-async def safe_resolve_host(host: str) -> Optional[str]:
+async def _safe_resolve_host(host: str, semaphore: asyncio.Semaphore) -> Optional[str]:
     try:
-        resolved = await _resolve_host(host, int(time.time() / CACHE_FOR))
+        async with semaphore:
+            resolved = await _resolve_host(host, int(time.time() / CACHE_FOR))
         if resolved == '127.0.0.1':
             raise dns.exception.DNSException('resolved to localhost')
         return resolved
@@ -49,8 +51,9 @@ async def resolve_all(hosts: List[str]) -> Dict[str, str]:
         for host in hosts
         if not dns.inet.is_address(host)
     ))
+    semaphore = asyncio.Semaphore(100)
     answers = await gather(*[
-        safe_resolve_host(h)
+        _safe_resolve_host(h, semaphore)
         for h in unresolved_hosts
     ])
     ips = dict(zip(unresolved_hosts, answers))
