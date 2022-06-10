@@ -1,3 +1,4 @@
+import asyncio
 import time
 from asyncio import gather
 from typing import Dict, List, Optional
@@ -8,6 +9,7 @@ from dns.asyncresolver import Resolver
 from dns.resolver import NoResolverConfiguration
 
 from .core import cl, logger
+from .exclude import is_forbidden_ip
 from .i18n import translate as t
 
 
@@ -20,6 +22,7 @@ ns = ['1.1.1.1', '1.0.0.1', '8.8.8.8', '8.8.4.4', '208.67.222.222', '208.67.220.
 resolver.nameservers = ns + list(resolver.nameservers)
 
 CACHE_FOR = 30 * 60
+RESOLVER_MAX_CONCURRENT = 100
 
 
 @lru_cache(maxsize=1024)
@@ -30,11 +33,12 @@ async def _resolve_host(host: str, ttl_hash=None) -> str:
     return answer[0].to_text()
 
 
-async def safe_resolve_host(host: str) -> Optional[str]:
+async def _safe_resolve_host(host: str, semaphore: asyncio.Semaphore) -> Optional[str]:
     try:
-        resolved = await _resolve_host(host, int(time.time() / CACHE_FOR))
-        if resolved == '127.0.0.1':
-            raise dns.exception.DNSException('resolved to localhost')
+        async with semaphore:
+            resolved = await _resolve_host(host, int(time.time() / CACHE_FOR))
+        if is_forbidden_ip(resolved):
+            raise dns.exception.DNSException("resolved to unsupported address")
         return resolved
     except dns.exception.DNSException:
         logger.warning(
@@ -49,8 +53,9 @@ async def resolve_all(hosts: List[str]) -> Dict[str, str]:
         for host in hosts
         if not dns.inet.is_address(host)
     ))
+    semaphore = asyncio.Semaphore(RESOLVER_MAX_CONCURRENT)
     answers = await gather(*[
-        safe_resolve_host(h)
+        _safe_resolve_host(h, semaphore)
         for h in unresolved_hosts
     ])
     ips = dict(zip(unresolved_hosts, answers))
