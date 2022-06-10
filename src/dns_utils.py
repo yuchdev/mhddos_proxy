@@ -9,6 +9,7 @@ from dns.asyncresolver import Resolver
 from dns.resolver import NoResolverConfiguration
 
 from .core import cl, logger
+from .exclude import is_forbidden_ip
 from .i18n import translate as t
 
 
@@ -19,7 +20,6 @@ except NoResolverConfiguration:
 
 ns = ['1.1.1.1', '1.0.0.1', '8.8.8.8', '8.8.4.4', '208.67.222.222', '208.67.220.220']
 resolver.nameservers = ns + list(resolver.nameservers)
-
 
 CACHE_FOR = 30 * 60
 RESOLVER_MAX_CONCURRENT = 100
@@ -37,7 +37,7 @@ async def _safe_resolve_host(host: str, semaphore: asyncio.Semaphore) -> Optiona
     try:
         async with semaphore:
             resolved = await _resolve_host(host, int(time.time() / CACHE_FOR))
-        if resolved == '127.0.0.1' or resolved in ns:
+        if is_forbidden_ip(resolved):
             raise dns.exception.DNSException("resolved to unsupported address")
         return resolved
     except dns.exception.DNSException:
