@@ -50,7 +50,7 @@ All options can be combined, you can specify them either before and after the li
 
 - Consider adding your IP/VPN to the attack (especially when running on dedicated server), add flag `--vpn`
 - To use targets provided by https://t.me/itarmyofukraine2022, add the `--itarmy` flag  
-- Number of threads: `-t XXXX` - the default is 7500 (or 1000 if the machine has only one CPU).
+- Number of threads: `-t XXXX` - the default is 8000 (or 4000 if the machine has only one CPU).
 - Number of copies: `--copies X` or `--copies auto` - in case you have 4+ CPU and stable network 100+ Mb/s
 
 ### 4. 📌 Help with finding new proxies for mhddos_proxy
@@ -80,7 +80,7 @@ The script itself and installation instructions are here: https://github.com/por
      optional arguments:
       -h, --help             show this help message and exit
       -c, --config URL|path  URL or local path to file with targets list
-      -t, --threads 7500     Number of threads (default is 7500 if CPU > 1, 1000 otherwise)
+      -t, --threads 8000     Number of threads (default is 8000 if CPU > 1, 4000 otherwise)
       --vpn                  Use both my IP and proxies. Optionally, specify a percent of using my IP (default is 10%)
       --proxies URL|path     URL or local path(ex. proxies.txt) to file with proxies to use
       --proxy [PROXY ...]    List of proxies to use, separated by spaces

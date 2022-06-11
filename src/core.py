@@ -46,7 +46,7 @@ ROOT_DIR = Path(__file__).parent.parent
 CONFIG_URL = "https://raw.githubusercontent.com/porthole-ascend-cinnamon/mhddos_proxy/main/config.json"
 
 CPU_COUNT = cpu_count()
-DEFAULT_THREADS = 7500 if CPU_COUNT > 1 else 1000
+DEFAULT_THREADS = 8000 if CPU_COUNT > 1 else 4000
 
 CPU_PER_COPY = 2
 COPIES_AUTO = "auto"
