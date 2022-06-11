@@ -142,6 +142,8 @@ async def run_ddos(args):
             threads = max_conns
 
     logger.info(f"{cl.GREEN}{t('Launching the attack...')}{cl.RESET}")
+    # Give user some time to read the output
+    await asyncio.sleep(5)
 
     attack_settings = AttackSettings(
         requests_per_connection=args.rpc,
@@ -285,8 +287,6 @@ async def run_ddos(args):
             logger.error(f"{cl.RED}{t('No working proxies found - stopping the attack')}{cl.RESET}")
             return
 
-    # Give user some time to read the output
-    await asyncio.sleep(5)
     await install_targets(initial_targets)
 
     tasks = []
