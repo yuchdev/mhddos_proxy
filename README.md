@@ -53,7 +53,7 @@
 
 - Щоб додати ваш IP/VPN до атаки (особливо актуально для виділених серверів), додайте параметр `--vpn`
 - Щоб обрати цілі від https://t.me/itarmyofukraine2022, додайте параметр `--itarmy`
-- Кількість потоків: `-t XXXX` - за замовчуванням 7500 (або 1000 якщо на машині лише 1 CPU)
+- Кількість потоків: `-t XXXX` - за замовчуванням 8000 (або 4000 якщо на машині лише 1 CPU)
 - Запуск декількох копій: `--copies X` або `--copies auto`, при наявності 4+ CPU та мережі 100+ Mb/s
 
 ### 4. 📌 Допомогти в пошуку нових проксі для mhddos_proxy
@@ -85,7 +85,7 @@
     optional arguments:
       -h, --help             show this help message and exit
       -c, --config URL|path  URL or local path to file with targets list
-      -t, --threads 7500     Number of threads (default is 7500 if CPU > 1, 1000 otherwise)
+      -t, --threads 8000     Number of threads (default is 8000 if CPU > 1, 4000 otherwise)
       --vpn                  Use both my IP and proxies. Optionally, specify a percent of using my IP (default is 10%)
       --proxies URL|path     URL or local path(ex. proxies.txt) to file with proxies to use
       --proxy [PROXY ...]    List of proxies to use, separated by spaces
