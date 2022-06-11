@@ -12,7 +12,6 @@
 - **08.06.2022** Added `--copies auto` option to set the value automatically based on the resources available
 - **25.05.2022** Improved default output - the `--debug` option is no longer required 
 - **24.05.2022** Added auto-update option - see [Running](#2--running)
-- **21.05.2022** Added english localization - use flag `--lang EN` (more languages may be added later)
 
 ### 1. 💽 Installation
 

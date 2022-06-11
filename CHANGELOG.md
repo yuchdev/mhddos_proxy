@@ -1,21 +1,18 @@
+- **10.06.2022** 
+  - Introduced `--proxy` option for providing custom proxies directly from command args
 - **08.06.2020**
   - Added `--copies auto` option to set the value automatically based on the resources available
-
 - **25.05.2022**
   - Improved default output - the `--debug` option is no longer required 
-
 - **21.05.2022**
   - Added english localization - use flag `--lang EN` (more languages may be added later)
-
 - **18.05.2022**
   - Added `--copies` option in order to run multiple copies (recommended for use with 4+ CPUs and network > 100 Mb / s).
-
 - **15.05.2022**
   - Completely updated, asynchronous version, which ensures maximum efficiency and minimum load on the system
   - Efficient operation with larger values of the `-t` parameter (up to 10k) without the risk of "freezing" the whole system
   - A brand-new algorithm for load balancing between targets in order to achieve maximum attack efficiency
   - Attack types `RGET`, `RHEAD`, `RHEX` and `STOMP` added
-
 - **23.04.2022** 
   - The `--vpn` option has been changed - now your IP/VPN is being used **together** with the proxy, rather than instead. To restore the previous behavior, use `--vpn 100`
 - **20.04.2022**
