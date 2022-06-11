@@ -62,6 +62,6 @@ do
     fi
   done
 
-  sleep 666
+  sleep 600
 
 done
