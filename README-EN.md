@@ -11,7 +11,7 @@
 - **10.06.2022** Introduced `--proxy` option for providing custom proxies directly from command args
 - **08.06.2022** Added `--copies auto` option to set the value automatically based on the resources available
 - **25.05.2022** Improved default output - the `--debug` option is no longer required 
-- **24.05.2022** Added auto-update option - see [Running](#2--running-different-options-for-targets-are-given)
+- **24.05.2022** Added auto-update option - see [Running](#2--running)
 - **21.05.2022** Added english localization - use flag `--lang EN` (more languages may be added later)
 
 ### 1. 💽 Installation
@@ -30,26 +30,26 @@ Requires python >= 3.8 and git
 
 Install and start Docker: https://docs.docker.com/desktop/#download-and-install
 
-### 2. 🕹 Running (different options for targets are given)
+### 2. 🕹 Running
 
 #### Python with automatic updates (if it doesn't work, try `python` or `python3.10` instead of `python3`)
 
-    ./runner.sh python3 https://ria.ru 5.188.56.124:80 tcp://194.54.14.131:4477
+    ./runner.sh python3 https://example.com tcp://198.18.0.123:5678
 
 #### Python (manual updates required) (if it doesn't work, try `python` or `python3.10` instead of `python3`)
 
-    python3 runner.py https://ria.ru 5.188.56.124:80 tcp://194.54.14.131:4477
+    python3 runner.py https://example.com tcp://198.18.0.123:5678
 
 #### Docker (for Linux, add sudo in front of the command)
 
-    docker run -it --rm --pull always ghcr.io/porthole-ascend-cinnamon/mhddos_proxy https://ria.ru 5.188.56.124:80 tcp://194.54.14.131:4477
+    docker run -it --rm --pull always ghcr.io/porthole-ascend-cinnamon/mhddos_proxy https://example.com tcp://198.18.0.123:5678
 
 ### 3. 🛠 Options (check out more in the [CLI](#cli) section)
 
 All options can be combined, you can specify them either before and after the list of targets
 
 - Consider adding your IP/VPN to the attack (especially when running on dedicated server), add flag `--vpn`
-- To use targets provided by https://t.me/itarmyofukraine2022, add the `--itarmy` flag  
+- To use targets provided by IT Army of Ukraine (https://t.me/itarmyofukraine2022), add the `--itarmy` flag  
 - Number of threads: `-t XXXX` - the default is 8000 (or 4000 if the machine has only one CPU).
 - Number of copies: `--copies X` or `--copies auto` - in case you have 4+ CPU and stable network 100+ Mb/s
 
@@ -133,6 +133,6 @@ where https://pastebin.com/raw/UkFWzLOt is your web page with a list of proxies 
   
 Put the file in the folder with `runner.py` and add the following option to the command (replace `proxies.txt` with the name of your file)
 
-    --proxies proxies.txt https://ria.ru
+    --proxies proxies.txt
 
 where `proxies.txt` is your proxy list file (each proxy should be on a new line)
