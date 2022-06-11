@@ -5,6 +5,7 @@ PID=""
 
 RED="\033[1;31m"
 GREEN="\033[1;32m"
+BLUE="\033[1;34m"
 RESET="\033[0m"
 
 PYTHON=$1
@@ -13,6 +14,7 @@ SCRIPT_ARGS="${@:2}"
 trap 'shutdown' SIGINT SIGQUIT SIGTERM ERR
 
 function shutdown() {
+    echo -e "\n${BLUE}---> Shutting down...${RESET}"
     stop_script
     exit
 }
