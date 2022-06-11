@@ -43,14 +43,7 @@ def setup_worker_logger(process_index: Optional[Tuple[int, int]]) -> None:
 
 ROOT_DIR = Path(__file__).parent.parent
 
-PROXIES_URLS = (
-    'https://raw.githubusercontent.com/porthole-ascend-cinnamon/assets/main/1.txt',
-    'https://raw.githubusercontent.com/porthole-ascend-cinnamon/assets/main/2.txt',
-    'https://raw.githubusercontent.com/porthole-ascend-cinnamon/assets/main/3.txt',
-    'https://raw.githubusercontent.com/porthole-ascend-cinnamon/assets/main/4.txt',
-)
-IT_ARMY_CONFIG_URL = 'https://gist.githubusercontent.com/itarmy2022/f6bed33bc0635303f058689b5f9c0ccc/raw/mhdos_targets_tcp_v2.txt'
-VERSION_URL = 'https://raw.githubusercontent.com/porthole-ascend-cinnamon/mhddos_proxy/main/version.txt'
+CONFIG_URL = "https://raw.githubusercontent.com/porthole-ascend-cinnamon/mhddos_proxy/main/config.json"
 
 CPU_COUNT = cpu_count()
 DEFAULT_THREADS = 7500 if CPU_COUNT > 1 else 1000
@@ -59,18 +52,15 @@ CPU_PER_COPY = 2
 COPIES_AUTO = "auto"
 MAX_COPIES_AUTO = 4
 
-CONFIG_FETCH_RETRIES = 5
-CONFIG_FETCH_TIMEOUT = 15
-REFRESH_OVERTIME = 2  # roughly 5 more seconds
-REFRESH_RATE = 5
-FAILURE_BUDGET_FACTOR = 3
-FAILURE_DELAY_SECONDS = 1
-ONLY_MY_IP = 100
+USE_ONLY_MY_IP = 100
 SCHEDULER_INITIAL_CAPACITY = 3
 SCHEDULER_MIN_INIT_FRACTION = 0.1
 SCHEDULER_MAX_INIT_FRACTION = 0.5
 SCHEDULER_FORK_SCALE = 3
 CONN_PROBE_PERIOD = 5
+
+UDP_FAILURE_BUDGET_FACTOR = 3
+UDP_FAILURE_DELAY_SECONDS = 1
 UDP_BATCH_PACKETS = 16
 UDP_ENOBUFS_PAUSE = 0.5
 

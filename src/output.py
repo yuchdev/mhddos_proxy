@@ -1,6 +1,6 @@
 from typing import List
 
-from .core import CPU_COUNT, CPU_PER_COPY, DEFAULT_THREADS, cl, logger, ONLY_MY_IP
+from .core import CPU_COUNT, CPU_PER_COPY, DEFAULT_THREADS, cl, logger, USE_ONLY_MY_IP
 from .i18n import translate as t
 from .mhddos import Tools
 from .targets import TargetStats
@@ -42,7 +42,7 @@ def print_status(
 ):
     if not use_my_ip:
         proxies_message = t('Using only proxies')
-    elif use_my_ip == ONLY_MY_IP:
+    elif use_my_ip == USE_ONLY_MY_IP:
         proxies_message = t('Using only your IP/VPN (no proxies)')
     else:
         proxies_message = t('Using both proxies and your IP/VPN')

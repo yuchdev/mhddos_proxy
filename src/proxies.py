@@ -5,7 +5,7 @@ from typing import List, Optional, Tuple
 from aiohttp_socks import ProxyConnector
 from yarl import URL
 
-from .core import ONLY_MY_IP, PROXIES_URLS
+from .core import USE_ONLY_MY_IP
 from .dns_utils import resolve_all
 from .system import fetch, read_or_fetch
 
@@ -52,16 +52,16 @@ class ProxySet:
 
     @property
     def has_proxies(self) -> bool:
-        return self._skip_ratio != ONLY_MY_IP
+        return self._skip_ratio != USE_ONLY_MY_IP
 
-    async def reload(self) -> int:
+    async def reload(self, config) -> int:
         if not self.has_proxies:
             return 0
 
         if self._provided_proxies or self._proxies_file:
             proxies = await load_provided_proxies(self._provided_proxies, self._proxies_file)
         else:
-            proxies = await load_system_proxies()
+            proxies = await load_system_proxies(config)
 
         if not proxies:
             return 0
@@ -131,8 +131,8 @@ async def load_provided_proxies(
     return proxies
 
 
-async def load_system_proxies():
-    raw = await fetch(random.choice(PROXIES_URLS))
+async def load_system_proxies(config):
+    raw = await fetch(random.choice(config['proxies_urls']))
     try:
         proxies = obtain_proxies(raw)
     except Exception:

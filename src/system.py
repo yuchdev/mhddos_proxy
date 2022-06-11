@@ -1,4 +1,5 @@
 import asyncio
+import json
 import os.path
 import selectors
 import socket
@@ -9,7 +10,7 @@ from typing import Optional
 
 import requests
 
-from src.core import CONFIG_FETCH_RETRIES, CONFIG_FETCH_TIMEOUT, VERSION_URL, cl, logger
+from src.core import cl, CONFIG_URL, logger
 from src.i18n import translate as t
 
 
@@ -47,10 +48,10 @@ async def read_or_fetch(path_or_url: str) -> Optional[str]:
     return await fetch(path_or_url)
 
 
-def sync_fetch(url: str):
-    for _ in range(CONFIG_FETCH_RETRIES):
+def _sync_fetch(url: str):
+    for _ in range(3):
         try:
-            response = requests.get(url, verify=False, timeout=CONFIG_FETCH_TIMEOUT)
+            response = requests.get(url, verify=False, timeout=10)
             response.raise_for_status()
             return response.text
         except requests.RequestException:
@@ -60,18 +61,18 @@ def sync_fetch(url: str):
 
 async def fetch(url: str) -> Optional[str]:
     loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, sync_fetch, url)
+    return await loop.run_in_executor(None, _sync_fetch, url)
 
 
-async def is_latest_version() -> bool:
-    resp = await fetch(VERSION_URL)
-    if not resp:
-        logger.warning(f'{cl.RED}New version check failed - check your internet connection{cl.RESET}')
-        return True
-
-    latest = int(resp.strip())
-    current = int((await read_or_fetch('version.txt')).strip())
-    return current >= latest
+async def load_configs():
+    local_config = json.loads(await read_or_fetch('config.json'))
+    remote_config_cnt = await fetch(CONFIG_URL)
+    if remote_config_cnt:
+        remote_config = json.loads(remote_config_cnt)
+    else:
+        logger.warning(f'{cl.MAGENTA}Failed to load remote config, a local copy will be used!{cl.RESET}')
+        remote_config = local_config
+    return local_config, remote_config
 
 
 def _safe_connection_lost(transport, exc) -> None:
