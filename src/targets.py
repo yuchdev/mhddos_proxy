@@ -131,7 +131,10 @@ class TargetsLoader:
         for row in config_content.splitlines():
             target = row.strip()
             if target and not target.startswith('#'):
-                targets.append(Target.from_string(target))
+                try:
+                    targets.append(Target.from_string(target))
+                except Exception:
+                    logger.warning(f'{cl.MAGENTA}Failed to parse: {target}{cl.RESET}')
 
         return targets
 
