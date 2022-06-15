@@ -63,8 +63,7 @@ class GeminoCurseTaskSet:
             pass
         except Exception:
             pass
-        finally:
-            self._launch(runnable)
+        self._launch(runnable)
 
     def __len__(self) -> int:
         return len(self._pending)
