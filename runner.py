@@ -370,8 +370,6 @@ def _main_signal_handler(ps, *args):
     for p in ps:
         if p.is_alive():
             p.terminate()
-    if not IS_DOCKER:
-        sys.exit()
 
 
 def _worker_process(args, lang: str, process_index: Optional[Tuple[int, int]]):
