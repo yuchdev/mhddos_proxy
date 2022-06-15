@@ -51,9 +51,9 @@ def init_argparse() -> argparse.ArgumentParser:
         '--http-methods',
         nargs='+',
         type=str.upper,
-        default=['GET', random.choice(['POST', 'STRESS'])],
+        default=['GET'],
         choices=Methods.HTTP_METHODS,
-        help='List of HTTP(L7) methods to use. Default is GET + POST|STRESS',
+        help='List of HTTP(L7) methods to use. Default is GET',
     )
     parser.add_argument(
         '--proxies',

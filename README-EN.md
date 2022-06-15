@@ -83,7 +83,7 @@ The script itself and installation instructions are here: https://github.com/por
       --vpn                  Use both my IP and proxies. Optionally, specify a percent of using my IP (default is 10%)
       --proxies URL|path     URL or local path(ex. proxies.txt) to file with proxies to use
       --proxy [PROXY ...]    List of proxies to use, separated by spaces
-      --http-methods GET     List of HTTP(L7) methods to use (default is GET + POST|STRESS).
+      --http-methods GET     List of HTTP(L7) methods to use (default is GET).
       --debug                Detailed log for each target
       --itarmy               Attack targets from https://t.me/itarmyofukraine2022  
       --copies 1             Number of copies to run (default is 1). Use "auto" to set the value automatically
