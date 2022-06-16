@@ -414,11 +414,13 @@ def main():
         print()
 
     if not IS_AUTO_MH:
-        new_command = f'./runner.sh {os.path.basename(sys.executable)} ' + ' '.join(sys.argv[1:])
-        logger.warning(
-            f"{cl.CYAN}{t('Try running with automatic updates: ')}{new_command}{cl.RESET}"
-        )
-        print()
+        python_bin = os.path.basename(sys.executable)
+        if not python_bin.endswith('.exe'):  # windows is not supported
+            new_command = f'./runner.sh {python_bin} ' + ' '.join(sys.argv[1:])
+            logger.warning(
+                f"{cl.CYAN}{t('Try running with automatic updates: ')}{new_command}{cl.RESET}"
+            )
+            print()
 
     processes = []
     mp.set_start_method("spawn")
