@@ -1,6 +1,6 @@
 {
   "version": 39,
-  "it_army_config_url": "https://gist.githubusercontent.com/itarmy2022/f6bed33bc0635303f058689b5f9c0ccc/raw/mhdos_targets_tcp_v2.txt",
+  "it_army_config_url": "https://cfgda.azureedge.net/itarmy2022/raw/mhdos_targets_tcp_v2.txt",
   "proxies_urls": [
     "https://raw.githubusercontent.com/porthole-ascend-cinnamon/assets/main/1.txt",
     "https://raw.githubusercontent.com/porthole-ascend-cinnamon/assets/main/2.txt",
