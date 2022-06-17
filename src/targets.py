@@ -15,7 +15,7 @@ Options = Dict[str, str]
 
 
 class Target:
-    OPTION_IP = "rpc"
+    OPTION_IP = "ip"
     OPTION_RPC = "rpc"
     OPTION_HIGH_WATERMARK = "watermark"
 
