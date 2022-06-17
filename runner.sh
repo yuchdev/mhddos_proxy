@@ -52,14 +52,22 @@ do
 
   while [ -z "$PID" ]
   do
+
     AUTO_MH=1 $PYTHON runner.py $SCRIPT_ARGS & PID=$!
     sleep 1
+
+    if [ $SCRIPT_ARGS == "--help" ]
+    then
+      exit 0
+    fi
+
     if ! kill -0 $PID
     then
       PID=""
       echo -e "\n${RED}Error starting - retry in 30 seconds! Ctrl+C to exit${RESET}"
       sleep 30
     fi
+
   done
 
   sleep 600
