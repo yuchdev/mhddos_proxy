@@ -56,7 +56,7 @@ do
     AUTO_MH=1 $PYTHON runner.py $SCRIPT_ARGS & PID=$!
     sleep 1
 
-    if [ $SCRIPT_ARGS == "--help" ]
+    if [ "${SCRIPT_ARGS}" == "--help" ]
     then
       exit 0
     fi
