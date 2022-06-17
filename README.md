@@ -85,7 +85,7 @@
       -h, --help             show this help message and exit
       -c, --config URL|path  URL or local path to file with targets list
       -t, --threads 8000     Number of threads (default is 8000 if CPU > 1, 4000 otherwise)
-      --vpn                  Use both my IP and proxies. Optionally, specify a percent of using my IP (default is 10%)
+      --vpn                  Use both my IP and proxies. Optionally, specify a chance of using my IP (default is 2%)
       --proxies URL|path     URL or local path(ex. proxies.txt) to file with proxies to use
       --proxy [PROXY ...]    List of proxies to use, separated by spaces
       --http-methods GET     List of HTTP(L7) methods to use (default is GET).
