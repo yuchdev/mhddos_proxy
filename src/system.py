@@ -75,7 +75,6 @@ async def fetch(urls: list[str], retries=5) -> Optional[bytes]:
 
 async def load_system_configs():
     local_config = json.loads(await read_or_fetch('config.json'))
-    return local_config, local_config
     remote_config = None
     remote_config_cnt = await fetch([CONFIG_URL])
     if remote_config_cnt:
