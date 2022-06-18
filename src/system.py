@@ -59,7 +59,7 @@ async def read_or_fetch(path_or_urls: Union[str, list[str]]) -> Optional[bytes]:
     return await fetch(path_or_urls)
 
 
-async def fetch(urls: list[str]) -> Optional[bytes]:
+async def fetch(urls: Union[str, list[str]]) -> Optional[bytes]:
     if isinstance(urls, str):
         urls = [urls]
 
@@ -79,7 +79,7 @@ async def fetch(urls: list[str]) -> Optional[bytes]:
 async def load_system_configs():
     local_config = json.loads(await read_or_fetch('config.json'))
     remote_config = None
-    remote_config_cnt = await fetch([CONFIG_URL])
+    remote_config_cnt = await fetch(CONFIG_URL)
     if remote_config_cnt:
         remote_config = json.loads(remote_config_cnt)
     else:
