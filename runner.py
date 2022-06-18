@@ -364,7 +364,7 @@ async def run_ddos(args):
                 _, new_config = await load_system_configs()
                 if new_config:
                     config.update(new_config)
-            except asyncion.CancelledError:
+            except asyncio.CancelledError:
                 raise
             except Exception:
                 pass
