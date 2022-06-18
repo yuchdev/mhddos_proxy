@@ -8,7 +8,7 @@ import sys
 from asyncio import events
 from contextlib import suppress
 from itertools import cycle
-from typing import Optional, Union
+from typing import List, Optional, Union
 
 import requests
 
@@ -52,14 +52,14 @@ def _sync_fetch(url: str, timeout=10):
         return None
 
 
-async def read_or_fetch(path_or_urls: Union[str, list[str]]) -> Optional[bytes]:
+async def read_or_fetch(path_or_urls: Union[str, List[str]]) -> Optional[bytes]:
     if isinstance(path_or_urls, str) and os.path.exists(path_or_urls):
         with open(path_or_urls, 'rb') as f:
             return f.read()
     return await fetch(path_or_urls)
 
 
-async def fetch(urls: Union[str, list[str]]) -> Optional[bytes]:
+async def fetch(urls: Union[str, List[str]]) -> Optional[bytes]:
     if isinstance(urls, str):
         urls = [urls]
 
