@@ -29,8 +29,8 @@ TRANSLATIONS = {
     'Total': {
         'ua': 'Усього'
     },
-    'Loaded config': {
-        'ua': 'Завантажено конфіг'
+    'Loaded config for': {
+        'ua': 'Завантажено конфіг на'
     },
     'Targets loading failed': {
         'ua': 'Завантаження цілей завершилося помилкою:'

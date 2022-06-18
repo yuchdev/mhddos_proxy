@@ -22,7 +22,7 @@ from src.i18n import DEFAULT_LANGUAGE, set_language, translate as t
 from src.mhddos import AsyncTcpFlood, AsyncUdpFlood, AttackSettings, main as mhddos_main
 from src.output import print_banner, print_status, show_statistic
 from src.proxies import ProxySet
-from src.system import fix_ulimits, load_configs, setup_event_loop, WINDOWS_WAKEUP_SECONDS
+from src.system import fix_ulimits, load_system_configs, setup_event_loop, WINDOWS_WAKEUP_SECONDS
 from src.targets import Target, TargetsLoader
 
 
@@ -114,7 +114,9 @@ async def run_udp_flood(runnable: AsyncUdpFlood) -> None:
 
 
 async def run_ddos(args):
-    local_config, config = await load_configs()
+    local_config, config = await load_system_configs()
+    if config is None:
+        config = local_config
     is_old_version = (local_config['version'] < config['version'])
     if is_old_version:
         logger.warning(
@@ -263,11 +265,7 @@ async def run_ddos(args):
             )
         print()
 
-    if args.itarmy:
-        targets_loader = TargetsLoader([], config['it_army_config_url'])
-    else:
-        targets_loader = TargetsLoader(args.targets, args.config)
-
+    targets_loader = TargetsLoader(args.targets, args.targets_config, config, it_army=args.itarmy)
     try:
         print()
         initial_targets, _ = await targets_loader.reload()
@@ -359,6 +357,21 @@ async def run_ddos(args):
     if proxies.has_proxies:
         tasks.append(loop.create_task(reload_proxies()))
 
+    async def reload_config():
+        while True:
+            try:
+                await asyncio.sleep(reload_after)
+                _, new_config = await load_system_configs()
+                if new_config:
+                    config.update(new_config)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                pass
+
+    # setup coroutine to reload config
+    tasks.append(loop.create_task(reload_config()))
+
     await asyncio.gather(*tasks, return_exceptions=True)
 
 
@@ -392,7 +405,7 @@ def main():
     lang = args.lang or DEFAULT_LANGUAGE
     set_language(lang)
 
-    if not any((args.targets, args.config, args.itarmy)):
+    if not any((args.targets, args.targets_config, args.itarmy)):
         logger.error(f"{cl.RED}{t('No targets specified for the attack')}{cl.RESET}")
         sys.exit()
 

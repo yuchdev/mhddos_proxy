@@ -126,15 +126,15 @@ async def load_provided_proxies(
     if proxies_file:
         content = await read_or_fetch(proxies_file)
         if content:
-            proxies.extend(content.split())
+            proxies.extend(content.decode().split())
     proxies = list(map(normalize_url, proxies))
     return proxies
 
 
 async def load_system_proxies(config):
-    raw = await fetch(random.choice(config['proxies_urls']))
+    raw = await fetch(config['proxies_urls'])
     try:
-        proxies = obtain_proxies(raw)
+        proxies = obtain_proxies(raw.decode())
     except Exception:
         proxies = []
     proxies = list(map(normalize_url, proxies))

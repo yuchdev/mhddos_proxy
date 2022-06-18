@@ -1,12 +1,14 @@
 import asyncio
 import json
 import os.path
+import random
 import selectors
 import socket
 import sys
 from asyncio import events
 from contextlib import suppress
-from typing import Optional
+from itertools import cycle
+from typing import Optional, Union
 
 import requests
 
@@ -41,37 +43,47 @@ def fix_ulimits() -> Optional[int]:
     return soft
 
 
-async def read_or_fetch(path_or_url: str) -> Optional[str]:
-    if os.path.exists(path_or_url):
-        with open(path_or_url, 'r') as f:
+def _sync_fetch(url: str, timeout=10):
+    try:
+        response = requests.get(url, verify=False, timeout=timeout)
+        response.raise_for_status()
+        return response.content
+    except requests.RequestException:
+        return None
+
+
+async def read_or_fetch(path_or_urls: Union[str, list[str]]) -> Optional[bytes]:
+    if isinstance(path_or_urls, str) and os.path.exists(path_or_urls):
+        with open(path_or_urls, 'rb') as f:
             return f.read()
-    return await fetch(path_or_url)
+    return await fetch(path_or_urls)
 
 
-def _sync_fetch(url: str):
-    for _ in range(3):
-        try:
-            response = requests.get(url, verify=False, timeout=10)
-            response.raise_for_status()
-            return response.text
-        except requests.RequestException:
-            pass
-    return None
+async def fetch(urls: Union[str, list[str]]) -> Optional[bytes]:
+    if isinstance(urls, str):
+        urls = [urls]
+
+    urls = list(urls)
+    random.shuffle(urls)
+
+    min_retries = 3
+    retries_per_url = 2
+    retries = max(retries_per_url * len(urls), min_retries)
+    for retry, url in zip(range(retries), cycle(urls)):
+        loop = asyncio.get_running_loop()
+        content = await loop.run_in_executor(None, _sync_fetch, url)
+        if content:
+            return content
 
 
-async def fetch(url: str) -> Optional[str]:
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, _sync_fetch, url)
-
-
-async def load_configs():
+async def load_system_configs():
     local_config = json.loads(await read_or_fetch('config.json'))
+    remote_config = None
     remote_config_cnt = await fetch(CONFIG_URL)
     if remote_config_cnt:
         remote_config = json.loads(remote_config_cnt)
     else:
         logger.warning(f'{cl.MAGENTA}Failed to load remote config, a local copy will be used!{cl.RESET}')
-        remote_config = local_config
     return local_config, remote_config
 
 
@@ -101,6 +113,7 @@ def _patch_proactor_connection_lost() -> None:
     a backport for already versions.
     """
     from asyncio.proactor_events import _ProactorBasePipeTransport
+
     setattr(_ProactorBasePipeTransport, "_call_connection_lost", _safe_connection_lost)
 
 
