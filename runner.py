@@ -359,10 +359,15 @@ async def run_ddos(args):
 
     async def reload_config():
         while True:
-            await asyncio.sleep(reload_after)
-            _, new_config = await load_system_configs()
-            if new_config:
-                config.update(new_config)
+            try:
+                await asyncio.sleep(reload_after)
+                _, new_config = await load_system_configs()
+                if new_config:
+                    config.update(new_config)
+            except asyncion.CancelledError:
+                raise
+            except Exception:
+                pass
 
     # setup coroutine to reload config
     tasks.append(loop.create_task(reload_config()))
