@@ -38,11 +38,11 @@ echo -e "\n${GREEN}---------------------Auto-update enabled---------------------
 
 if [ -z "$TERMUX" ]
 then
-  $PYTHON -m pip install -q -r requirements.txt
+  $PYTHON -m pip install --disable-pip-version-check -q -r requirements.txt
 else
   git config --global --add safe.directory /storage/emulated/0/mhddos_proxy
   git config --global --add safe.directory ~/mhddos_proxy
-  $PYTHON -m pip install -q -r termux_requirements.txt
+  $PYTHON -m pip install --disable-pip-version-check -q -r termux_requirements.txt
 fi
 
 while true
