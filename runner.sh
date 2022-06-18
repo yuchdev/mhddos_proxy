@@ -32,11 +32,18 @@ function update_script() {
     git reset -q --hard
     git checkout -q $BRANCH
     git pull -q || echo -e "${RED}git pull failed${RESET}"
-    $PYTHON -m pip install -q -r requirements.txt
 }
 
 echo -e "\n${GREEN}---------------------Auto-update enabled---------------------${RESET}"
-$PYTHON -m pip install -q -r requirements.txt
+
+if [ -z "$TERMUX" ]
+then
+  $PYTHON -m pip install -q -r requirements.txt
+else
+  git config --global --add safe.directory /storage/emulated/0/mhddos_proxy
+  git config --global --add safe.directory ~/mhddos_proxy
+  $PYTHON -m pip install -q -r termux_requirements.txt
+fi
 
 while true
 do
@@ -48,7 +55,14 @@ do
     echo -e "\n${GREEN}[$(date +"%d-%m-%Y %T")] - New version available, updating the script!${RESET}"
     stop_script
     update_script
-    exec ./runner.sh $PYTHON $SCRIPT_ARGS
+
+    if [ -z "$TERMUX" ]
+    then
+      exec ./runner.sh $PYTHON $SCRIPT_ARGS
+    else
+      exec bash runner.sh $PYTHON $SCRIPT_ARGS
+    fi
+
   fi
 
   while [ -z "$PID" ]
