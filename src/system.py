@@ -59,13 +59,16 @@ async def read_or_fetch(path_or_urls: Union[str, list[str]]) -> Optional[bytes]:
     return await fetch(path_or_urls)
 
 
-async def fetch(urls: list[str], retries=5) -> Optional[bytes]:
+async def fetch(urls: list[str]) -> Optional[bytes]:
     if isinstance(urls, str):
         urls = [urls]
 
     urls = list(urls)
     random.shuffle(urls)
 
+    min_retries = 3
+    retries_per_url = 2
+    retries = max(retries_per_url * len(urls), min_retries)
     for retry, url in zip(range(retries), cycle(urls)):
         loop = asyncio.get_running_loop()
         content = await loop.run_in_executor(None, _sync_fetch, url)
