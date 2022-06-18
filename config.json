@@ -1,6 +1,10 @@
 {
-  "version": 39,
+  "version": 40,
   "it_army_config_url": "https://cfgda.azureedge.net/itarmy2022/raw/mhdos_targets_tcp_v2.txt",
+  "it_army_config_urls_list": [
+    "https://cfgda.azureedge.net/itarmy2022/raw/mhdos_targets_tcp_v2.txt",
+    "https://cfgda.azureedge.net/itarmy2022/raw/config_v4.txt"
+  ],
   "proxies_urls": [
     "https://cfgpa.azureedge.net/porthole-ascend-cinnamon/assets/main/1.txt",
     "https://cfgpa.azureedge.net/porthole-ascend-cinnamon/assets/main/2.txt",

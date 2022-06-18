@@ -16,6 +16,7 @@ def init_argparse() -> argparse.ArgumentParser:
     parser.add_argument(
         '-c',
         '--config',
+        dest='targets_config',
         help='URL or local path to file with attack targets',
     )
     parser.add_argument(

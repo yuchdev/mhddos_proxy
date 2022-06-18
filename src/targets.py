@@ -1,7 +1,8 @@
-import os
+import base64
 import time
 from typing import Dict, List, Optional, Tuple
 
+from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 from dns import inet
 from yarl import URL
 
@@ -98,18 +99,24 @@ class Target:
         return TargetStats(self, method)
 
 
+ENC_KEYS = {
+    b'\xe4\xdc\xf7\x1f': b'fZPK2OTLiNdqVDBxJTSMuph/rfLzpFWHDmHC1/+rR1s=',
+}
+
+
 class TargetsLoader:
-    def __init__(self, targets, config):
+    def __init__(self, targets, targets_config, global_config, it_army: bool = False):
         self._targets = [Target.from_string(raw) for raw in targets]
-        self._config = config
+        self._cmd_targets_config = targets_config
+        self._global_config = global_config
+        self._it_army = it_army
         self._cached_targets = []
 
     async def reload(self) -> Tuple[List[Target], bool]:
         config_targets = await self._load_config()
         if config_targets:
             logger.info(
-                f"{cl.YELLOW}{t('Loaded config')} {cl.BLUE}{os.path.basename(self._config)}{cl.YELLOW} "
-                f"{t('for')} {cl.BLUE}{len(config_targets)} {t('targets')}{cl.RESET}"
+                f"{cl.YELLOW}{t('Loaded config for')} {cl.BLUE}{len(config_targets)} {t('targets')}{cl.RESET}"
             )
 
         all_targets = await resolve_all_targets(self._targets + config_targets)
@@ -120,15 +127,21 @@ class TargetsLoader:
         return all_targets, is_changed
 
     async def _load_config(self):
-        if not self._config:
+        if self._it_army:
+            target_urls = self._global_config['it_army_config_urls_list']
+        elif self._cmd_targets_config:
+            target_urls = self._cmd_targets_config  # do not make a list, so local path can be handled by read_or_fetch
+        else:
             return []
 
-        config_content = await read_or_fetch(self._config)
-        if config_content is None:
+        content = await read_or_fetch(target_urls)
+        if content is None:
             raise RuntimeError('Failed to load configuration')
 
+        content = self._possibly_decrypt(content).decode()
+
         targets = []
-        for row in config_content.splitlines():
+        for row in content.splitlines():
             target = row.strip()
             if target and not target.startswith('#'):
                 try:
@@ -137,6 +150,16 @@ class TargetsLoader:
                     logger.warning(f'{cl.MAGENTA}Failed to parse: {target}{cl.RESET}')
 
         return targets
+
+    def _possibly_decrypt(self, content):
+        nonce_len = 12
+        for version, key in ENC_KEYS.items():
+            if content.startswith(version):
+                v_len = len(version)
+                cip = ChaCha20Poly1305(key=base64.b64decode(key))
+                nonce = content[v_len: v_len + nonce_len]
+                return cip.decrypt(nonce, content[v_len + nonce_len:], None)
+        return content
 
 
 class TargetStats:
