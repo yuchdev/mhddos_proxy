@@ -23,6 +23,7 @@ class FloodSpecType(Enum):
     GENERATOR = 0
     BYTES = 1
     CALLABLE = 2
+    BUFFER = 3
 
 
 class FloodSpec:
@@ -33,6 +34,8 @@ class FloodSpec:
             return spec
         if spec_type == FloodSpecType.BYTES:
             return cls.from_bytes(spec, *args)
+        if spec_type == FloodSpecType.BUFFER:
+            return cls.from_buffer(spec, *args)
         if spec_type == FloodSpecType.CALLABLE:
             return cls.from_callable(spec, *args)
         raise ValueError(f"Don't know how to create spec from {type(spec)}")
@@ -41,13 +44,20 @@ class FloodSpec:
     def from_bytes(packet: bytes, num_packets: int) -> FloodSpecGen:
         packet_size = len(packet)
         for _ in range(num_packets):
-            yield FloodOp.WRITE, (packet, packet_size)
+            yield FloodOp.WRITE, (packet, packet_size, 1)
+    
+    @staticmethod
+    def from_buffer(packet: Tuple[bytes, int], num_packets: int) -> FloodSpecGen:
+        packet, stacked = packet
+        packet_size = len(packet)
+        for _ in range(int(num_packets/stacked)):
+            yield FloodOp.WRITE, (packet, packet_size, stacked)
 
     @staticmethod
     def from_callable(packet: Callable[[], bytes], num_packets: int) -> FloodSpecGen:
         for _ in range(num_packets):
             _packet: bytes = packet()
-            yield FloodOp.WRITE, (_packet, len(_packet))
+            yield FloodOp.WRITE, (_packet, len(_packet), 1)
 
 
 # XXX: add instrumentation to keep track of connection lifetime,
@@ -186,9 +196,9 @@ class FloodIO(asyncio.Protocol):
             #      as we still need to keep track of current op & stash
             op, args = next(self._flood_spec)
             if op == FloodOp.WRITE:
-                packet, size = args
+                packet, size, num_stacked = args
                 self._transport.write(packet)
-                self._stats.track(1, size)
+                self._stats.track(num_stacked, size)
                 self._handle = None
                 if not self._paused:
                     self._handle = self._loop.call_soon(self._step)
