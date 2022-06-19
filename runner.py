@@ -14,7 +14,7 @@ from typing import List, Optional, Set, Tuple, Union
 
 from src.cli import init_argparse
 from src.core import (
-    cl, COPIES_AUTO, CPU_COUNT, CPU_PER_COPY, DEFAULT_THREADS, logger, MAX_COPIES_AUTO, SCHEDULER_MAX_INIT_FRACTION,
+    cl, COPIES_AUTO, CPU_COUNT, DEFAULT_THREADS, logger, MAX_COPIES_AUTO, SCHEDULER_MAX_INIT_FRACTION,
     SCHEDULER_MIN_INIT_FRACTION, setup_worker_logger, UDP_FAILURE_BUDGET_FACTOR, UDP_FAILURE_DELAY_SECONDS,
     USE_ONLY_MY_IP,
 )
@@ -410,7 +410,7 @@ def main():
         logger.error(f"{cl.RED}{t('No targets specified for the attack')}{cl.RESET}")
         sys.exit()
 
-    max_copies = max(1, CPU_COUNT // CPU_PER_COPY)
+    max_copies = max(1, CPU_COUNT-1)
     num_copies = args.copies
     if args.copies == COPIES_AUTO:
         num_copies = min(max_copies, MAX_COPIES_AUTO)
