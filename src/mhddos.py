@@ -623,8 +623,8 @@ class AsyncTcpFlood:
         transport = None
         try:
             async with async_timeout.timeout(self._settings.connect_timeout_seconds):
-                self._transport, _ = await conn
-            sock = self._transport.get_extra_info("socket")
+                transport, _ = await conn
+            sock = transport.get_extra_info("socket")
             if sock and hasattr(sock, "setsockopt"):
                 sock.setsockopt(SOL_SOCKET, SO_RCVBUF, self._settings.socket_rcvbuf)
                 # the normal termination sequence SHOULD NOT to be initiated
