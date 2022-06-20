@@ -47,10 +47,13 @@ class FloodSpec:
             yield FloodOp.WRITE, (packet, packet_size, 1)
     
     @staticmethod
-    def from_buffer(packet: Tuple[bytes, int], num_packets: int) -> FloodSpecGen:
-        packet, stacked = packet
-        packet_size = len(packet)
+    def from_buffer(packet: Tuple[Callable[[], bytes], int], num_packets: int) -> FloodSpecGen:
+        packet_gen, stacked = packet
+        packet, packet_size = None, None
         for _ in range(int(num_packets/stacked)):
+            if packet is None:
+                packet = packet_gen()
+                packet_size = len(packet)
             yield FloodOp.WRITE, (packet, packet_size, stacked)
 
     @staticmethod
