@@ -24,7 +24,7 @@ def show_statistic(statistics: List[TargetStats], net_stats: Optional[NetStats],
                 f"{cl.YELLOW}{t('Method')}:{cl.BLUE} {method}{method_sig}, "
                 f"{cl.YELLOW}{t('Connections')}:{cl.BLUE} {Tools.humanformat(in_flight_conn)}, "
                 f"{cl.YELLOW}{t('Requests')}:{cl.BLUE} {Tools.humanformat(pps)}/s, "
-                f"{cl.YELLOW}{t('Traffic')}:{cl.BLUE} {Tools.humanbits(bps)}/s"
+                f"{cl.YELLOW}{t('Traffic (estimated)')}:{cl.BLUE} {Tools.humanbits(bps)}/s"
                 f"{cl.RESET}"
             )
 
