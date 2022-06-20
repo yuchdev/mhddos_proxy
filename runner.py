@@ -22,7 +22,10 @@ from src.i18n import DEFAULT_LANGUAGE, set_language, translate as t
 from src.mhddos import AsyncTcpFlood, AsyncUdpFlood, AttackSettings, main as mhddos_main
 from src.output import print_banner, print_status, show_statistic
 from src.proxies import ProxySet
-from src.system import fix_ulimits, load_system_configs, setup_event_loop, WINDOWS_WAKEUP_SECONDS
+from src.system import (
+    NetStats, fix_ulimits, load_system_configs, setup_event_loop,
+    WINDOWS_WAKEUP_SECONDS
+)
 from src.targets import Target, TargetsLoader
 
 
@@ -291,14 +294,17 @@ async def run_ddos(args):
 
     tasks = []
 
+    import psutil
+
     async def stats_printer():
+        net_stats = NetStats()
         it, cycle_start = 0, time.perf_counter()
         refresh_rate = 5
 
         print_status(threads, use_my_ip, False)
         while True:
             await asyncio.sleep(refresh_rate)
-            show_statistic(stats, debug)
+            show_statistic(stats, net_stats, debug)
 
             if it >= 20:
                 it = 0

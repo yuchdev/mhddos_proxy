@@ -1,15 +1,19 @@
 import asyncio
 import json
 import os.path
+import psutil
 import random
 import selectors
 import socket
 import sys
+import time
 from asyncio import events
 from contextlib import suppress
+from functools import cache
 from itertools import cycle
-from typing import List, Optional, Union
+from typing import List, Optional, Tuple, Union
 
+import netifaces
 import requests
 
 from src.core import cl, CONFIG_URL, logger
@@ -155,3 +159,51 @@ def setup_event_loop() -> asyncio.AbstractEventLoop:
     loop.set_exception_handler(_handle_uncaught_exception)
     asyncio.set_event_loop(loop)
     return loop
+
+
+@cache
+def detect_local_iface() -> Optional[str]:
+    gateways = netifaces.gateways()
+    default_gw = gateways.get("default", {})
+    _, iface = default_gw.get(netifaces.AF_INET, (None, None))
+    if iface is not None: return iface
+    # if default gateway is missing, most likely we are on utun (e.g. VPN on Mac)
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        try:
+            sock.connect(("8.8.8.8", 80))
+        except:
+            return None
+        laddr, _ = sock.getsockname()
+        for iface_name in netifaces.interfaces():
+            addrs = netifaces.ifaddresses(iface_name).get(netifaces.AF_INET, [])
+            for addr in addrs:
+                if addr["addr"] == laddr: return iface_name
+    return None
+
+
+def fetch_netstats(iface: Optional[str]) -> Optional['snetio']:
+    if iface is None:
+        return psutil.net_io_counters()
+    else:
+        return psutil.net_io_counters(pernic=True).get(iface, None)
+
+
+class NetStats:
+
+    def __init__(self):
+        self._iface = detect_local_iface()
+        self._timer = time.perf_counter()
+        self._cursor = fetch_netstats(self._iface)
+
+    def tick(self) -> Optional[Tuple[float, float]]:
+        if self._cursor is None: return None
+        now = time.perf_counter()
+        next_cursor = fetch_netstats(self._iface)
+        elapsed = now - self._timer
+        diff = (
+            (next_cursor.packets_sent-self._cursor.packets_sent)/elapsed,
+            (next_cursor.bytes_sent-self._cursor.bytes_sent)/elapsed,
+        )
+        self._timer = now
+        self._cursor = next_cursor
+        return diff

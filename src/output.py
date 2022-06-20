@@ -1,12 +1,13 @@
-from typing import List
+from typing import List, Optional
 
 from .core import CPU_COUNT, DEFAULT_THREADS, cl, logger, USE_ONLY_MY_IP
 from .i18n import translate as t
 from .mhddos import Tools
+from .system import NetStats
 from .targets import TargetStats
 
 
-def show_statistic(statistics: List[TargetStats], debug: bool):
+def show_statistic(statistics: List[TargetStats], net_stats: Optional[NetStats], debug: bool):
     total_pps, total_bps, total_in_flight = 0, 0, 0
     for stats in statistics:
         pps, bps, in_flight_conn = stats.reset()
@@ -26,6 +27,11 @@ def show_statistic(statistics: List[TargetStats], debug: bool):
                 f"{cl.YELLOW}{t('Traffic')}:{cl.BLUE} {Tools.humanbits(bps)}/s"
                 f"{cl.RESET}"
             )
+
+    netdiff = net_stats.tick()
+    if netdiff is not None:
+        total_pps, total_bps = netdiff
+        total_bps *= 8
 
     logger.info(
         f"{cl.GREEN}{t('Total')}: "
