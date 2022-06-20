@@ -294,8 +294,6 @@ async def run_ddos(args):
 
     tasks = []
 
-    import psutil
-
     async def stats_printer():
         net_stats = NetStats()
         it, cycle_start = 0, time.perf_counter()
