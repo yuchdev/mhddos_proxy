@@ -296,6 +296,7 @@ class AsyncTcpFlood:
             proxy, proxy_protocol = proxy_proto.for_proxy(proxy_url)
             flood_proto = partial(
                 proxy_protocol,
+                self._proxies,
                 self._loop,
                 on_close,
                 self._raw_target,

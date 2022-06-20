@@ -161,7 +161,7 @@ async def run_ddos(args):
         # note that "generic flood" attacks switch reading off completely
         reader_limit=1024 << 2,
         socket_rcvbuf=1024 << 2,
-        requests_per_buffer=32,
+        requests_per_buffer=64,
     )
     loop = asyncio.get_event_loop()
     stats = []

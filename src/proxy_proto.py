@@ -9,6 +9,7 @@ from python_socks.async_.asyncio import Proxy
 from python_socks.async_.asyncio._proxy import HttpProxy, Socks4Proxy, Socks5Proxy
 
 from .core import logger
+from .proxies import ProxySet
 
 
 class ProxyProtocol(asyncio.Protocol):
@@ -17,13 +18,14 @@ class ProxyProtocol(asyncio.Protocol):
         self,
         proxy_url: str,  # XXX: is one is only used for the logging
         proxy: Proxy,
+        proxies: ProxySet,
         loop: asyncio.AbstractEventLoop,
         on_close: asyncio.Future,
         dest: Tuple[str, int],
         ssl: Optional[SSLContext],
         downstream_factory: Callable[[], asyncio.Protocol],
         connect_timeout: int = 30,
-        on_connect=None
+        on_connect=None,
     ):
         logger.debug(f"Factory called for {proxy_url}")
         self._loop = loop
@@ -34,6 +36,7 @@ class ProxyProtocol(asyncio.Protocol):
         self._downstream_resume_writing = None
         self._proxy_url = proxy_url
         self._proxy = proxy
+        self._proxies = proxies
         self._dest = dest
         self._ssl = ssl
         self._on_close = on_close
@@ -105,6 +108,7 @@ class ProxyProtocol(asyncio.Protocol):
 
     def _dest_connection_made(self):
         assert not self._dest_connected
+        self._proxies.track_alive(self._proxy_url)
         self._dest_connected = True
         self._downstream_protocol = self._downstream_factory()
         if hasattr(self._downstream_protocol, "pause_writing"):

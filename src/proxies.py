@@ -48,6 +48,7 @@ class ProxySet:
         self._proxies_file = proxies_file
         self._skip_ratio = skip_ratio
         self._loaded_proxies = []
+        self._num_proxies = 0
         self._connections = defaultdict(int)
 
     @property
@@ -71,15 +72,19 @@ class ProxySet:
         ips = await resolve_all([url.host for url in urls])
         proxies = [str(url.with_host(ips.get(url.host, url.host))) for url in urls]
         self._loaded_proxies = proxies
+        self._num_proxies = len(self._loaded_proxies)
         self._connections = defaultdict(int)
-        return len(self._loaded_proxies)
+        return self._num_proxies
 
     def pick_random(self) -> Optional[str]:
         if not self.has_proxies:
             return None
         if self._skip_ratio > 0 and random.random() * 100 <= self._skip_ratio:
             return None
-        return random.choice(self._loaded_proxies)
+        # in case we have > 20% proxies marked as "alive", give 50% chance
+        # to prioritize "alive" pool rather than all proxies
+        alive = (len(self._connections) > self._num_proxies * 0.2) and (random.random() > 0.5)
+        return random.choice(self._connections.keys() if alive else self._loaded_proxies)
 
     def pick_random_connector(self) -> Optional[ProxyConnector]:
         proxy_url = self.pick_random()
@@ -88,7 +93,7 @@ class ProxySet:
     def __len__(self) -> int:
         if not self.has_proxies:
             return 0
-        return len(self._loaded_proxies)
+        return self._num_proxies
 
     def track_alive(self, proxy_url: str) -> None:
         self._connections[proxy_url] += 1
@@ -116,6 +121,10 @@ class NoProxySet:
     @staticmethod
     def track_alive(self, proxy_url: str) -> None:
         pass
+
+    @property
+    def alive(self) -> List[Tuple[int, str]]:
+        return []
 
 
 async def load_provided_proxies(
