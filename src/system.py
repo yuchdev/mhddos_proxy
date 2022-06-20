@@ -13,7 +13,6 @@ from functools import cache
 from itertools import cycle
 from typing import List, Optional, Tuple, Union
 
-import netifaces
 import requests
 
 from src.core import cl, CONFIG_URL, logger
@@ -163,10 +162,10 @@ def setup_event_loop() -> asyncio.AbstractEventLoop:
 
 @cache
 def detect_local_iface() -> Optional[str]:
-    gateways = netifaces.gateways()
-    default_gw = gateways.get("default", {})
-    _, iface = default_gw.get(netifaces.AF_INET, (None, None))
-    if iface is not None: return iface
+    #gateways = netifaces.gateways()
+    #default_gw = gateways.get("default", {})
+    #_, iface = default_gw.get(netifaces.AF_INET, (None, None))
+    #if iface is not None: return iface
     # if default gateway is missing, most likely we are on utun (e.g. VPN on Mac)
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         try:
