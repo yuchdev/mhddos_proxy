@@ -395,7 +395,8 @@ def _main_signal_handler(ps, *args):
 def _worker_process(args, lang: str, process_index: Optional[Tuple[int, int]]):
     try:
         if IS_DOCKER:
-            random.seed(int(time.time() // 100))
+            ind = 0 if process_index is None else process_index[0]
+            random.seed(int(time.time() // 100) + ind)
         set_language(lang)  # set language again for the subprocess
         setup_worker_logger(process_index)
         loop = setup_event_loop()
