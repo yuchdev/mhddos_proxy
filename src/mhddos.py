@@ -191,7 +191,6 @@ class AsyncTcpFlood:
         self.SENT_FLOOD = getattr(self, method)
 
         self._loop = loop
-        self._transport = None
         self._settings = settings
 
     @property
@@ -253,11 +252,6 @@ class AsyncTcpFlood:
         if body:
             request += body
         return request.encode()
-
-    def _abort_transport(self):
-        if self._transport:
-            self._transport.abort()
-            self._transport = None
 
     async def run(self, on_connect=None) -> bool:
         try:
@@ -611,11 +605,11 @@ class AsyncTcpFlood:
         return await self._exec_proto(conn, on_connect, on_close)
 
     async def _exec_proto(self, conn, on_connect, on_close) -> bool:
-        self._transport = None
+        transport = None
         try:
             async with async_timeout.timeout(self._settings.connect_timeout_seconds):
-                self._transport, _ = await conn
-            sock = self._transport.get_extra_info("socket")
+                transport, _ = await conn
+            sock = transport.get_extra_info("socket")
             if sock and hasattr(sock, "setsockopt"):
                 sock.setsockopt(SOL_SOCKET, SO_RCVBUF, self._settings.socket_rcvbuf)
                 # the normal termination sequence SHOULD NOT to be initiated
@@ -632,7 +626,8 @@ class AsyncTcpFlood:
         else:
             return bool(await on_close)
         finally:
-            self._abort_transport()
+            if transport:
+                transport.abort()
 
 
 class AsyncUdpFlood:
