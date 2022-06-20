@@ -162,21 +162,16 @@ def setup_event_loop() -> asyncio.AbstractEventLoop:
 
 @cache
 def detect_local_iface() -> Optional[str]:
-    #gateways = netifaces.gateways()
-    #default_gw = gateways.get("default", {})
-    #_, iface = default_gw.get(netifaces.AF_INET, (None, None))
-    #if iface is not None: return iface
-    # if default gateway is missing, most likely we are on utun (e.g. VPN on Mac)
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         try:
             sock.connect(("8.8.8.8", 80))
         except:
             return None
         laddr, _ = sock.getsockname()
-        for iface_name in netifaces.interfaces():
-            addrs = netifaces.ifaddresses(iface_name).get(netifaces.AF_INET, [])
+        for iface_name, addrs in psutil.net_if_addrs().items():
             for addr in addrs:
-                if addr["addr"] == laddr: return iface_name
+                if addr.family == socket.AF_INET and addr.address == laddr:
+                    return iface_name
     return None
 
 
