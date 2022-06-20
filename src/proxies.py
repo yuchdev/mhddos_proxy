@@ -5,7 +5,7 @@ from typing import List, Optional, Tuple
 from aiohttp_socks import ProxyConnector
 from yarl import URL
 
-from .core import USE_ONLY_MY_IP
+from .core import USE_ONLY_MY_IP, PROXY_ALIVE_PRIO_THRESHOLD, PROXY_ALIVE_PRIO_RATE
 from .dns_utils import resolve_all
 from .system import fetch, read_or_fetch
 
@@ -81,10 +81,13 @@ class ProxySet:
             return None
         if self._skip_ratio > 0 and random.random() * 100 <= self._skip_ratio:
             return None
-        # in case we have > 20% proxies marked as "alive", give 50% chance
+        # in case we have > 25% proxies marked as "alive", give 50% chance
         # to prioritize "alive" pool rather than all proxies
-        alive = (len(self._connections) > self._num_proxies * 0.2) and (random.random() > 0.5)
-        return random.choice(self._connections.keys() if alive else self._loaded_proxies)
+        prio = all((
+            len(self._connections) > self._num_proxies * PROXY_ALIVE_PRIO_THRESHOLD,
+            random.random() < PROXY_ALIVE_PRIO_RATE
+        ))
+        return random.choice(self._connections.keys() if prio else self._loaded_proxies)
 
     def pick_random_connector(self) -> Optional[ProxyConnector]:
         proxy_url = self.pick_random()
