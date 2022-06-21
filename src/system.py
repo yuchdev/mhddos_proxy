@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 import os.path
 import random
 import selectors
@@ -20,6 +21,8 @@ from src.i18n import translate as t
 
 
 WINDOWS = sys.platform == "win32"
+LINUX = sys.platform.startswith("linux")
+MACOS = sys.platform.startswith("darwin")
 WINDOWS_WAKEUP_SECONDS = 0.5
 
 
@@ -160,7 +163,29 @@ def setup_event_loop() -> asyncio.AbstractEventLoop:
     return loop
 
 
-@lru_cache(maxsize=1)
+def _detect_port_range() -> Optional[Tuple[int, int]]:
+    if LINUX:
+        with open("/proc/sys/net/ipv4/ip_local_port_range") as f:
+            low, high = f.read().split()
+            return int(low), int(high)
+    if MACOS:
+        ctl = "sysctl -n net.inet.ip.portrange.first net.inet.ip.portrange.last"
+        with os.popen(ctl) as f:
+            low, high = f.readlines()
+            return int(low), int(high)
+    if WINDOWS:
+        return 1024, 4999
+
+
+@lru_cache(maxsize=None)
+def detect_port_range() -> Optional[Tuple[int, int]]:
+    try:
+        return _detect_port_range()
+    except:
+        return None
+
+
+@lru_cache(maxsize=None)
 def detect_local_iface() -> Optional[str]:
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         try:
