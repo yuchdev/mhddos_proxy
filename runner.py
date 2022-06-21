@@ -169,7 +169,6 @@ async def run_ddos(args):
         requests_per_buffer=64,
     )
     loop = asyncio.get_event_loop()
-    stats = []
 
     def prepare_flooder(target: Target, method: str) -> Union[AsyncUdpFlood, AsyncTcpFlood]:
         if target.has_options:
@@ -185,7 +184,6 @@ async def run_ddos(args):
             url=target.url,
             ip=target.addr,
             method=method,
-            stats=target.create_stats(method),
             proxies=proxies,
             loop=loop,
             settings=settings
@@ -203,8 +201,6 @@ async def run_ddos(args):
             for task in active_flooder_tasks:
                 task.cancel()
             active_flooder_tasks.clear()
-
-        stats.clear()
 
         tcp_flooders, udp_flooders = [], []
         for target in targets:
@@ -246,9 +242,6 @@ async def run_ddos(args):
                 int(SCHEDULER_MIN_INIT_FRACTION * threads / num_flooders)
             ) if num_flooders > 1 else threads
 
-            for flooder in tcp_flooders:
-                stats.append(flooder.stats)
-
             tcp_task_group = GeminoCurseTaskSet(
                 loop,
                 runnables=tcp_flooders,
@@ -262,7 +255,6 @@ async def run_ddos(args):
             tcp_task_group = None
 
         for flooder in udp_flooders:
-            stats.append(flooder.stats)
             task = loop.create_task(run_udp_flood(flooder))
             active_flooder_tasks.append(task)
 

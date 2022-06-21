@@ -7,7 +7,6 @@ from typing import Any, Callable, Generator, Optional, Tuple
 from OpenSSL import SSL
 
 from .core import CONN_PROBE_PERIOD, UDP_BATCH_PACKETS, UDP_ENOBUFS_PAUSE, logger
-from .targets import TargetStats
 
 
 FloodSpecGen = Generator[Tuple[int, Any], None, None]
@@ -71,14 +70,12 @@ class FloodIO(asyncio.Protocol):
         self,
         loop: asyncio.AbstractEventLoop,
         on_close: asyncio.Future,
-        stats: TargetStats,
         settings: "AttackSettings",
         flood_spec: FloodSpecGen,
         on_connect: Optional[asyncio.Future] = None,
         debug: bool = False,
     ):
         self._loop = loop
-        self._stats = stats
         self._flood_spec = flood_spec
         self._settings = settings
         self._on_close: asyncio.Future = on_close
@@ -96,7 +93,6 @@ class FloodIO(asyncio.Protocol):
         self._num_steps: int = 0
 
     def connection_made(self, transport) -> None:
-        self._stats.track_open_connection()
         self._connected_at = time.perf_counter()
         if self._on_connect and not self._on_connect.done():
             self._on_connect.set_result(True)
@@ -125,11 +121,6 @@ class FloodIO(asyncio.Protocol):
                 #      to delay re-launch of the task
                 self._transport.abort()
                 self._transport = None
-                if self._debug:
-                    target, method, _ = self._stats.target
-                    logger.info(
-                        f"Writing resumed too late (bailing)\t{target.human_repr()}\t{method}"
-                        f"\t{resumed_after}\t{self._num_steps}")
                 return
         self._probe_handle = self._loop.call_later(5, self._probe)
 
@@ -153,7 +144,6 @@ class FloodIO(asyncio.Protocol):
         pass
 
     def connection_lost(self, exc) -> None:
-        self._stats.track_close_connection()
         self._transport = None
         if self._handle:
             self._handle.cancel()
@@ -201,7 +191,6 @@ class FloodIO(asyncio.Protocol):
             if op == FloodOp.WRITE:
                 packet, size, num_stacked = args
                 self._transport.write(packet)
-                self._stats.track(num_stacked, size)
                 self._handle = None
                 if not self._paused:
                     self._handle = self._loop.call_soon(self._step)
@@ -230,12 +219,10 @@ class DatagramFloodIO(asyncio.Protocol):
     def __init__(
         self,
         loop: asyncio.AbstractEventLoop,
-        stats: TargetStats,
         packet_gen: Callable[[], Tuple[bytes, int]],
         on_close: asyncio.Future,
     ):
         self._loop = loop
-        self._stats = stats
         self._packet_gen = packet_gen
         self._on_close = on_close
         self._on_close.add_done_callback(self._handle_cancellation)
@@ -254,7 +241,6 @@ class DatagramFloodIO(asyncio.Protocol):
             packet, packet_size = self._packet_gen()
             sent_bytes += packet_size
             self._transport.sendto(packet)
-        self._stats.track(UDP_BATCH_PACKETS, sent_bytes)
         self._handle = self._loop.call_soon(self._send_batch)
 
     def datagram_received(self, data, addr) -> None:
@@ -298,7 +284,6 @@ class TrexIO(asyncio.Protocol):
         self,
         ctx: SSL.Context,
         rpc: int,
-        stats: TargetStats,
         loop: asyncio.AbstractEventLoop,
         on_connect: asyncio.Future,
         on_close: asyncio.Future,
@@ -306,7 +291,6 @@ class TrexIO(asyncio.Protocol):
         self._loop = loop
         self._ctx = ctx
         self._budget = rpc
-        self._stats = stats
         self._transport = None
         self._conn: Optional[SSL.Connection] = None
         self._on_connect = on_connect
@@ -316,7 +300,6 @@ class TrexIO(asyncio.Protocol):
 
     def connection_made(self, transport):
         self._transport = transport
-        self._stats.track_open_connection()
         self._conn = SSL.Connection(self._ctx, None)
         self._conn.set_connect_state()
         self._handshake()
@@ -355,7 +338,6 @@ class TrexIO(asyncio.Protocol):
         else:
             if not self._on_connect.done():
                 self._on_connect.set_result(True)
-            self._stats.track(1, self._nbytes_sent)
             self._nbytes_sent = 0
             self._handle = self._loop.call_soon(self._re)
 
@@ -371,7 +353,6 @@ class TrexIO(asyncio.Protocol):
 
     def _terminate(self, exc: Optional[Exception], abort: bool = True) -> None:
         if self._transport is None: return
-        self._stats.track_close_connection()
         if not self._on_connect.done():
             self._on_connect.set_result(False)
         if not self._on_close.done():

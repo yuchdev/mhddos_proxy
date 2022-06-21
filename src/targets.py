@@ -95,9 +95,6 @@ class Target:
         else:
             return self.url.host
 
-    def create_stats(self, method: str) -> "TargetStats":
-        return TargetStats(self, method)
-
 
 ENC_KEYS = {
     b'\xe4\xdc\xf7\x1f': b'fZPK2OTLiNdqVDBxJTSMuph/rfLzpFWHDmHC1/+rR1s=',
@@ -160,40 +157,3 @@ class TargetsLoader:
                 nonce = content[v_len: v_len + nonce_len]
                 return cip.decrypt(nonce, content[v_len + nonce_len:], None)
         return content
-
-
-class TargetStats:
-    __slots__ = ['_target', '_method', '_sig', '_requests', '_bytes', '_conns', '_reset_at']
-
-    def __init__(self, target: Target, method: str):
-        self._target = target
-        self._method = method
-        self._sig = target.options_repr
-        self._requests: int = 0
-        self._bytes: int = 0
-        self._conns: int = 0
-        self._reset_at = time.perf_counter()
-
-    @property
-    def target(self) -> Tuple[Target, str, str]:
-        return self._target, self._method, self._sig
-
-    def track(self, rs: int, bs: int) -> None:
-        self._requests += rs
-        self._bytes += bs
-
-    def track_open_connection(self) -> None:
-        self._conns += 1
-
-    def track_close_connection(self) -> None:
-        if self._conns <= 0:
-            logger.debug(
-                f"Invalid connection stats calculation for {self._target.human_repr()}")
-        else:
-            self._conns -= 1
-
-    def reset(self) -> Tuple[int, int, int]:
-        sent_requests, sent_bytes, prev_reset_at = self._requests, self._bytes, self._reset_at
-        self._requests, self._bytes, self._reset_at = 0, 0, time.perf_counter()
-        interval = self._reset_at - prev_reset_at
-        return int(sent_requests / interval), int(8 * sent_bytes / interval), self._conns

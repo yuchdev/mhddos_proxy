@@ -4,7 +4,6 @@ from .core import CPU_COUNT, DEFAULT_THREADS, cl, logger, USE_ONLY_MY_IP
 from .i18n import translate as t
 from .mhddos import Tools
 from .system import NetStats
-from .targets import TargetStats
 
 
 def show_statistic(net_stats: Optional[NetStats], flooders: Optional[Tuple[int, int]]):

