@@ -23,6 +23,9 @@ TRANSLATIONS = {
     'Requests': {
         'ua': 'Запити'
     },
+    'Packets': {
+        'ua': 'Пакети'
+    },
     'Traffic': {
         'ua': 'Трафік'
     },

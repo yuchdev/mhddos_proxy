@@ -8,7 +8,7 @@ from .targets import TargetStats
 
 
 def show_statistic(statistics: List[TargetStats], net_stats: Optional[NetStats], debug: bool):
-    total_pps, total_bps, total_in_flight = 0, 0, 0
+    pps_name, total_pps, total_bps, total_in_flight = "Requests", 0, 0, 0
     for stats in statistics:
         pps, bps, in_flight_conn = stats.reset()
         total_pps += pps
@@ -32,11 +32,12 @@ def show_statistic(statistics: List[TargetStats], net_stats: Optional[NetStats],
     if netdiff is not None:
         total_pps, total_bps = netdiff
         total_bps *= 8
+        pps_name = "Packets"
 
     logger.info(
         f"{cl.GREEN}{t('Total')}: "
         f"{cl.YELLOW}{t('Connections')}:{cl.GREEN} {Tools.humanformat(total_in_flight)}, "
-        f"{cl.YELLOW}{t('Requests')}:{cl.GREEN} {Tools.humanformat(total_pps)}/s, "
+        f"{cl.YELLOW}{t(pps_name)}:{cl.GREEN} {Tools.humanformat(total_pps)}/s, "
         f"{cl.YELLOW}{t('Traffic')}:{cl.GREEN} {Tools.humanbits(total_bps)}/s{cl.RESET}"
     )
 
