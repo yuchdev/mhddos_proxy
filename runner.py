@@ -266,7 +266,7 @@ async def run_ddos(args):
     targets_loader = TargetsLoader(args.targets, args.targets_config, config, it_army=args.itarmy)
     try:
         print()
-        initial_targets, _ = await targets_loader.reload()
+        initial_targets = await targets_loader.reload()
     except Exception as exc:
         logger.error(f"{cl.RED}{t('Targets loading failed')} {exc}{cl.RESET}")
         initial_targets = []
