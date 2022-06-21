@@ -423,7 +423,7 @@ def main():
     max_ports = port_range_size - PORT_RANGE_PADDING
     if num_copies * (args.threads or DEFAULT_THREADS) > max_ports:
         args.threads = int(max_ports / num_copies)
-        logger.warning(f"{cl.RED}This is gonna hurt you a lot, set threads to {args.threads} to ease your pain{cl.RESET}")
+        logger.warning(f"{cl.RED}{t('Concurrency was reduced to')} {args.threads} {t('per copy to match the size of available port range')}{cl.RESET}")
 
     print_banner(args)
 
