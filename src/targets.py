@@ -1,6 +1,5 @@
 import base64
-import time
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Optional, Set
 
 from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 from dns import inet
@@ -107,9 +106,8 @@ class TargetsLoader:
         self._cmd_targets_config = targets_config
         self._global_config = global_config
         self._it_army = it_army
-        self._cached_targets = []
 
-    async def reload(self) -> Tuple[List[Target], bool]:
+    async def reload(self) -> Set[Target]:
         config_targets = await self._load_config()
         if config_targets:
             logger.info(
@@ -117,11 +115,8 @@ class TargetsLoader:
             )
 
         all_targets = await resolve_all_targets(self._targets + config_targets)
-        all_targets = [target for target in all_targets if target.is_resolved]
-
-        is_changed = (set(all_targets) != set(self._cached_targets))
-        self._cached_targets = all_targets
-        return all_targets, is_changed
+        all_targets = set(target for target in all_targets if target.is_resolved)
+        return all_targets
 
     async def _load_config(self):
         if self._it_army:

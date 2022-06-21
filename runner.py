@@ -312,26 +312,18 @@ async def run_ddos(args):
     # setup coroutine to print stats
     tasks.append(loop.create_task(stats_printer()))
 
-    reload_after = 5 * 60
-    reinstall_after_iter = 3
-
     async def reload_targets():
-        it = 0
+        period = 15 * 60
         while True:
             try:
-                await asyncio.sleep(reload_after)
-                it += 1
-
-                targets, is_changed = await targets_loader.reload()
-
-                if not targets:
+                await asyncio.sleep(period)
+                targets = await targets_loader.reload()
+                if targets:
+                    await install_targets(targets)
+                else:
                     logger.warning(
                         f"{cl.MAGENTA}{t('Empty config loaded - the previous one will be used')}{cl.RESET}"
                     )
-                elif is_changed or it >= reinstall_after_iter:
-                    it = 0
-                    await install_targets(targets)
-
             except asyncio.CancelledError as e:
                 raise e
             except Exception as exc:
@@ -341,14 +333,15 @@ async def run_ddos(args):
     tasks.append(loop.create_task(reload_targets()))
 
     async def reload_proxies():
+        period = 5 * 60
         while True:
             try:
-                await asyncio.sleep(reload_after)
-                if (await proxies.reload(config)) == 0:
+                await asyncio.sleep(period)
+                result = await proxies.reload(config)
+                if result == 0:
                     logger.warning(
                         f"{cl.MAGENTA}{t('Failed to reload proxy list - the previous one will be used')}{cl.RESET}"
                     )
-
             except asyncio.CancelledError:
                 raise
             except Exception:
@@ -359,9 +352,10 @@ async def run_ddos(args):
         tasks.append(loop.create_task(reload_proxies()))
 
     async def reload_config():
+        period = 5 * 60
         while True:
             try:
-                await asyncio.sleep(reload_after)
+                await asyncio.sleep(period)
                 _, new_config = await load_system_configs()
                 if new_config:
                     config.update(new_config)
