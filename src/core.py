@@ -4,7 +4,7 @@ from asyncio.log import logger as asyncio_logger
 from contextlib import suppress
 from multiprocessing import cpu_count
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional, Set, Tuple
 
 from colorama import Fore
 
@@ -74,3 +74,23 @@ class cl:
     YELLOW = Fore.LIGHTYELLOW_EX
     RED = Fore.LIGHTRED_EX
     RESET = Fore.RESET
+
+
+class Methods:
+    HTTP_METHODS: Set[str] = {
+        "CFB", "BYPASS", "GET", "RGET", "HEAD", "RHEAD", "POST", "STRESS", "DYN", "SLOW",
+        "NULL", "COOKIE", "PPS", "EVEN", "AVB",
+        "APACHE", "XMLRPC", "DOWNLOADER", "RHEX", "STOMP",
+        # this is not HTTP method (rather TCP) but this way it works with --http-methods
+        # settings being applied to the entire set of targets
+        "TREX"
+    }
+    TCP_METHODS: Set[str] = {"TCP", }
+    UDP_METHODS: Set[str] = {
+        "UDP", "VSE", "FIVEM", "TS3", "MCPE",
+        # the following methods are temporarily disabled for further investigation and testing
+        # "SYN", "CPS",
+        # Amplification
+        # "ARD", "CHAR", "RDP", "CLDAP", "MEM", "DNS", "NTP"
+    }
+    ALL_METHODS: Set[str] = {*HTTP_METHODS, *UDP_METHODS, *TCP_METHODS}

@@ -178,9 +178,8 @@ async def run_ddos(args):
             settings = attack_settings
 
         return mhddos_main(
-            url=target.url,
-            ip=target.addr,
-            method=method,
+            target,
+            method,
             proxies=proxies,
             loop=loop,
             settings=settings

@@ -1,8 +1,7 @@
 import argparse
 
-from .core import COPIES_AUTO, DEFAULT_THREADS, SCHEDULER_FORK_SCALE, SCHEDULER_INITIAL_CAPACITY
+from .core import COPIES_AUTO, DEFAULT_THREADS, Methods, SCHEDULER_FORK_SCALE, SCHEDULER_INITIAL_CAPACITY
 from .i18n import LANGUAGES
-from .mhddos import Methods
 
 
 def init_argparse() -> argparse.ArgumentParser:

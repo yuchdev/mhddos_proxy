@@ -5,7 +5,7 @@ from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
 from dns import inet
 from yarl import URL
 
-from .core import cl, logger
+from .core import cl, logger, Methods
 from .dns_utils import resolve_all_targets
 from .i18n import translate as t
 from .system import read_or_fetch
@@ -46,7 +46,13 @@ class Target:
         parts = [part.strip() for part in raw.split(" ")]
         n_parts = len(parts)
         url = URL(Target.prepare_url(parts[0]))
-        method = parts[1].upper() if n_parts > 1 else None
+
+        method = None
+        if n_parts > 1:
+            method = parts[1].upper()
+            if method not in Methods.ALL_METHODS:
+                raise ValueError(f'Invalid method {method}')
+
         options = dict(tuple(part.split("=")) for part in parts[2:])
         addr = url.host if inet.is_address(url.host) else None
         return cls(url, method, options, addr)
@@ -75,24 +81,9 @@ class Target:
     def option(self, key: str, default: Optional[str] = None) -> Optional[str]:
         return self.options.get(key, default)
 
-    def has_option(self, key: str) -> bool:
-        return key in self.options
-
     @property
     def has_options(self) -> bool:
         return len(self.options) > 0
-
-    @property
-    def options_repr(self) -> Optional[str]:
-        if not self.has_options:
-            return None
-        return " ".join(f"{k}={v}" for k, v in self.options.items())
-
-    def human_repr(self) -> str:
-        if self.url.host != self.addr:
-            return f"{self.url.host} ({self.addr})"
-        else:
-            return self.url.host
 
 
 ENC_KEYS = {
