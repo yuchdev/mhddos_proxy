@@ -9,6 +9,9 @@ from OpenSSL import SSL
 from .core import CONN_PROBE_PERIOD, UDP_BATCH_PACKETS, UDP_ENOBUFS_PAUSE
 
 
+DRAIN_PROBE_INTERVAL = 5
+
+
 FloodSpecGen = Generator[Tuple[int, Any], None, None]
 
 
@@ -88,14 +91,12 @@ class FloodIO(asyncio.Protocol):
         self._paused_at: Optional[int] = None
         self._read_waiting: bool = False
         self._return_code: bool = False
-        self._connected_at: Optional[int] = None
         self._probe_handle = None
         self._num_steps: int = 0
         self._connections = connections
 
     def connection_made(self, transport) -> None:
         self._connections.add(hash(transport))
-        self._connected_at = time.perf_counter()
         if self._on_connect and not self._on_connect.done():
             self._on_connect.set_result(True)
         self._transport = transport
@@ -129,7 +130,7 @@ class FloodIO(asyncio.Protocol):
                 #      to delay re-launch of the task
                 self._abort()
                 return
-        self._probe_handle = self._loop.call_later(5, self._probe)
+        self._probe_handle = self._loop.call_later(DRAIN_PROBE_INTERVAL, self._probe)
 
     def data_received(self, data) -> None:
         # overall, we don't use data at all
@@ -153,7 +154,6 @@ class FloodIO(asyncio.Protocol):
     def connection_lost(self, exc) -> None:
         if self._transport:
             self._connections.remove(hash(self._transport))
-        self._connected_at = time.perf_counter()
         self._transport = None
         if self._handle:
             self._handle.cancel()
