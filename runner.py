@@ -71,6 +71,10 @@ class GeminoCurseTaskSet:
     def __len__(self) -> int:
         return len(self._pending)
 
+    @property
+    def capacity(self) -> Tuple[int, int]:
+        return len(self), self._max_capacity
+
     def _launch(self, runnable) -> None:
         if self._shutdown_event.is_set():
             return
@@ -127,9 +131,10 @@ async def run_ddos(args):
             "https://telegra.ph/Onovlennya-mhddos-proxy-04-16\n"
         )
 
-    debug, http_methods, initial_capacity, fork_scale = (
-        args.debug, args.http_methods,
-        args.scheduler_initial_capacity, args.scheduler_fork_scale
+    http_methods, initial_capacity, fork_scale = (
+        args.http_methods,
+        args.scheduler_initial_capacity,
+        args.scheduler_fork_scale
     )
 
     # we are going to fetch proxies even in case we have only UDP
@@ -302,8 +307,7 @@ async def run_ddos(args):
         print_status(threads, use_my_ip, False)
         while True:
             await asyncio.sleep(refresh_rate)
-            show_statistic(stats, net_stats, debug)
-
+            show_statistic(stats, net_stats)
             if it >= 20:
                 it = 0
                 passed = time.perf_counter() - cycle_start
@@ -430,7 +434,7 @@ def main():
 
     if args.debug:
         logger.warning(
-            f"{cl.CYAN}{t('The `--debug` option is not needed for common usage and may impact performance')}{cl.RESET}"
+            f"{cl.CYAN}{t('The `--debug` option is deprecated to avoid negative impact on performance')}{cl.RESET}"
         )
         print()
 

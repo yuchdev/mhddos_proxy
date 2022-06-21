@@ -7,37 +7,17 @@ from .system import NetStats
 from .targets import TargetStats
 
 
-def show_statistic(statistics: List[TargetStats], net_stats: Optional[NetStats], debug: bool):
-    pps_name, total_pps, total_bps, total_in_flight = "Requests", 0, 0, 0
-    for stats in statistics:
-        pps, bps, in_flight_conn = stats.reset()
-        total_pps += pps
-        total_bps += bps
-        total_in_flight += in_flight_conn
-
-        if debug:
-            (target, method, sig) = stats.target
-            method_sig = f" ({sig})" if sig is not None else ""
-            logger.info(
-                f"{cl.YELLOW}{t('Target')}:{cl.BLUE} {target.human_repr()}, "
-                f"{cl.YELLOW}{t('Port')}:{cl.BLUE} {target.url.port}, "
-                f"{cl.YELLOW}{t('Method')}:{cl.BLUE} {method}{method_sig}, "
-                f"{cl.YELLOW}{t('Connections')}:{cl.BLUE} {Tools.humanformat(in_flight_conn)}, "
-                f"{cl.YELLOW}{t('Requests')}:{cl.BLUE} {Tools.humanformat(pps)}/s, "
-                f"{cl.YELLOW}{t('Traffic (estimated)')}:{cl.BLUE} {Tools.humanbits(bps)}/s"
-                f"{cl.RESET}"
-            )
-
+def show_statistic(statistics: List[TargetStats], net_stats: Optional[NetStats]):
     netdiff = net_stats.tick()
-    if netdiff is not None:
-        total_pps, total_bps = netdiff
-        total_bps *= 8
-        pps_name = "Packets"
-
+    if netdiff is None:
+        return
+    
+    total_pps, total_bps = netdiff
+    total_bps *= 8
+    
     logger.info(
         f"{cl.GREEN}{t('Total')}: "
-        f"{cl.YELLOW}{t('Connections')}:{cl.GREEN} {Tools.humanformat(total_in_flight)}, "
-        f"{cl.YELLOW}{t(pps_name)}:{cl.GREEN} {Tools.humanformat(total_pps)}/s, "
+        f"{cl.YELLOW}{t('Packets')}:{cl.GREEN} {Tools.humanformat(total_pps)}/s, "
         f"{cl.YELLOW}{t('Traffic')}:{cl.GREEN} {Tools.humanbits(total_bps)}/s{cl.RESET}"
     )
 

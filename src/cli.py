@@ -32,12 +32,6 @@ def init_argparse() -> argparse.ArgumentParser:
         help='Number of copies (default is 1). Use "auto" to set the value automatically',
     )
     parser.add_argument(
-        '--debug',
-        action='store_true',
-        default=False,
-        help='Detailed log for each target',
-    )
-    parser.add_argument(
         '--vpn',
         dest='use_my_ip',
         const=2,
@@ -100,5 +94,6 @@ def init_argparse() -> argparse.ArgumentParser:
 
     # Deprecated
     parser.add_argument('--table', action='store_true', default=False)
+    parser.add_argument('--debug', action='store_true', help='[DEPRECATED]')
 
     return parser
