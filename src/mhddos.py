@@ -514,8 +514,8 @@ class AsyncTcpFlood:
     async def TCP(self, on_connect=None) -> bool:
         packet_size = 1024 * self._settings.requests_per_buffer
         return await self._generic_flood_proto(
-            FloodSpecType.CALLABLE,
-            partial(randbytes, packet_size),
+            FloodSpecType.BUFFER,
+            (partial(randbytes, packet_size), self._settings.requests_per_buffer),
             on_connect
         )
 
