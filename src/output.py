@@ -18,7 +18,7 @@ def show_statistic(net_stats: Optional[NetStats], flooders: Optional[Tuple[int, 
     capacity = "n/a"
     if flooders:
         c, m = flooders
-        capacity = f"{c/m:.2f}%"
+        capacity = f"{100*c/m:.1f}%"
     
     logger.info(
         f"{cl.GREEN}{t('Total')}: "
