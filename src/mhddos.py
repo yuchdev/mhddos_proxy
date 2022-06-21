@@ -145,7 +145,7 @@ class FloodBase:
         proxies: ProxySet,
         loop,
         settings: AttackSettings,
-        connections: Optional[Set[int]],
+        connections: Set[int],
     ):
         self._target = target
         self._method = method
@@ -262,10 +262,10 @@ class AsyncTcpFlood(FloodBase):
         on_close = self._loop.create_future()
         flood_proto = partial(
             FloodIO,
-            self._loop,
-            on_close,
-            self._settings,
-            FloodSpec.from_any(payload_type, payload, self._settings.requests_per_connection),
+            loop=self._loop,
+            on_close=on_close,
+            settings=self._settings,
+            flood_spec=FloodSpec.from_any(payload_type, payload, self._settings.requests_per_connection),
             connections=self._connections,
             on_connect=on_connect,
         )
@@ -683,29 +683,22 @@ class AsyncUdpFlood(FloodBase):
         return await self._generic_flood(lambda: (packet, packet_size))
 
 
-def main(target, method, proxies, loop, settings, connections=None):
+def main(target, method, proxies, loop, settings, connections):
     (url, ip), proxies = Tools.parse_params(target, proxies)
     if method in {*Methods.HTTP_METHODS, *Methods.TCP_METHODS}:
-        return AsyncTcpFlood(
-            target,
-            method,
-            url,
-            ip,
-            proxies,
-            loop=loop,
-            settings=settings,
-            connections=connections,
-        )
-
+        flood_cls = AsyncTcpFlood
     elif method in Methods.UDP_METHODS:
-        return AsyncUdpFlood(
-            target,
-            method,
-            url,
-            ip,
-            proxies,
-            loop=loop,
-            settings=settings
-        )
+        flood_cls = AsyncUdpFlood
     else:
         raise RuntimeError(f'Invalid method {target.method}')
+
+    return flood_cls(
+        target,
+        method,
+        url,
+        ip,
+        proxies,
+        loop=loop,
+        settings=settings,
+        connections=connections,
+    )

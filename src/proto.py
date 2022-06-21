@@ -75,7 +75,6 @@ class FloodIO(asyncio.Protocol):
         on_close: asyncio.Future,
         settings: "AttackSettings",
         flood_spec: FloodSpecGen,
-        *,
         connections: Set[int],
         on_connect: Optional[asyncio.Future] = None,
     ):

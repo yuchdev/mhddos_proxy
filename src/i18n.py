@@ -117,8 +117,8 @@ TRANSLATIONS = {
         'ua': 'Потужність'
     },
     'Connections': {
-        'ua': 'Зʼєднання',
-    }
+        'ua': "З'єднань"
+    },
 }
 
 LANGUAGES = ['ua', 'en']
