@@ -1,6 +1,6 @@
-from typing import List, Optional, Tuple
+from typing import Optional, Tuple
 
-from .core import CPU_COUNT, DEFAULT_THREADS, cl, logger, USE_ONLY_MY_IP
+from .core import cl, CPU_COUNT, DEFAULT_THREADS, logger, USE_ONLY_MY_IP
 from .i18n import translate as t
 from .mhddos import Tools
 from .system import NetStats
@@ -11,15 +11,15 @@ def show_statistic(net_stats: Optional[NetStats], flooders: Optional[Tuple[int, 
     if netdiff is not None:
         total_pps, total_bps = netdiff
         total_pps = f"{Tools.humanformat(total_pps)}/s"
-        total_bps = f"{Tools.humanbits(total_bps*8)}/s"
+        total_bps = f"{Tools.humanbits(total_bps * 8)}/s"
     else:
         total_pps, total_bps = "n/a", "n/a"
 
     capacity = "n/a"
     if flooders:
-        c, m = flooders
-        capacity = f"{100*c/m:.1f}%"
-    
+        cur_cap, max_cap = flooders
+        capacity = f"{100 * cur_cap / max_cap:.1f}%"
+
     logger.info(
         f"{cl.GREEN}{t('Total')}: "
         f"{cl.YELLOW}{t('Capacity')}:{cl.GREEN} {capacity}, "
@@ -61,7 +61,8 @@ def print_banner(args):
         )
     if not args.threads:
         rows.append(
-            f"- {cl.YELLOW}{t('Workload (number of threads)')}:{cl.BLUE} {t('use flag `-t XXXX`, default is')} {DEFAULT_THREADS}"
+            f"- {cl.YELLOW}{t('Workload (number of threads)')}:{cl.BLUE} {t('use flag `-t XXXX`, default is')} "
+            f"{DEFAULT_THREADS}"
         )
     elif args.threads > 10000 and args.copies == 1 and CPU_COUNT > 2:
         rows.append(
@@ -72,7 +73,8 @@ def print_banner(args):
             f"- {cl.MAGENTA}{t('Consider adding your IP/VPN to the attack - use flag `--vpn`')}{cl.RESET}"
         )
     rows.append(
-        f"- {cl.YELLOW}{t('Complete documentation')}:{cl.RESET} - https://github.com/porthole-ascend-cinnamon/mhddos_proxy"
+        f"- {cl.YELLOW}{t('Complete documentation')}:{cl.RESET} - "
+        f"https://github.com/porthole-ascend-cinnamon/mhddos_proxy"
     )
 
     print()

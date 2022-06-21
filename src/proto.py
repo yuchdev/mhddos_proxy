@@ -6,7 +6,7 @@ from typing import Any, Callable, Generator, Optional, Tuple
 
 from OpenSSL import SSL
 
-from .core import CONN_PROBE_PERIOD, UDP_BATCH_PACKETS, UDP_ENOBUFS_PAUSE, logger
+from .core import CONN_PROBE_PERIOD, UDP_BATCH_PACKETS, UDP_ENOBUFS_PAUSE
 
 
 FloodSpecGen = Generator[Tuple[int, Any], None, None]
@@ -44,12 +44,12 @@ class FloodSpec:
         packet_size = len(packet)
         for _ in range(num_packets):
             yield FloodOp.WRITE, (packet, packet_size, 1)
-    
+
     @staticmethod
     def from_buffer(packet: Tuple[Callable[[], bytes], int], num_packets: int) -> FloodSpecGen:
         packet_gen, stacked = packet
         packet, packet_size = None, None
-        for _ in range(int(num_packets/stacked)):
+        for _ in range(int(num_packets / stacked)):
             if packet is None:
                 packet = packet_gen()
                 packet_size = len(packet)
@@ -232,7 +232,8 @@ class DatagramFloodIO(asyncio.Protocol):
         self._handle = self._loop.call_soon(self._send_batch)
 
     def _send_batch(self) -> None:
-        if not self._transport: return
+        if not self._transport:
+            return
         self._handle = None
         sent_bytes = 0
         for _ in range(UDP_BATCH_PACKETS):
@@ -258,7 +259,8 @@ class DatagramFloodIO(asyncio.Protocol):
         self._transport = None
         if self._handle is not None:
             self._handle.cancel()
-        if self._on_close.done(): return
+        if self._on_close.done():
+            return
         if exc is None:
             self._on_close.set_result(True)
         else:
@@ -326,7 +328,8 @@ class TrexIO(asyncio.Protocol):
     # XXX: it might be necessary to send a "dummy" write from time to time
     #      to keep connection "alive"
     def _handshake(self):
-        if self._transport is None: return
+        if self._transport is None:
+            return
         try:
             self._conn.do_handshake()
         except (SSL.WantReadError, SSL.WantWriteError):
@@ -340,7 +343,8 @@ class TrexIO(asyncio.Protocol):
             self._handle = self._loop.call_soon(self._re)
 
     def _re(self):
-        if self._transport is None: return
+        if self._transport is None:
+            return
         self._handle = None
         if not self._conn.renegotiate():
             self._terminate(TrexIOError("Unsupported operation"))
@@ -350,7 +354,8 @@ class TrexIO(asyncio.Protocol):
             self._handshake()
 
     def _terminate(self, exc: Optional[Exception], abort: bool = True) -> None:
-        if self._transport is None: return
+        if self._transport is None:
+            return
         if not self._on_connect.done():
             self._on_connect.set_result(False)
         if not self._on_close.done():
@@ -365,6 +370,6 @@ class TrexIO(asyncio.Protocol):
         self._transport = None
 
     def connection_lost(self, exc):
-        if self._transport is None: return
+        if self._transport is None:
+            return
         self._terminate(exc, abort=False)
-

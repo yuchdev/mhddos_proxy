@@ -5,7 +5,7 @@ from typing import List, Optional, Tuple
 from aiohttp_socks import ProxyConnector
 from yarl import URL
 
-from .core import USE_ONLY_MY_IP, PROXY_ALIVE_PRIO_THRESHOLD, PROXY_ALIVE_PRIO_RATE
+from .core import PROXY_ALIVE_PRIO_RATE, PROXY_ALIVE_PRIO_THRESHOLD, USE_ONLY_MY_IP
 from .dns_utils import resolve_all
 from .system import fetch, read_or_fetch
 

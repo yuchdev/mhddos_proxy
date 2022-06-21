@@ -22,10 +22,7 @@ from src.i18n import DEFAULT_LANGUAGE, set_language, translate as t
 from src.mhddos import AsyncTcpFlood, AsyncUdpFlood, AttackSettings, main as mhddos_main
 from src.output import print_banner, print_status, show_statistic
 from src.proxies import ProxySet
-from src.system import (
-    NetStats, fix_ulimits, load_system_configs, setup_event_loop,
-    WINDOWS_WAKEUP_SECONDS
-)
+from src.system import (fix_ulimits, load_system_configs, NetStats, setup_event_loop, WINDOWS_WAKEUP_SECONDS)
 from src.targets import Target, TargetsLoader
 
 
@@ -190,7 +187,7 @@ async def run_ddos(args):
         )
 
     active_flooder_tasks = []
-    tcp_task_group = None
+    tcp_task_group: Optional[GeminoCurseTaskSet] = None
 
     async def install_targets(targets):
         print()
@@ -394,8 +391,9 @@ def _main_signal_handler(ps, *args):
 def _worker_process(args, lang: str, process_index: Optional[Tuple[int, int]]):
     try:
         if IS_DOCKER:
+            # FIXME
             ind = 0 if process_index is None else process_index[0]
-            random.seed(time.time() + ind*1_000)
+            random.seed(time.time() + ind * 1_000)
         set_language(lang)  # set language again for the subprocess
         setup_worker_logger(process_index)
         loop = setup_event_loop()
@@ -414,7 +412,7 @@ def main():
         logger.error(f"{cl.RED}{t('No targets specified for the attack')}{cl.RESET}")
         sys.exit()
 
-    max_copies = max(1, CPU_COUNT-1)
+    max_copies = max(1, CPU_COUNT - 1)
     num_copies = args.copies
     if args.copies == COPIES_AUTO:
         num_copies = min(max_copies, MAX_COPIES_AUTO)

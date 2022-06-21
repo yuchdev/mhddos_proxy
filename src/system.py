@@ -1,7 +1,6 @@
 import asyncio
 import json
 import os.path
-import psutil
 import random
 import selectors
 import socket
@@ -9,10 +8,11 @@ import sys
 import time
 from asyncio import events
 from contextlib import suppress
-from functools import cache
+from functools import lru_cache
 from itertools import cycle
 from typing import List, Optional, Tuple, Union
 
+import psutil
 import requests
 
 from src.core import cl, CONFIG_URL, logger
@@ -160,7 +160,7 @@ def setup_event_loop() -> asyncio.AbstractEventLoop:
     return loop
 
 
-@cache
+@lru_cache(maxsize=1)
 def detect_local_iface() -> Optional[str]:
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         try:
@@ -175,7 +175,7 @@ def detect_local_iface() -> Optional[str]:
     return None
 
 
-def fetch_netstats(iface: Optional[str]) -> Optional['snetio']:
+def fetch_netstats(iface: Optional[str]) -> Optional['psutil._common.snetio']:
     if iface is None:
         return psutil.net_io_counters()
     else:
@@ -190,13 +190,14 @@ class NetStats:
         self._cursor = fetch_netstats(self._iface)
 
     def tick(self) -> Optional[Tuple[float, float]]:
-        if self._cursor is None: return None
+        if self._cursor is None:
+            return None
         now = time.perf_counter()
         next_cursor = fetch_netstats(self._iface)
         elapsed = now - self._timer
         diff = (
-            (next_cursor.packets_sent-self._cursor.packets_sent)/elapsed,
-            (next_cursor.bytes_sent-self._cursor.bytes_sent)/elapsed,
+            (next_cursor.packets_sent - self._cursor.packets_sent) / elapsed,
+            (next_cursor.bytes_sent - self._cursor.bytes_sent) / elapsed,
         )
         self._timer = now
         self._cursor = next_cursor

@@ -5,7 +5,7 @@ TRANSLATIONS = {
     'Selected': {
         'ua': 'Обрано'
     },
-    'targets to attack': {
+    'targets for the attack': {
         'ua': 'цілей для атаки'
     },
     'Target': {
@@ -16,12 +16,6 @@ TRANSLATIONS = {
     },
     'Method': {
         'ua': 'Метод'
-    },
-    'Connections': {
-        'ua': "З'єднань"
-    },
-    'Requests': {
-        'ua': 'Запити'
     },
     'Packets': {
         'ua': 'Пакети'
@@ -113,20 +107,14 @@ TRANSLATIONS = {
     '(increased network efficiency)': {
         'ua': '(підвищенна ефективність роботи з мережею)'
     },
-    'for': {
-        'ua': 'на'
-    },
     'targets': {
         'ua': 'цілей'
-    },
-    'targets for the attack': {
-        'ua': 'цілей для атаки'
     },
     "is not available and won't be attacked": {
         'ua': 'не доступна і не буде атакована'
     },
     'Capacity': {
-        'ua': 'Потужності'
+        'ua': 'Потужність'
     },
 }
 
