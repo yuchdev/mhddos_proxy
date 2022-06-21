@@ -157,7 +157,7 @@ async def run_ddos(args):
     attack_settings = AttackSettings(
         connect_timeout_seconds=8.0,
         dest_connect_timeout_seconds=10.0,
-        drain_timeout_seconds=10.0,
+        drain_timeout_seconds=15.0,
         close_timeout_seconds=1.0,
         http_response_timeout_seconds=15.0,
         tcp_read_timeout_seconds=0.5,
@@ -166,7 +166,7 @@ async def run_ddos(args):
         # note that "generic flood" attacks switch reading off completely
         reader_limit=1024 << 2,
         socket_rcvbuf=1024 << 2,
-        requests_per_buffer=64,
+        requests_per_buffer=128,
     )
     loop = asyncio.get_event_loop()
 
