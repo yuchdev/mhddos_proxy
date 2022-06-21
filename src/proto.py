@@ -73,14 +73,12 @@ class FloodIO(asyncio.Protocol):
         settings: "AttackSettings",
         flood_spec: FloodSpecGen,
         on_connect: Optional[asyncio.Future] = None,
-        debug: bool = False,
     ):
         self._loop = loop
         self._flood_spec = flood_spec
         self._settings = settings
         self._on_close: asyncio.Future = on_close
         self._on_close.add_done_callback(self._handle_cancellation)
-        self._debug = debug
         self._on_connect = on_connect
         self._transport = None
         self._handle = None

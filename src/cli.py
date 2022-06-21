@@ -93,7 +93,7 @@ def init_argparse() -> argparse.ArgumentParser:
     )
 
     # Deprecated
-    parser.add_argument('--table', action='store_true', default=False)
+    parser.add_argument('--table', action='store_true', help='[DEPRECATED]')
     parser.add_argument('--debug', action='store_true', help='[DEPRECATED]')
 
     return parser

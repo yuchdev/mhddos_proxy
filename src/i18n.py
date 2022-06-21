@@ -29,9 +29,6 @@ TRANSLATIONS = {
     'Traffic': {
         'ua': 'Трафік'
     },
-    'Traffic (estimated)': {
-        'ua': 'Трафік (орієнтовно)'
-    },
     'Total': {
         'ua': 'Усього'
     },
