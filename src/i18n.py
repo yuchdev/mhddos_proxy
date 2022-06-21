@@ -127,7 +127,10 @@ TRANSLATIONS = {
     },
     "is not available and won't be attacked": {
         'ua': 'не доступна і не буде атакована'
-    }
+    },
+    'Capacity': {
+        'ua': 'Потужності'
+    },
 }
 
 LANGUAGES = ['ua', 'en']

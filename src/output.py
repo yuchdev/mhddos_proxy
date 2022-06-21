@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from .core import CPU_COUNT, DEFAULT_THREADS, cl, logger, USE_ONLY_MY_IP
 from .i18n import translate as t
@@ -7,18 +7,25 @@ from .system import NetStats
 from .targets import TargetStats
 
 
-def show_statistic(statistics: List[TargetStats], net_stats: Optional[NetStats]):
+def show_statistic(net_stats: Optional[NetStats], flooders: Optional[Tuple[int, int]]):
     netdiff = net_stats.tick()
-    if netdiff is None:
-        return
-    
-    total_pps, total_bps = netdiff
-    total_bps *= 8
+    if netdiff is not None:
+        total_pps, total_bps = netdiff
+        total_pps = f"{Tools.humanformat(total_pps)}/s"
+        total_bps = f"{Tools.humanbits(total_bps*8)}/s"
+    else:
+        total_pps, total_bps = "n/a", "n/a"
+
+    capacity = "n/a"
+    if flooders:
+        c, m = flooders
+        capacity = f"{c/m:.2f}%"
     
     logger.info(
         f"{cl.GREEN}{t('Total')}: "
-        f"{cl.YELLOW}{t('Packets')}:{cl.GREEN} {Tools.humanformat(total_pps)}/s, "
-        f"{cl.YELLOW}{t('Traffic')}:{cl.GREEN} {Tools.humanbits(total_bps)}/s{cl.RESET}"
+        f"{cl.YELLOW}{t('Capacity')}:{cl.GREEN} {capacity}, "
+        f"{cl.YELLOW}{t('Packets')}:{cl.GREEN} {total_pps}, "
+        f"{cl.YELLOW}{t('Traffic')}:{cl.GREEN} {total_bps}{cl.RESET}"
     )
 
 

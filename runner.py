@@ -307,7 +307,10 @@ async def run_ddos(args):
         print_status(threads, use_my_ip, False)
         while True:
             await asyncio.sleep(refresh_rate)
-            show_statistic(stats, net_stats)
+            show_statistic(
+                net_stats,
+                tcp_task_group.capacity if tcp_task_group is not None else None
+            )
             if it >= 20:
                 it = 0
                 passed = time.perf_counter() - cycle_start
