@@ -2,7 +2,7 @@ import asyncio
 import errno
 import time
 from enum import Enum
-from typing import Any, Callable, Generator, Optional, Tuple
+from typing import Any, Callable, Generator, Optional, Set, Tuple
 
 from OpenSSL import SSL
 
@@ -72,6 +72,8 @@ class FloodIO(asyncio.Protocol):
         on_close: asyncio.Future,
         settings: "AttackSettings",
         flood_spec: FloodSpecGen,
+        *,
+        connections: Set[int],
         on_connect: Optional[asyncio.Future] = None,
     ):
         self._loop = loop
@@ -89,8 +91,10 @@ class FloodIO(asyncio.Protocol):
         self._connected_at: Optional[int] = None
         self._probe_handle = None
         self._num_steps: int = 0
+        self._connections = connections
 
     def connection_made(self, transport) -> None:
+        self._connections.add(hash(transport))
         self._connected_at = time.perf_counter()
         if self._on_connect and not self._on_connect.done():
             self._on_connect.set_result(True)
@@ -100,6 +104,12 @@ class FloodIO(asyncio.Protocol):
             self._transport.pause_reading()
         self._handle = self._loop.call_soon(self._step)
         self._probe_handle = self._loop.call_later(CONN_PROBE_PERIOD, self._probe)
+
+    def _abort(self) -> None:
+        if self._transport:
+            self._transport.abort()
+            self._connections.remove(hash(self._transport))
+            self._transport = None
 
     def _probe(self) -> None:
         # the approach with "probing" instead of direct timeouts tracking (e.g.
@@ -117,8 +127,7 @@ class FloodIO(asyncio.Protocol):
                 # XXX: it might be the case that network is overwhelmed, which means
                 #      it's gonna be wise to track special status for the scheduler
                 #      to delay re-launch of the task
-                self._transport.abort()
-                self._transport = None
+                self._abort()
                 return
         self._probe_handle = self._loop.call_later(5, self._probe)
 
@@ -142,6 +151,9 @@ class FloodIO(asyncio.Protocol):
         pass
 
     def connection_lost(self, exc) -> None:
+        if self._transport:
+            self._connections.remove(hash(self._transport))
+        self._connected_at = time.perf_counter()
         self._transport = None
         if self._handle:
             self._handle.cancel()
@@ -208,8 +220,7 @@ class FloodIO(asyncio.Protocol):
 
     def _handle_cancellation(self, on_close):
         if on_close.cancelled() and self._transport and not self._transport.is_closing():
-            self._transport.abort()
-            self._transport = None
+            self._abort()
 
 
 class DatagramFloodIO(asyncio.Protocol):

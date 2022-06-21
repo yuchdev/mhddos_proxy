@@ -116,6 +116,9 @@ TRANSLATIONS = {
     'Capacity': {
         'ua': 'Потужність'
     },
+    'Connections': {
+        'ua': 'Зʼєднання',
+    }
 }
 
 LANGUAGES = ['ua', 'en']

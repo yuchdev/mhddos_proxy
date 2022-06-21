@@ -6,7 +6,11 @@ from .mhddos import Tools
 from .system import NetStats
 
 
-def show_statistic(net_stats: Optional[NetStats], flooders: Optional[Tuple[int, int]]):
+def show_statistic(
+    net_stats: Optional[NetStats],
+    flooders: Optional[Tuple[int, int]],
+    num_connections: int
+):
     netdiff = net_stats.tick()
     if netdiff is not None:
         total_pps, total_bps = netdiff
@@ -23,6 +27,7 @@ def show_statistic(net_stats: Optional[NetStats], flooders: Optional[Tuple[int, 
     logger.info(
         f"{cl.GREEN}{t('Total')}: "
         f"{cl.YELLOW}{t('Capacity')}:{cl.GREEN} {capacity}, "
+        f"{cl.YELLOW}{t('Connections')}:{cl.GREEN} {num_connections}, "
         f"{cl.YELLOW}{t('Packets')}:{cl.GREEN} {total_pps}, "
         f"{cl.YELLOW}{t('Traffic')}:{cl.GREEN} {total_bps}{cl.RESET}"
     )

