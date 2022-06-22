@@ -1,6 +1,6 @@
 FROM --platform=$TARGETPLATFORM python:3.10-slim
 
-RUN apt-get update && apt-get -y install git
+RUN apt-get update && apt-get -y install git gcc python3-dev
 RUN python3 -m venv /opt/venv
 ENV IS_DOCKER=1 PATH="/opt/venv/bin:$PATH"
 
