@@ -171,9 +171,8 @@ def setup_event_loop() -> asyncio.AbstractEventLoop:
 def _detect_port_range() -> Optional[Tuple[int, int]]:
     if IS_LINUX:
         try:
-            ctl = "sysctl -n net.ipv4.ip_local_port_range"
-            with os.popen(ctl) as f:
-                low, high = f.readlines()
+            with open("/proc/sys/net/ipv4/ip_local_port_range") as f:
+                low, high = f.read().split()
             return int(low), int(high)
         except Exception:
             return LINUX_DEFAULT_PORT_RANGE
@@ -191,7 +190,7 @@ def _detect_port_range() -> Optional[Tuple[int, int]]:
         try:
             ctl = "netsh int ipv4 show dynamicport tcp"
             with os.popen(ctl) as f:
-                low, high = re.findall("\d+", f.read())
+                low, high = re.findall(r"\d+", f.read())
             return int(low), int(high)
         except Exception:
             return IANA_DEFAULT_PORT_RANGE
