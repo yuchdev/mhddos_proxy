@@ -144,7 +144,7 @@ async def run_ddos(args):
         max_conns -= LIMITS_PADDING  # keep some for other needs
         if max_conns < threads:
             logger.warning(
-                f"{cl.RED}{t('The number of threads has been reduced to')} {max_conns} "
+                f"{cl.MAGENTA}{t('The number of threads has been reduced to')} {max_conns} "
                 f"{t('due to the limitations of your system')}{cl.RESET}"
             )
             threads = max_conns
@@ -418,17 +418,18 @@ def main():
     if num_copies > max_copies:
         num_copies = max_copies
         logger.warning(
-            f"{cl.RED}{t('The number of copies is automatically reduced to')} {max_copies}{cl.RESET}"
+            f"{cl.MAGENTA}{t('The number of copies is automatically reduced to')} {max_copies}{cl.RESET}"
         )
 
     port_range_size = detect_port_range_size()
     max_ports = port_range_size - LIMITS_PADDING
     if num_copies * (args.threads or DEFAULT_THREADS) > max_ports:
         args.threads = int(max_ports / num_copies)
-        logger.warning(
-            f"{cl.RED}{t('The number of threads has been reduced to')} {args.threads} "
-            f"{t('due to the limitations of your system')}{cl.RESET}"
-        )
+        if args.threads:
+            logger.warning(
+                f"{cl.MAGENTA}{t('The number of threads has been reduced to')} {args.threads} "
+                f"{t('due to the limitations of your system')}{cl.RESET}"
+            )
 
     print_banner(args)
 
