@@ -119,12 +119,6 @@ TRANSLATIONS = {
     'Connections': {
         'ua': "З'єднань"
     },
-    'Concurrency was reduced to': {
-        'ua': 'Кількість потоків на одну копію було зменшено до'
-    },
-    'per copy to match the size of available port range': {
-        'ua': '(згідно з максимальною кількістю портів)'
-    },
 }
 
 LANGUAGES = ['ua', 'en']

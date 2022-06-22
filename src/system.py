@@ -24,7 +24,8 @@ WINDOWS = sys.platform == "win32"
 LINUX = sys.platform.startswith("linux")
 MACOS = sys.platform.startswith("darwin")
 WINDOWS_WAKEUP_SECONDS = 0.5
-DEFAULT_PORT_RANGE_SIZE = 28_233 # default Linux's "32768 61000"
+LINUX_DEFAULT_PORT_RANGE = (32_768, 61_000)
+MACOS_DEFAULT_PORT_RANGE = (49_152, 65_535)
 
 
 def fix_ulimits() -> Optional[int]:
@@ -166,14 +167,20 @@ def setup_event_loop() -> asyncio.AbstractEventLoop:
 
 def _detect_port_range() -> Optional[Tuple[int, int]]:
     if LINUX:
-        with open("/proc/sys/net/ipv4/ip_local_port_range") as f:
-            low, high = f.read().split()
-            return int(low), int(high)
+        try:
+            with open("/proc/sys/net/ipv4/ip_local_port_range") as f:
+                low, high = f.read().split()
+                return int(low), int(high)
+        except:
+            return LINUX_DEFAULT_PORT_RANGE
     if MACOS:
-        ctl = "sysctl -n net.inet.ip.portrange.first net.inet.ip.portrange.last"
-        with os.popen(ctl) as f:
-            low, high = f.readlines()
-            return int(low), int(high)
+        try:
+            ctl = "sysctl -n net.inet.ip.portrange.first net.inet.ip.portrange.last"
+            with os.popen(ctl) as f:
+                low, high = f.readlines()
+                return int(low), int(high)
+        except:
+            return MACOS_DEFAULT_PORT_RANGE
     if WINDOWS:
         return 1024, 4999
 
@@ -182,9 +189,9 @@ def _detect_port_range() -> Optional[Tuple[int, int]]:
 def detect_port_range_size() -> int:
     try:
         low, high = _detect_port_range()
-        return high - low + 1
     except:
-        return DEFAULT_PORT_RANGE_SIZE
+        return LINUX_DEFAULT_PORT_RANGE
+    return high - low + 1
 
 
 @lru_cache(maxsize=None)
