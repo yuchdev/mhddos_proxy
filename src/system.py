@@ -190,8 +190,8 @@ def _detect_port_range() -> Optional[Tuple[int, int]]:
         try:
             ctl = "netsh int ipv4 show dynamicport tcp"
             with os.popen(ctl) as f:
-                low, high = re.findall(r"\d+", f.read())
-            return int(low), int(high)
+                low, ports = re.findall(r"\d+", f.read())
+            return int(low), int(low) + int(ports)
         except Exception:
             return IANA_DEFAULT_PORT_RANGE
 
@@ -202,7 +202,7 @@ def detect_port_range_size() -> int:
         low, high = _detect_port_range()
     except Exception:
         low, high = IANA_DEFAULT_PORT_RANGE  # IANA default
-    return max(high - low + 1, 1024)
+    return max(high - low + 1, 1024)  # Be safe and never return less then 1024
 
 
 @lru_cache(maxsize=None)
