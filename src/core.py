@@ -47,7 +47,7 @@ CONFIG_URL = "https://raw.githubusercontent.com/porthole-ascend-cinnamon/mhddos_
 
 CPU_COUNT = cpu_count()
 DEFAULT_THREADS = 8000 if CPU_COUNT > 1 else 4000
-PORT_RANGE_PADDING = 50
+LIMITS_PADDING = 50
 
 COPIES_AUTO = "auto"
 MAX_COPIES_AUTO = 4

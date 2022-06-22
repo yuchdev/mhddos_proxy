@@ -20,12 +20,15 @@ from src.core import cl, CONFIG_URL, logger
 from src.i18n import translate as t
 
 
-WINDOWS = sys.platform == "win32"
-LINUX = sys.platform.startswith("linux")
-MACOS = sys.platform.startswith("darwin")
-WINDOWS_WAKEUP_SECONDS = 0.5
+IS_WINDOWS = sys.platform in {"win32", "cygwin"}
+IS_LINUX = sys.platform.startswith("linux")
+IS_MACOS = sys.platform.startswith("darwin") or sys.platform.startswith("freebsd")
+
 LINUX_DEFAULT_PORT_RANGE = (32_768, 61_000)
 MACOS_DEFAULT_PORT_RANGE = (49_152, 65_535)
+WINDOWS_DEFAULT_PORT_RANGE = (1024, 4999)
+
+WINDOWS_WAKEUP_SECONDS = 0.5
 
 
 def fix_ulimits() -> Optional[int]:
@@ -149,7 +152,7 @@ def setup_event_loop() -> asyncio.AbstractEventLoop:
 
     if uvloop:
         loop = events.new_event_loop()
-    elif WINDOWS:
+    elif IS_WINDOWS:
         _patch_proactor_connection_lost()
         loop = asyncio.ProactorEventLoop()
         # This is to allow CTRL-C to be detected in a timely fashion,
@@ -166,31 +169,34 @@ def setup_event_loop() -> asyncio.AbstractEventLoop:
 
 
 def _detect_port_range() -> Optional[Tuple[int, int]]:
-    if LINUX:
+    if IS_LINUX:
         try:
-            with open("/proc/sys/net/ipv4/ip_local_port_range") as f:
-                low, high = f.read().split()
-                return int(low), int(high)
-        except:
+            ctl = "sysctl -n net.ipv4.ip_local_port_range"
+            with os.popen(ctl) as f:
+                low, high = f.readlines()
+            return int(low), int(high)
+        except Exception:
             return LINUX_DEFAULT_PORT_RANGE
-    if MACOS:
+
+    if IS_MACOS:
         try:
             ctl = "sysctl -n net.inet.ip.portrange.first net.inet.ip.portrange.last"
             with os.popen(ctl) as f:
                 low, high = f.readlines()
-                return int(low), int(high)
-        except:
+            return int(low), int(high)
+        except Exception:
             return MACOS_DEFAULT_PORT_RANGE
-    if WINDOWS:
-        return 1024, 4999
+
+    if IS_WINDOWS:
+        return WINDOWS_DEFAULT_PORT_RANGE
 
 
 @lru_cache(maxsize=None)
 def detect_port_range_size() -> int:
     try:
         low, high = _detect_port_range()
-    except:
-        low, high = LINUX_DEFAULT_PORT_RANGE
+    except Exception:
+        low, high = MACOS_DEFAULT_PORT_RANGE  # IANA default
     return high - low + 1
 
 
