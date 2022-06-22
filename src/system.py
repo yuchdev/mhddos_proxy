@@ -202,7 +202,7 @@ def detect_port_range_size() -> int:
     try:
         low, high = _detect_port_range()
     except Exception:
-        low, high = MACOS_DEFAULT_PORT_RANGE  # IANA default
+        low, high = IANA_DEFAULT_PORT_RANGE  # IANA default
     return high - low + 1
 
 
