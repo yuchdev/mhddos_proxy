@@ -3,6 +3,7 @@ import json
 import os
 import os.path
 import random
+import re
 import selectors
 import socket
 import sys
@@ -25,8 +26,7 @@ IS_LINUX = sys.platform.startswith("linux")
 IS_MACOS = sys.platform.startswith("darwin") or sys.platform.startswith("freebsd")
 
 LINUX_DEFAULT_PORT_RANGE = (32_768, 61_000)
-MACOS_DEFAULT_PORT_RANGE = (49_152, 65_535)
-WINDOWS_DEFAULT_PORT_RANGE = (1024, 4999)
+IANA_DEFAULT_PORT_RANGE = (49_152, 65_535)
 
 WINDOWS_WAKEUP_SECONDS = 0.5
 
@@ -185,10 +185,16 @@ def _detect_port_range() -> Optional[Tuple[int, int]]:
                 low, high = f.readlines()
             return int(low), int(high)
         except Exception:
-            return MACOS_DEFAULT_PORT_RANGE
+            return IANA_DEFAULT_PORT_RANGE
 
     if IS_WINDOWS:
-        return WINDOWS_DEFAULT_PORT_RANGE
+        try:
+            ctl = "netsh int ipv4 show dynamicport tcp"
+            with os.popen(ctl) as f:
+                low, high = re.findall("\d+", f.read())
+            return int(low), int(high)
+        except Exception:
+            return IANA_DEFAULT_PORT_RANGE
 
 
 @lru_cache(maxsize=None)
