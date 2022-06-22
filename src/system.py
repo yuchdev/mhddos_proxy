@@ -202,7 +202,7 @@ def detect_port_range_size() -> int:
         low, high = _detect_port_range()
     except Exception:
         low, high = IANA_DEFAULT_PORT_RANGE  # IANA default
-    return high - low + 1
+    return max(high - low + 1, 1024)
 
 
 @lru_cache(maxsize=None)
