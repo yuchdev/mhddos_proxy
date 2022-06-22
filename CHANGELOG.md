@@ -27,7 +27,7 @@
   - Fixed color display on Windows terminal (without editing the registry)
   - In case of no targets available, the script will wait, instead of stopping completely
 - **09.04.2022** New proxy utilization system; as of now everyone gets ~ 200 proxies to attack from a total pool of 10,000+. The `-p` (` --period`) and `--proxy-timeout` parameters are deprecated
-- **04.04.2022** Added the ability to use your own proxy list for the attack: [instructions] (#custom-proxies)
+- **04.04.2022** Added the ability to use your own proxy list for the attack
 - **03.04.2022** Fixed 'Too many open files' bug (thanks to @kobzar-darmogray and @euclid-catoptrics)
 - **02.04.2022** Working threads are being reused rather than restarted for each cycle. Ctrl-C has also been fixed
 - **01.04.2022** Updated CFB attack method to synchronize with MHDDoS
