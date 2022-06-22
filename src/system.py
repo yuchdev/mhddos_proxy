@@ -190,7 +190,7 @@ def detect_port_range_size() -> int:
     try:
         low, high = _detect_port_range()
     except:
-        return LINUX_DEFAULT_PORT_RANGE
+        low, high = LINUX_DEFAULT_PORT_RANGE
     return high - low + 1
 
 
