@@ -207,12 +207,10 @@ def detect_port_range_size() -> int:
 
 @lru_cache(maxsize=None)
 def detect_local_iface() -> Optional[str]:
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-        try:
+    with suppress(Exception):
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
             sock.connect(("8.8.8.8", 80))
-        except:
-            return None
-        laddr, _ = sock.getsockname()
+            laddr, _ = sock.getsockname()
         for iface_name, addrs in psutil.net_if_addrs().items():
             for addr in addrs:
                 if addr.family == socket.AF_INET and addr.address == laddr:
@@ -221,10 +219,12 @@ def detect_local_iface() -> Optional[str]:
 
 
 def fetch_netstats(iface: Optional[str]) -> Optional['psutil._common.snetio']:
-    if iface is None:
-        return psutil.net_io_counters()
-    else:
-        return psutil.net_io_counters(pernic=True).get(iface, None)
+    with suppress(Exception):
+        if iface is None:
+            return psutil.net_io_counters()
+        else:
+            return psutil.net_io_counters(pernic=True).get(iface, None)
+    return None
 
 
 class NetStats:
