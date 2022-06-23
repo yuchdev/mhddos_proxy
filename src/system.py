@@ -8,17 +8,25 @@ import selectors
 import socket
 import sys
 import time
+import traceback
 from asyncio import events
 from contextlib import suppress
 from functools import lru_cache
 from itertools import cycle
 from typing import List, Optional, Tuple, Union
 
-import psutil
 import requests
 
 from src.core import cl, CONFIG_URL, logger
 from src.i18n import translate as t
+
+
+# @formatter:off
+print_exc_orig = traceback.print_exc
+traceback.print_exc = lambda *args, **kwargs: None
+import psutil
+traceback.print_exc = print_exc_orig
+# @formatter:on
 
 
 IS_WINDOWS = sys.platform in {"win32", "cygwin"}
