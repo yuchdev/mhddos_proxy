@@ -44,25 +44,20 @@ class FloodSpec:
 
     @staticmethod
     def from_bytes(packet: bytes, num_packets: int) -> FloodSpecGen:
-        packet_size = len(packet)
         for _ in range(num_packets):
-            yield FloodOp.WRITE, (packet, packet_size, 1)
+            yield FloodOp.WRITE, packet
 
     @staticmethod
     def from_buffer(packet: Tuple[Callable[[], bytes], int], num_packets: int) -> FloodSpecGen:
         packet_gen, stacked = packet
-        packet, packet_size = None, None
+        packet = packet_gen()
         for _ in range(int(num_packets / stacked)):
-            if packet is None:
-                packet = packet_gen()
-                packet_size = len(packet)
-            yield FloodOp.WRITE, (packet, packet_size, stacked)
+            yield FloodOp.WRITE, packet
 
     @staticmethod
     def from_callable(packet: Callable[[], bytes], num_packets: int) -> FloodSpecGen:
         for _ in range(num_packets):
-            _packet: bytes = packet()
-            yield FloodOp.WRITE, (_packet, len(_packet), 1)
+            yield FloodOp.WRITE, packet()
 
 
 # XXX: add instrumentation to keep track of connection lifetime,
@@ -198,7 +193,7 @@ class FloodIO(asyncio.Protocol):
             #      as we still need to keep track of current op & stash
             op, args = next(self._flood_spec)
             if op == FloodOp.WRITE:
-                packet, size, num_stacked = args
+                packet = args
                 self._transport.write(packet)
                 self._handle = None
                 if not self._paused:
