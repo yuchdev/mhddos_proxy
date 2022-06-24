@@ -8,8 +8,6 @@
 - Ефективне використання ресурсів завдяки асихронній архітектурі
 
 ### ⏱ Останні оновлення
-  
-Оновлення версії для Windows | Mac | Linux | Android | Docker: https://telegra.ph/Onovlennya-mhddos-proxy-04-16  
 
 - **22.06.2022** Покращено продуктивність роботи. Параметр `--debug` більше не підтримується через негативний вплив на продуктивність
 - **10.06.2022** Додано зручний спосіб вказати власний проксі напряму в команді запуску (параметр `--proxy`)
@@ -17,11 +15,11 @@
 
 ### 1. 💽 Встановлення
 
-#### Розширені інструкції - [натисніть тут](/docs/installation.md) 
+#### Windows installer https://itarmy.com.ua/instruction/#mhddos/#windows
 
 #### Python (якщо не працює - спробуйте `python` або `python3.10` замість `python3`)
 
-Потребує python >= 3.8 та git
+Потребує [Python](https://www.python.org/downloads/) та [Git](https://git-scm.com/download/)
 
     git clone https://github.com/porthole-ascend-cinnamon/mhddos_proxy.git
     cd mhddos_proxy
@@ -35,32 +33,33 @@
 
 #### Python з автоматичним оновленням (якщо не працює - спробуйте `python` або `python3.10` замість `python3`)
 
-    ./runner.sh python3 https://example.com tcp://198.18.0.123:5678
+    ./runner.sh python3 --itarmy
   
 Для [**Termux for Android**](https://telegra.ph/mhddos-proxy-for-Android-with-Termux-03-31) ось так:
     
-    TERMUX=1 bash runner.sh python https://example.com tcp://198.18.0.123:5678 -t 1000
+    TERMUX=1 bash runner.sh python --itarmy -t 1000
 
 #### Python (потребує оновлення вручну) (якщо не працює - спробуйте `python` або `python3.10` замість `python3`)
 
-    python3 runner.py https://example.com tcp://198.18.0.123:5678
+    python3 runner.py --itarmy
 
 #### Docker (для Linux додавайте sudo на початку команди)
 
-    docker run -it --rm --pull always ghcr.io/porthole-ascend-cinnamon/mhddos_proxy https://example.com tcp://198.18.0.123:5678
+    docker run -it --rm --pull always ghcr.io/porthole-ascend-cinnamon/mhddos_proxy --itarmy
 
 ### 3. 🛠 Налаштування (більше у розділі [CLI](#cli))
 
 Усі параметри можна комбінувати, можна вказувати і до і після переліку цілей
 
 - Щоб додати ваш IP/VPN до атаки (особливо актуально для виділених серверів), додайте параметр `--vpn`
-- Щоб обрати цілі від IT Army of Ukraine (https://t.me/itarmyofukraine2022), додайте параметр `--itarmy`
+- Щоб обрати цілі від IT Army of Ukraine (https://itarmy.com.ua/), додайте параметр `--itarmy`
 - Кількість потоків: `-t XXXX` - за замовчуванням 8000 (або 4000 якщо на машині лише 1 CPU)
 - Запуск декількох копій: `--copies X` або `--copies auto`, при наявності 4+ CPU та мережі 100+ Mb/s
 
 ### 4. 🐳 Комьюніті
-- [Створення ботнету з 30+ безкоштовних та автономних(працюють навіть при вимкненому ПК) Linux-серверів](https://auto-ddos.notion.site/dd91326ed30140208383ffedd0f13e5c)
-- [Детальний розбір mhddos_proxy та інструкції по встановленню](docs/installation.md)
+- [Детальні (неофіційні) інструкції по встановленню](docs/installation.md)
+- [Створення ботнету з 20+ безкоштовних серверів](https://auto-ddos.notion.site/dd91326ed30140208383ffedd0f13e5c)
+- [Cкрипти з автоматичним встановленням](https://t.me/ddos_separ/1126)
 - [Аналіз засобу mhddos_proxy](https://telegra.ph/Anal%D1%96z-zasobu-mhddos-proxy-04-01)
 - [Приклад запуску через docker на OpenWRT](https://youtu.be/MlL6fuDcWlI)
 - [VPN](https://auto-ddos.notion.site/VPN-5e45e0aadccc449e83fea45d56385b54)
@@ -87,7 +86,7 @@
       --proxies URL|path     URL or local path(ex. proxies.txt) to file with proxies to use
       --proxy [PROXY ...]    List of proxies to use, separated by spaces
       --http-methods GET     List of HTTP(L7) methods to use (default is GET).
-      --itarmy               Attack targets from https://t.me/itarmyofukraine2022  
+      --itarmy               Attack targets from https://itarmy.com.ua/  
       --copies 1             Number of copies to run (default is 1). Use "auto" to set the value automatically
       --lang {en,ua}         Select language (default is ua)
 

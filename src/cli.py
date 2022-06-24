@@ -61,7 +61,7 @@ def init_argparse() -> argparse.ArgumentParser:
         '--itarmy',
         action='store_true',
         default=False,
-        help='Attack targets from https://t.me/itarmyofukraine2022'
+        help='Attack targets from https://itarmy.com.ua/'
     )
     parser.add_argument(
         '--lang',

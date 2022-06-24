@@ -8,17 +8,18 @@
 - Effective utilization of your resources due to the asynchronous architecture
 
 ### ⏱ Recent updates
+
 - **22.06.2022** Performance improvements. The `--debug` option is deprecated to avoid negative impact on performance
 - **10.06.2022** Introduced `--proxy` option for providing custom proxies directly from command args
 - **08.06.2022** Added `--copies auto` option to set the value automatically based on the resources available
 
 ### 1. 💽 Installation
 
-#### Extended instructions (UA only so far) - [click here](/docs/installation.md)
+#### Windows installer https://itarmy.com.ua/instruction/#mhddos/#windows
 
 #### Python (if it doesn't work, try `python` or `python3.10` instead of `python3`)
 
-Requires python >= 3.8 and git
+Requires [Python](https://www.python.org/downloads/) and [Git](https://git-scm.com/download/)
 
     git clone https://github.com/porthole-ascend-cinnamon/mhddos_proxy.git
     cd mhddos_proxy
@@ -32,35 +33,37 @@ Install and start Docker: https://docs.docker.com/desktop/#download-and-install
 
 #### Python with automatic updates (if it doesn't work, try `python` or `python3.10` instead of `python3`)
 
-    ./runner.sh python3 https://example.com tcp://198.18.0.123:5678
+    ./runner.sh python3 --itarmy
 
 For [**Termux for Android**](https://telegra.ph/mhddos-proxy-for-Android-with-Termux-03-31) use:
 
-    TERMUX=1 bash runner.sh python https://example.com tcp://198.18.0.123:5678 -t 1000
+    TERMUX=1 bash runner.sh python --itarmy -t 1000
 
 #### Python (manual updates required) (if it doesn't work, try `python` or `python3.10` instead of `python3`)
 
-    python3 runner.py https://example.com tcp://198.18.0.123:5678
+    python3 runner.py --itarmy
 
 #### Docker (for Linux, add sudo in front of the command)
 
-    docker run -it --rm --pull always ghcr.io/porthole-ascend-cinnamon/mhddos_proxy https://example.com tcp://198.18.0.123:5678
+    docker run -it --rm --pull always ghcr.io/porthole-ascend-cinnamon/mhddos_proxy --itarmy
 
 ### 3. 🛠 Options (check out more in the [CLI](#cli) section)
 
 All options can be combined, you can specify them either before and after the list of targets
 
 - Consider adding your IP/VPN to the attack (especially when running on dedicated server), add flag `--vpn`
-- To use targets provided by IT Army of Ukraine (https://t.me/itarmyofukraine2022), add the `--itarmy` flag  
+- To use targets provided by IT Army of Ukraine (https://itarmy.com.ua/), add the `--itarmy` flag  
 - Number of threads: `-t XXXX` - the default is 8000 (or 4000 if the machine has only one CPU).
 - Number of copies: `--copies X` or `--copies auto` - in case you have 4+ CPU and stable network 100+ Mb/s
 
 ### 4. 🐳 Community (mostly in Ukrainian)
 - [Create a botnet of 30+ free and standalone Linux servers](https://auto-ddos.notion.site/dd91326ed30140208383ffedd0f13e5c)
 - [Detailed analysis of mhddos_proxy and installation instructions](docs/installation.md)
+- [Scripts with automatic install](https://t.me/ddos_separ/1126)
 - [Analysis of mhddos_proxy](https://telegra.ph/Anal%D1%96z-zasobu-mhddos-proxy-04-01)
 - [Example of running via docker on OpenWRT](https://youtu.be/MlL6fuDcWlI)
 - [VPN](https://auto-ddos.notion.site/VPN-5e45e0aadccc449e83fea45d56385b54)
+- [Setup with Telegram notifications](https://github.com/sadviq99/mhddos_proxy-setup)
 
 ### 5. CLI
 
@@ -83,7 +86,7 @@ All options can be combined, you can specify them either before and after the li
       --proxies URL|path     URL or local path(ex. proxies.txt) to file with proxies to use
       --proxy [PROXY ...]    List of proxies to use, separated by spaces
       --http-methods GET     List of HTTP(L7) methods to use (default is GET).
-      --itarmy               Attack targets from https://t.me/itarmyofukraine2022  
+      --itarmy               Attack targets from https://itarmy.com.ua/  
       --copies 1             Number of copies to run (default is 1). Use "auto" to set the value automatically
       --lang {en,ua}         Select language (default is ua)
 
