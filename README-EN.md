@@ -15,9 +15,9 @@
 
 ### 1. 💽 Installation
 
-#### Windows installer https://itarmy.com.ua/instruction/#mhddos/#windows
+#### 1.1 Windows installer https://itarmy.com.ua/instruction/#mhddos/#windows
 
-#### Python (if it doesn't work, try `python` or `python3.10` instead of `python3`)
+#### 1.2 Python (if it doesn't work, try `python` or `python3.10` instead of `python3`)
 
 Requires [Python](https://www.python.org/downloads/) and [Git](https://git-scm.com/download/)
 
@@ -25,7 +25,7 @@ Requires [Python](https://www.python.org/downloads/) and [Git](https://git-scm.c
     cd mhddos_proxy
     python3 -m pip install -r requirements.txt
 
-#### Docker
+#### 1.3 Docker
 
 Install and start Docker: https://docs.docker.com/desktop/#download-and-install
 

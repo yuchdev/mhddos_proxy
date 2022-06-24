@@ -15,9 +15,9 @@
 
 ### 1. 💽 Встановлення
 
-#### Windows installer https://itarmy.com.ua/instruction/#mhddos/#windows
+#### 1.1 Windows installer https://itarmy.com.ua/instruction/#mhddos/#windows
 
-#### Python (якщо не працює - спробуйте `python` або `python3.10` замість `python3`)
+#### 1.2 Python (якщо не працює - спробуйте `python` або `python3.10` замість `python3`)
 
 Потребує [Python](https://www.python.org/downloads/) та [Git](https://git-scm.com/download/)
 
@@ -25,7 +25,7 @@
     cd mhddos_proxy
     python3 -m pip install -r requirements.txt
 
-#### Docker
+#### 1.3 Docker
 
 Встановіть і запустіть Docker: https://docs.docker.com/desktop/#download-and-install
 
