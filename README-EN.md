@@ -47,16 +47,35 @@ For [**Termux for Android**](https://telegra.ph/mhddos-proxy-for-Android-with-Te
 
     docker run -it --rm --pull always ghcr.io/porthole-ascend-cinnamon/mhddos_proxy --itarmy
 
-### 3. 🛠 Options (check out more in the [CLI](#cli) section)
+### 3. 🛠 Configuration and options
 
-All options can be combined, you can specify them either before and after the list of targets
+All options can be combined and specified in any order
 
 - Consider adding your IP/VPN to the attack (especially when running on dedicated server), add flag `--vpn`
 - To use targets provided by IT Army of Ukraine (https://itarmy.com.ua/), add the `--itarmy` flag  
 - Number of threads: `-t XXXX` - the default is 8000 (or 4000 if the machine has only one CPU).
 - Number of copies: `--copies X` or `--copies auto` - in case you have 4+ CPU and stable network 100+ Mb/s
 
-### 4. 🐳 Community (mostly in Ukrainian)
+
+    usage: runner.py [-t THREADS] [--copies COPIES] [--itarmy] [--lang {ua,en}] [--vpn]
+                     [-c URL|path] [--proxies URL|path] [--proxy [PROXY ...]]
+                     [--http-methods METHOD [METHOD ...]] [targets...]
+
+      -h, --help             show all available options
+      -t, --threads 8000     Number of threads (default is 8000 if CPU > 1, 4000 otherwise)
+      --copies 1             Number of copies to run (default is 1). Use "auto" to set the value automatically
+      --itarmy               Use targets from https://itarmy.com.ua/  
+      --lang {en,ua}         Select language (default is ua)
+      --vpn                  Use both my IP and proxies. Optionally, specify a chance of using my IP (default is 2%)
+      -c, --config URL|path  URL or local path to file with targets list
+      --proxies URL|path     URL or local path(ex. proxies.txt) to file with proxies to use
+      --proxy [PROXY ...]    List of proxies to use, separated by spaces
+      --http-methods GET     List of HTTP(L7) methods to use (default is GET).
+
+    positional arguments:
+       targets               List of targets, separated by space
+
+### 5. 🐳 Community (mostly in Ukrainian)
 - [Detailed (unofficial) installation instructions](docs/installation.md)
 - [Create a botnet of 30+ free and standalone Linux servers](https://auto-ddos.notion.site/dd91326ed30140208383ffedd0f13e5c)
 - [Scripts with automatic install](https://t.me/ddos_separ/1126)
@@ -65,34 +84,9 @@ All options can be combined, you can specify them either before and after the li
 - [VPN](https://auto-ddos.notion.site/VPN-5e45e0aadccc449e83fea45d56385b54)
 - [Setup with Telegram notifications](https://github.com/sadviq99/mhddos_proxy-setup)
 
-### 5. CLI
-
-    usage: runner.py target [target ...]
-                     [-t THREADS] 
-                     [-c URL]
-                     [--vpn]
-                     [--http-methods METHOD [METHOD ...]]
-                     [--itarmy]
-                     [--copies COPIES]
-
-    positional arguments:
-      targets                List of targets, separated by space
-    
-     optional arguments:
-      -h, --help             show all available options
-      -c, --config URL|path  URL or local path to file with targets list
-      -t, --threads 8000     Number of threads (default is 8000 if CPU > 1, 4000 otherwise)
-      --vpn                  Use both my IP and proxies. Optionally, specify a chance of using my IP (default is 2%)
-      --proxies URL|path     URL or local path(ex. proxies.txt) to file with proxies to use
-      --proxy [PROXY ...]    List of proxies to use, separated by spaces
-      --http-methods GET     List of HTTP(L7) methods to use (default is GET).
-      --itarmy               Attack targets from https://itarmy.com.ua/  
-      --copies 1             Number of copies to run (default is 1). Use "auto" to set the value automatically
-      --lang {en,ua}         Select language (default is ua)
-
 ### 6. Custom proxies
 
-#### CLI
+#### Command line
 
 To specify custom proxy use `--proxy` option:
 

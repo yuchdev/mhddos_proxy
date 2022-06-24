@@ -47,16 +47,35 @@
 
     docker run -it --rm --pull always ghcr.io/porthole-ascend-cinnamon/mhddos_proxy --itarmy
 
-### 3. 🛠 Налаштування (більше у розділі [CLI](#cli))
+### 3. 🛠 Налаштування та параметри
 
-Усі параметри можна комбінувати, можна вказувати і до і після переліку цілей
+Усі параметри можна комбінувати і вказувати у довільному порядку
 
 - Щоб додати ваш IP/VPN до атаки (особливо актуально для виділених серверів), додайте параметр `--vpn`
 - Щоб обрати цілі від IT Army of Ukraine (https://itarmy.com.ua/), додайте параметр `--itarmy`
 - Кількість потоків: `-t XXXX` - за замовчуванням 8000 (або 4000 якщо на машині лише 1 CPU)
 - Запуск декількох копій: `--copies X` або `--copies auto`, при наявності 4+ CPU та мережі 100+ Mb/s
 
-### 4. 🐳 Комьюніті
+
+    usage: runner.py [-t THREADS] [--copies COPIES] [--itarmy] [--lang {ua,en}] [--vpn]
+                     [-c URL|path] [--proxies URL|path] [--proxy [PROXY ...]]
+                     [--http-methods METHOD [METHOD ...]] [targets...]
+
+      -h, --help             show all available options
+      -t, --threads 8000     Number of threads (default is 8000 if CPU > 1, 4000 otherwise)
+      --copies 1             Number of copies to run (default is 1). Use "auto" to set the value automatically
+      --itarmy               Use targets from https://itarmy.com.ua/  
+      --lang {en,ua}         Select language (default is ua)
+      --vpn                  Use both my IP and proxies. Optionally, specify a chance of using my IP (default is 2%)
+      -c, --config URL|path  URL or local path to file with targets list
+      --proxies URL|path     URL or local path(ex. proxies.txt) to file with proxies to use
+      --proxy [PROXY ...]    List of proxies to use, separated by spaces
+      --http-methods GET     List of HTTP(L7) methods to use (default is GET).
+
+    positional arguments:
+       targets               List of targets, separated by space
+
+### 5. 🐳 Комьюніті
 - [Детальні (неофіційні) інструкції по встановленню](docs/installation.md)
 - [Створення ботнету з 20+ безкоштовних серверів](https://auto-ddos.notion.site/dd91326ed30140208383ffedd0f13e5c)
 - [Cкрипти з автоматичним встановленням](https://t.me/ddos_separ/1126)
@@ -64,31 +83,6 @@
 - [Приклад запуску через docker на OpenWRT](https://youtu.be/MlL6fuDcWlI)
 - [VPN](https://auto-ddos.notion.site/VPN-5e45e0aadccc449e83fea45d56385b54)
 - [Налаштування з нотифікаціями у Телеграм](https://github.com/sadviq99/mhddos_proxy-setup)
-
-### 5. CLI
-
-    usage: runner.py target [target ...]
-                     [-t THREADS] 
-                     [-c URL]
-                     [--vpn]
-                     [--http-methods METHOD [METHOD ...]]
-                     [--itarmy]
-                     [--copies COPIES]
-
-    positional arguments:
-      targets                List of targets, separated by space
-    
-    optional arguments:
-      -h, --help             show all available options
-      -c, --config URL|path  URL or local path to file with targets list
-      -t, --threads 8000     Number of threads (default is 8000 if CPU > 1, 4000 otherwise)
-      --vpn                  Use both my IP and proxies. Optionally, specify a chance of using my IP (default is 2%)
-      --proxies URL|path     URL or local path(ex. proxies.txt) to file with proxies to use
-      --proxy [PROXY ...]    List of proxies to use, separated by spaces
-      --http-methods GET     List of HTTP(L7) methods to use (default is GET).
-      --itarmy               Attack targets from https://itarmy.com.ua/  
-      --copies 1             Number of copies to run (default is 1). Use "auto" to set the value automatically
-      --lang {en,ua}         Select language (default is ua)
 
 ### 6. Власні проксі
 
