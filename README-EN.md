@@ -56,24 +56,25 @@ All options can be combined and specified in any order
 - Number of threads: `-t XXXX` - the default is 8000 (or 4000 if the machine has only one CPU).
 - Number of copies: `--copies X` or `--copies auto` - in case you have 4+ CPU and stable network 100+ Mb/s
 
+```
+usage: runner.py [-t THREADS] [--copies COPIES] [--itarmy] [--lang {ua,en}] [--vpn]
+                 [-c URL|path] [--proxies URL|path] [--proxy [PROXY ...]]
+                 [--http-methods METHOD [METHOD ...]] [targets...]
 
-    usage: runner.py [-t THREADS] [--copies COPIES] [--itarmy] [--lang {ua,en}] [--vpn]
-                     [-c URL|path] [--proxies URL|path] [--proxy [PROXY ...]]
-                     [--http-methods METHOD [METHOD ...]] [targets...]
+  -h, --help             show all available options
+  -t, --threads 8000     Number of threads (default is 8000 if CPU > 1, 4000 otherwise)
+  --copies 1             Number of copies to run (default is 1). Use "auto" to set the value automatically
+  --itarmy               Use targets from https://itarmy.com.ua/  
+  --lang {en,ua}         Select language (default is ua)
+  --vpn                  Use both my IP and proxies. Optionally, specify a chance of using my IP (default is 2%)
+  -c, --config URL|path  URL or local path to file with targets list
+  --proxies URL|path     URL or local path(ex. proxies.txt) to file with proxies to use
+  --proxy [PROXY ...]    List of proxies to use, separated by spaces
+  --http-methods GET     List of HTTP(L7) methods to use (default is GET).
 
-      -h, --help             show all available options
-      -t, --threads 8000     Number of threads (default is 8000 if CPU > 1, 4000 otherwise)
-      --copies 1             Number of copies to run (default is 1). Use "auto" to set the value automatically
-      --itarmy               Use targets from https://itarmy.com.ua/  
-      --lang {en,ua}         Select language (default is ua)
-      --vpn                  Use both my IP and proxies. Optionally, specify a chance of using my IP (default is 2%)
-      -c, --config URL|path  URL or local path to file with targets list
-      --proxies URL|path     URL or local path(ex. proxies.txt) to file with proxies to use
-      --proxy [PROXY ...]    List of proxies to use, separated by spaces
-      --http-methods GET     List of HTTP(L7) methods to use (default is GET).
-
-    positional arguments:
-       targets               List of targets, separated by space
+positional arguments:
+   targets               List of targets, separated by space
+```
 
 ### 5. 🐳 Community (mostly in Ukrainian)
 - [Detailed (unofficial) installation instructions](docs/installation.md)
