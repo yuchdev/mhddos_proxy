@@ -13,11 +13,11 @@
 - **10.06.2022** Додано зручний спосіб вказати власний проксі напряму в команді запуску (параметр `--proxy`)
 - **08.06.2022** Додано налаштування `--copies auto` для автоматичного вибору значення з врахуванням доступних ресурсів
 
-### 1. 💽 Встановлення
+### 1. 💽 Варіанти встановлення
 
-#### 1.1 Windows installer https://itarmy.com.ua/instruction/#mhddos/#windows
+#### A) Windows installer https://itarmy.com.ua/instruction/#mhddos/#windows
 
-#### 1.2 Python (якщо не працює - спробуйте `python` або `python3.10` замість `python3`)
+#### B) Python (якщо не працює - спробуйте `python` або `python3.10` замість `python3`)
 
 Потребує [Python](https://www.python.org/downloads/) та [Git](https://git-scm.com/download/)
 
@@ -25,7 +25,7 @@
     cd mhddos_proxy
     python3 -m pip install -r requirements.txt
 
-#### 1.3 Docker
+#### C) Docker
 
 Встановіть і запустіть Docker: https://docs.docker.com/desktop/#download-and-install
 

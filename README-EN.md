@@ -13,11 +13,11 @@
 - **10.06.2022** Introduced `--proxy` option for providing custom proxies directly from command args
 - **08.06.2022** Added `--copies auto` option to set the value automatically based on the resources available
 
-### 1. 💽 Installation
+### 1. 💽 Installation options
 
-#### 1.1 Windows installer https://itarmy.com.ua/instruction/#mhddos/#windows
+#### A) Windows installer https://itarmy.com.ua/instruction/#mhddos/#windows
 
-#### 1.2 Python (if it doesn't work, try `python` or `python3.10` instead of `python3`)
+#### B) Python (if it doesn't work, try `python` or `python3.10` instead of `python3`)
 
 Requires [Python](https://www.python.org/downloads/) and [Git](https://git-scm.com/download/)
 
@@ -25,7 +25,7 @@ Requires [Python](https://www.python.org/downloads/) and [Git](https://git-scm.c
     cd mhddos_proxy
     python3 -m pip install -r requirements.txt
 
-#### 1.3 Docker
+#### C) Docker
 
 Install and start Docker: https://docs.docker.com/desktop/#download-and-install
 
