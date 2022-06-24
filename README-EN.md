@@ -57,8 +57,8 @@ All options can be combined, you can specify them either before and after the li
 - Number of copies: `--copies X` or `--copies auto` - in case you have 4+ CPU and stable network 100+ Mb/s
 
 ### 4. 🐳 Community (mostly in Ukrainian)
+- [Detailed (unofficial) installation instructions](docs/installation.md)
 - [Create a botnet of 30+ free and standalone Linux servers](https://auto-ddos.notion.site/dd91326ed30140208383ffedd0f13e5c)
-- [Detailed analysis of mhddos_proxy and installation instructions](docs/installation.md)
 - [Scripts with automatic install](https://t.me/ddos_separ/1126)
 - [Analysis of mhddos_proxy](https://telegra.ph/Anal%D1%96z-zasobu-mhddos-proxy-04-01)
 - [Example of running via docker on OpenWRT](https://youtu.be/MlL6fuDcWlI)
@@ -79,7 +79,7 @@ All options can be combined, you can specify them either before and after the li
       targets                List of targets, separated by space
     
      optional arguments:
-      -h, --help             show this help message and exit
+      -h, --help             show all available options
       -c, --config URL|path  URL or local path to file with targets list
       -t, --threads 8000     Number of threads (default is 8000 if CPU > 1, 4000 otherwise)
       --vpn                  Use both my IP and proxies. Optionally, specify a chance of using my IP (default is 2%)

@@ -79,7 +79,7 @@
       targets                List of targets, separated by space
     
     optional arguments:
-      -h, --help             show this help message and exit
+      -h, --help             show all available options
       -c, --config URL|path  URL or local path to file with targets list
       -t, --threads 8000     Number of threads (default is 8000 if CPU > 1, 4000 otherwise)
       --vpn                  Use both my IP and proxies. Optionally, specify a chance of using my IP (default is 2%)
