@@ -1,4 +1,5 @@
 import base64
+import json
 from typing import Dict, Optional, Set
 
 from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
@@ -28,6 +29,9 @@ class Target:
         options: Optional[Options] = None,
         addr: Optional[str] = None
     ):
+        if method and method not in Methods.ALL_METHODS:
+            raise ValueError(f'Invalid method {method}')
+
         self.url = url
         self.method = method
         self.options = options or {}
@@ -45,17 +49,25 @@ class Target:
     def from_string(cls, raw: str) -> "Target":
         parts = [part.strip() for part in raw.split(" ")]
         n_parts = len(parts)
-        url = URL(Target.prepare_url(parts[0]))
+        url = URL(cls.prepare_url(parts[0]))
 
         method = None
         if n_parts > 1:
             method = parts[1].upper()
-            if method not in Methods.ALL_METHODS:
-                raise ValueError(f'Invalid method {method}')
 
         options = dict(tuple(part.split("=")) for part in parts[2:])
         addr = url.host if inet.is_address(url.host) else None
         return cls(url, method, options, addr)
+
+    @classmethod
+    def from_dict(cls, raw: dict) -> "Target":
+        url = URL(cls.prepare_url(raw['target']))
+        return Target(
+            url=url,
+            method=raw.get('method'),
+            addr=raw.get('ip'),
+            options=raw.get('options'),
+        )
 
     @staticmethod
     def prepare_url(target: str) -> str:
@@ -122,15 +134,24 @@ class TargetsLoader:
             raise RuntimeError('Failed to load configuration')
 
         content = self._possibly_decrypt(content).decode()
-
         targets = []
-        for row in content.splitlines():
-            target = row.strip()
-            if target and not target.startswith('#'):
+
+        try:
+            data = json.loads(content)
+            for config in data['targets']:
                 try:
-                    targets.append(Target.from_string(target))
+                    targets.append(Target.from_dict(config))
                 except Exception:
-                    logger.warning(f'{cl.MAGENTA}Failed to parse: {target}{cl.RESET}')
+                    logger.warning(f'{cl.MAGENTA}Failed to parse: {config}{cl.RESET}')
+
+        except json.JSONDecodeError:
+            for row in content.splitlines():
+                target = row.strip()
+                if target and not target.startswith('#'):
+                    try:
+                        targets.append(Target.from_string(target))
+                    except Exception:
+                        logger.warning(f'{cl.MAGENTA}Failed to parse: {target}{cl.RESET}')
 
         return targets
 
