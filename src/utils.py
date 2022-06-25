@@ -7,6 +7,7 @@ from zlib import crc32
 class GOSSolver:
 
     DEFAULT_A = 1800
+    MAX_RPC = 100
 
     _path = bytes.fromhex("68747470733a2f2f7777772e676f7375736c7567692e72752f5f5f6a7363682f736368656d612e6a736f6e").decode()
     _verifier = bytes.fromhex("5f5f6a7363682f7374617469632f7363726970742e6a73")
@@ -24,7 +25,7 @@ class GOSSolver:
     def _challenge(self, value: str) -> str:
         return md5(value.encode()).digest().hex()
 
-    def verify(self, resp: bytes) -> bool:
+    def bypass(self, resp: bytes) -> bool:
         return self._verifier not in resp
 
     def time_bucket(self, a):

