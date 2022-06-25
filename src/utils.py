@@ -37,8 +37,8 @@ class GOSSolver:
         if current is None:
             return None
         next_bucket, _, _ = current
-        now_bucket = self.time_bucket(a)
-        if next_bucket > now_bucket + self.CACHE_EXPIRE_THRESHOLD:
+        now_bucket = self.time_bucket(a + self.CACHE_EXPIRE_THRESHOLD)
+        if next_bucket > now_bucket:
             return current
         # evict from the cache
         del self._cache[ip]
