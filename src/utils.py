@@ -7,6 +7,7 @@ from zlib import crc32
 class GOSSolver:
 
     DEFAULT_A = 1800
+    CACHE_EXPIRE_THRESHOLD = 1800*0.1
     MAX_RPC = 100
     OWN_IP_KEY = "__OWN__"
 
@@ -35,9 +36,9 @@ class GOSSolver:
         current = self._cache.get(ip)
         if current is None:
             return None
-        bucket, _, _ = current
-        new_bucket = self.time_bucket(a)
-        if bucket > new_bucket:
+        next_bucket, _, _ = current
+        now_bucket = self.time_bucket(a)
+        if next_bucket > now_bucket + self.CACHE_EXPIRE_THRESHOLD:
             return current
         # evict from the cache
         del self._cache[ip]
