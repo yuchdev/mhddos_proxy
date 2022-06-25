@@ -1,5 +1,5 @@
-from hashlib import md5
 import time
+from hashlib import md5
 from typing import Dict, Optional, Tuple
 from zlib import crc32
 
@@ -23,22 +23,21 @@ class GOSSolver:
     def path(self) -> str:
         return self._path
 
-    def _challenge(self, value: str) -> str:
-        return md5(value.encode()).digest().hex()
-
     def bypass(self, resp: bytes) -> bool:
         return self._verifier not in resp
 
     def time_bucket(self, a):
         ts = int(time.time())
-        return ts - ts%a
+        return ts - ts % a
 
     def lookup(self, a, ip) -> Optional[Tuple[int, str, Dict[str, str]]]:
         current = self._cache.get(ip)
-        if current is None: return None
-        bucket, _, _= current
+        if current is None:
+            return None
+        bucket, _, _ = current
         new_bucket = self.time_bucket(a)
-        if bucket > new_bucket: return current
+        if bucket > new_bucket:
+            return current
         # evict from the cache
         del self._cache[ip]
         return None
@@ -47,14 +46,16 @@ class GOSSolver:
         a, ip, cn = resp["a"], resp["ip"], resp["cn"]
         bucket = self.time_bucket(a)
         value = f"{ua}:{ip}:{bucket}"
+
+        hasher = md5
         for pos in range(10_000_000):
-            response = self._challenge(f"{value}{pos}")
-            if response[6:10] == "3fe3":
+            response = hasher(f'{value}{pos}'.encode()).hexdigest()
+            if response[6:10] == '3fe3':
                 cookies = {
                     cn: response.upper(),
                     f"{cn}_2": pos,
                     f"{cn}_3": crc32(value.encode())
                 }
-                self._cache[cache_key] = (bucket+a, ua, cookies)
-                return (bucket+a, cookies)
+                self._cache[cache_key] = (bucket + a, ua, cookies)
+                return bucket + a, cookies
         raise ValueError("invalid input")
