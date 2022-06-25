@@ -499,7 +499,7 @@ class AsyncTcpFlood(FloodBase):
                                 break
                     await asyncio.sleep(1.0)
             finally:
-                self._connections.remove(conn_id)
+                self._connections.discard(conn_id)
         return packets_sent > 0
 
     async def CFB(self, on_connect=None) -> bool:
