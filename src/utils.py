@@ -1,5 +1,5 @@
 import time
-from hashlib import md5
+from _md5 import md5
 from typing import Dict, Optional, Tuple
 from zlib import crc32
 
@@ -10,7 +10,8 @@ class GOSSolver:
     MAX_RPC = 100
     OWN_IP_KEY = "__OWN__"
 
-    _path = bytes.fromhex("68747470733a2f2f7777772e676f7375736c7567692e72752f5f5f6a7363682f736368656d612e6a736f6e").decode()
+    _path = bytes.fromhex(
+        "68747470733a2f2f7777772e676f7375736c7567692e72752f5f5f6a7363682f736368656d612e6a736f6e").decode()
     _verifier = bytes.fromhex("5f5f6a7363682f7374617469632f7363726970742e6a73")
 
     # this is going to be shared between all tasks
