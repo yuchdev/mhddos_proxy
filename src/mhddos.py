@@ -457,6 +457,7 @@ class AsyncTcpFlood(FloodBase):
             'Sec-Fetch-Site': 'none',
             'Sec-Fetch-User': '?1',
             'Pragma': 'no-cache',
+            'Accept-Language': 'ru-RU, ru;q=0.9',
         }
         async with aiohttp.ClientSession(
             connector=connector,
