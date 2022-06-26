@@ -73,7 +73,7 @@ TRANSLATIONS = {
     },
     'due to the limitations of your system': {
         'ua': 'через обмеження вашої системи',
-        'es': 'due to the limitations of your system'
+        'es': 'debido a las limitaciones de tu sistema'
     },
     'Shutting down...': {
         'ua': 'Завершуємо роботу...',
