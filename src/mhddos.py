@@ -235,7 +235,7 @@ class AsyncTcpFlood(FloodBase):
 
         return await self._exec_proto(conn, on_connect, on_close)
 
-    async def HTTP(self, on_connect=None) -> bool:
+    async def HTTP_TEMPLATE(self, on_connect=None) -> bool:
         def payload():
             get_opt = self._target.option
 
