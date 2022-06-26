@@ -8,7 +8,6 @@ from string import ascii_letters, digits
 from typing import Dict, Optional, Tuple
 from zlib import crc32
 
-import aiohttp
 from jinja2 import Environment
 
 from src.proxies import NoProxySet
@@ -67,12 +66,6 @@ class Tools:
             "int": random.randint,
             "str": Tools.rand_str,
         })
-
-
-def request_info_size(request: aiohttp.RequestInfo) -> int:
-    headers = "\r\n".join(f"{k}: {v}" for k, v in request.headers.items())
-    status_line = f"{request.method} {request.url} HTTP/1.1"
-    return len(f"{status_line}\r\n{headers}\r\n\r\n".encode())
 
 
 class GOSSolver:
