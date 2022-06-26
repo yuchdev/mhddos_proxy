@@ -16,10 +16,6 @@ Options = Dict[str, str]
 
 
 class Target:
-    OPTION_IP = "ip"
-    OPTION_RPC = "rpc"
-    OPTION_HIGH_WATERMARK = "watermark"
-
     __slots__ = ['url', 'method', 'options', 'addr', 'hash']
 
     def __init__(
@@ -35,7 +31,7 @@ class Target:
         self.url = url
         self.method = method
         self.options = options or {}
-        self.addr = self.option(Target.OPTION_IP, addr)
+        self.addr = self.option("ip", addr)
 
         self.hash = hash((self.url, self.method, tuple(self.options.items()), self.addr))
 
@@ -55,9 +51,8 @@ class Target:
         if n_parts > 1:
             method = parts[1].upper()
 
-        options = dict(tuple(part.split("=")) for part in parts[2:])
         addr = url.host if inet.is_address(url.host) else None
-        return cls(url, method, options, addr)
+        return cls(url, method, {}, addr)
 
     @classmethod
     def from_dict(cls, raw: dict) -> "Target":
@@ -90,7 +85,7 @@ class Target:
     def is_udp(self) -> bool:
         return self.url.scheme == "udp"
 
-    def option(self, key: str, default: Optional[str] = None) -> Optional[str]:
+    def option(self, key: str, default: Optional[object] = None) -> Optional[object]:
         return self.options.get(key, default)
 
     @property
