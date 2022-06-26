@@ -79,7 +79,7 @@ class cl:
 
 class Methods:
     HTTP_METHODS: Set[str] = {
-        "CFB", "BYPASS", "GET", "RGET", "HEAD", "RHEAD", "POST", "STRESS", "DYN", "SLOW",
+        "CFB", "BYPASS", "HTTP", "GET", "RGET", "HEAD", "RHEAD", "POST", "STRESS", "DYN", "SLOW",
         "NULL", "COOKIE", "PPS", "EVEN", "AVB",
         "APACHE", "XMLRPC", "DOWNLOADER", "RHEX", "STOMP", "GOSPASS",
         # this is not HTTP method (rather TCP) but this way it works with --http-methods

