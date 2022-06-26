@@ -1,3 +1,4 @@
+from collections import defaultdict
 import math
 import random
 import struct
@@ -5,7 +6,7 @@ import time
 from _md5 import md5
 from _socket import inet_ntoa
 from string import ascii_letters, digits
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 from zlib import crc32
 
 from jinja2 import Environment
@@ -59,13 +60,28 @@ class Tools:
             struct.pack('>I', random.randint(1, 0xffffffff))
         )
 
-    @staticmethod
-    def render(raw):
-        template = JINJA.from_string(raw)
-        return template.render({
+
+class Templater:
+
+    _template_cache = {}
+    _render_max_threshold = 256
+    _render_cache: Dict[str, List[str]] = defaultdict(list)
+
+    @classmethod
+    def render(cls, raw):
+        template = cls._template_cache.get(raw)
+        if template is None:
+            template = JINJA.from_string(raw)
+            cls._template_cache[raw] = template
+        options = cls._render_cache(raw)
+        if len(options) >= cls._render_max_threshold:
+            return random.choice(options)
+        rendered = template.render({
             "int": random.randint,
             "str": Tools.rand_str,
         })
+        options.append(rendered)
+        return rendered
 
 
 class GOSSolver:

