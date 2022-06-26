@@ -1,6 +1,5 @@
 import asyncio
 import errno
-import math
 import random
 import struct
 import time
@@ -9,9 +8,8 @@ from copy import copy
 from dataclasses import dataclass
 from functools import partial
 from os import urandom as randbytes
-from socket import (inet_ntoa, SO_LINGER, SO_RCVBUF, SOL_SOCKET)
+from socket import (SO_LINGER, SO_RCVBUF, SOL_SOCKET)
 from ssl import CERT_NONE, create_default_context, SSLContext
-from string import ascii_letters
 from typing import Callable, Optional, Set, Tuple
 
 import aiohttp
@@ -24,10 +22,9 @@ from yarl import URL
 from . import proxy_proto
 from .core import Methods
 from .proto import DatagramFloodIO, FloodIO, FloodOp, FloodSpec, FloodSpecType, TrexIO
-from .proxies import NoProxySet, ProxySet
+from .proxies import ProxySet
 from .targets import Target
-from .utils import GOSSolver
-from .vendor.rotate import params as rotate_params, suffix as rotate_suffix
+from .utils import GOSSolver, Tools
 from .vendor.useragents import USERAGENTS
 
 
@@ -61,54 +58,6 @@ trex_ctx = SSL.Context(SSL.TLSv1_2_METHOD)
 # NULL-SHA256             TLSv1.2 Kx=RSA      Au=RSA  Enc=None      Mac=SHA256
 trex_ctx.set_cipher_list(b"RSA")
 trex_ctx.set_verify(SSL.VERIFY_NONE, None)
-
-
-class Tools:
-    @staticmethod
-    def humanbits(i: int) -> str:
-        MULTIPLES = ["Bit", "kBit", "MBit", "GBit"]
-        if i > 0:
-            base = 1024
-            multiple = math.trunc(math.log2(i) / math.log2(base))
-            value = i / pow(base, multiple)
-            return f'{value:.2f} {MULTIPLES[multiple]}'
-        else:
-            return '0 Bit'
-
-    @staticmethod
-    def humanformat(i: int) -> str:
-        MULTIPLES = ['', 'k', 'M', 'G']
-        if i > 0:
-            base = 1000
-            multiple = math.trunc(math.log2(i) / math.log2(base))
-            value = i / pow(base, multiple)
-            return f'{value:.2f}{MULTIPLES[multiple]}'
-        else:
-            return '0'
-
-    @staticmethod
-    def parse_params(target: Target, proxies):
-        url, ip = target.url, target.addr
-        result = url.host.lower().endswith(rotate_suffix)
-        if result:
-            return random.choice(rotate_params), NoProxySet
-        return (url, ip), proxies
-
-    @staticmethod
-    def rand_str(length=16):
-        return ''.join(random.choices(ascii_letters, k=length))
-
-    @staticmethod
-    def rand_ipv4():
-        return inet_ntoa(
-            struct.pack('>I', random.randint(1, 0xffffffff))
-        )
-
-
-def request_info_size(request: aiohttp.RequestInfo) -> int:
-    headers = "\r\n".join(f"{k}: {v}" for k, v in request.headers.items())
-    status_line = f"{request.method} {request.url} HTTP/1.1"
-    return len(f"{status_line}\r\n{headers}\r\n\r\n".encode())
 
 
 @dataclass

@@ -1,7 +1,66 @@
+import math
+import random
+import struct
 import time
 from _md5 import md5
+from _socket import inet_ntoa
+from string import ascii_letters
 from typing import Dict, Optional, Tuple
 from zlib import crc32
+
+import aiohttp
+
+from src.proxies import NoProxySet
+from src.targets import Target
+from .vendor.rotate import params as rotate_params, suffix as rotate_suffix
+
+
+class Tools:
+    @staticmethod
+    def humanbits(i: int) -> str:
+        MULTIPLES = ["Bit", "kBit", "MBit", "GBit"]
+        if i > 0:
+            base = 1024
+            multiple = math.trunc(math.log2(i) / math.log2(base))
+            value = i / pow(base, multiple)
+            return f'{value:.2f} {MULTIPLES[multiple]}'
+        else:
+            return '0 Bit'
+
+    @staticmethod
+    def humanformat(i: int) -> str:
+        MULTIPLES = ['', 'k', 'M', 'G']
+        if i > 0:
+            base = 1000
+            multiple = math.trunc(math.log2(i) / math.log2(base))
+            value = i / pow(base, multiple)
+            return f'{value:.2f}{MULTIPLES[multiple]}'
+        else:
+            return '0'
+
+    @staticmethod
+    def parse_params(target: Target, proxies):
+        url, ip = target.url, target.addr
+        result = url.host.lower().endswith(rotate_suffix)
+        if result:
+            return random.choice(rotate_params), NoProxySet
+        return (url, ip), proxies
+
+    @staticmethod
+    def rand_str(length=16):
+        return ''.join(random.choices(ascii_letters, k=length))
+
+    @staticmethod
+    def rand_ipv4():
+        return inet_ntoa(
+            struct.pack('>I', random.randint(1, 0xffffffff))
+        )
+
+
+def request_info_size(request: aiohttp.RequestInfo) -> int:
+    headers = "\r\n".join(f"{k}: {v}" for k, v in request.headers.items())
+    status_line = f"{request.method} {request.url} HTTP/1.1"
+    return len(f"{status_line}\r\n{headers}\r\n\r\n".encode())
 
 
 class GOSSolver:
