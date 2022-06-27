@@ -9,6 +9,7 @@
 
 ### ⏱ Останні оновлення
 
+- **27.06.2022** Додано іспанську локалізацію - параметр `--lang es`
 - **22.06.2022** Покращено продуктивність роботи. Параметр `--debug` більше не підтримується через негативний вплив на продуктивність
 - **10.06.2022** Додано зручний спосіб вказати власний проксі напряму в команді запуску (параметр `--proxy`)
 - **08.06.2022** Додано налаштування `--copies auto` для автоматичного вибору значення з врахуванням доступних ресурсів
@@ -65,7 +66,7 @@ usage: runner.py [-t THREADS] [--copies COPIES] [--itarmy] [--lang {ua,en}] [--v
   -t, --threads 8000     Number of threads (default is 8000 if CPU > 1, 4000 otherwise)
   --copies 1             Number of copies to run (default is 1). Use "auto" to set the value automatically
   --itarmy               Use targets from https://itarmy.com.ua/  
-  --lang {en,ua}         Select language (default is ua)
+  --lang {ua,en,es}      Select language (default is ua)
   --vpn                  Use both my IP and proxies. Optionally, specify a chance of using my IP (default is 2%)
   -c, --config URL|path  URL or local path to file with targets list
   --proxies URL|path     URL or local path(ex. proxies.txt) to file with proxies to use
