@@ -71,6 +71,8 @@ class Templater:
     _context = {
         "int": random.randint,
         "str": Tools.rand_str,
+        "digits": digits,
+        "letters": ascii_letters,
     }
 
     @classmethod
