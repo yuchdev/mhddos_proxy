@@ -1,17 +1,17 @@
 # @formatter:off
-from contextlib import suppress
 try: import colorama; colorama.init()
 except:raise
 # @formatter:on
 import asyncio
 import multiprocessing as mp
-from multiprocessing import shared_memory
 import os
 import random
 import signal
 import sys
 import time
+from contextlib import suppress
 from functools import partial
+from multiprocessing import shared_memory
 from typing import List, Optional, Set, Tuple, Union
 
 from src.cli import init_argparse
