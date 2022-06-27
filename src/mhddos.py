@@ -11,7 +11,7 @@ from functools import partial
 from os import urandom as randbytes
 from socket import (SO_LINGER, SO_RCVBUF, SOL_SOCKET)
 from ssl import CERT_NONE, create_default_context, SSLContext
-from typing import Callable, Optional, Set, Tuple
+from typing import Callable, Mapping, Optional, Set, Tuple
 
 import aiohttp
 import async_timeout
@@ -160,7 +160,7 @@ class AsyncTcpFlood(FloodBase):
         }
         return headers
 
-    def build_request(self, *, req_type=None, path_qs=None, headers: Optional[dict] = None, body=None) -> bytes:
+    def build_request(self, *, req_type=None, path_qs=None, headers: Optional[Mapping] = None, body=None) -> bytes:
         req_type = req_type or self._req_type
         path_qs = path_qs or self._url.raw_path_qs
         headers = headers or self.default_headers()
@@ -206,7 +206,8 @@ class AsyncTcpFlood(FloodBase):
             on_close=on_close,
             settings=self._settings,
             flood_spec=FloodSpec.from_any(
-                payload_type, payload, num_packets),
+                payload_type, payload, num_packets
+            ),
             connections=self._connections,
             on_connect=on_connect,
         )
@@ -244,28 +245,32 @@ class AsyncTcpFlood(FloodBase):
             get_opt = self._target.option
 
             req_type = get_opt('verb')
-            path_qs = get_opt('path_qs')
-            body = get_opt('body')
+            raw_path_qs = get_opt('path_qs')
+            raw_body = get_opt('body')
             raw_headers = get_opt('headers')
             include_default_headers = get_opt('include_default_headers', True)
 
-            headers = CaseInsensitiveDict(self.default_headers()) if include_default_headers else {}
+            headers = CaseInsensitiveDict(self.default_headers() if include_default_headers else {})
             if raw_headers:
                 if isinstance(raw_headers, dict):
-                    parsed = raw_headers
+                    render_headers = False
+                    headers.update(raw_headers)
                 else:
-                    parsed = json.loads(Tools.render(raw_headers))
-                headers.update(parsed)
+                    render_headers = True
 
             def payload():
-                if path_qs:
-                    path_qs = Templater.render(path_qs)
+                path_qs = None
+                if raw_path_qs:
+                    path_qs = Templater.render(raw_path_qs)
 
-                if body:
-                    body = Templater.render(body)
+                if render_headers:
+                    parsed = json.loads(Templater.render(raw_headers))
+                    headers.update(parsed)
+
+                body = None
+                if raw_body:
+                    body = Templater.render(raw_body)
                     headers['Content-Length'] = str(len(body))
-                else:
-                    headers['Content-Length'] = 0
 
                 return self.build_request(
                     req_type=req_type,
