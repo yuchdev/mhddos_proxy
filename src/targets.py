@@ -139,8 +139,8 @@ class TargetsLoader:
             for config in data['targets']:
                 try:
                     targets.append(Target.from_dict(config))
-                except Exception:
-                    logger.warning(f'{cl.MAGENTA}Failed to parse: {config}{cl.RESET}')
+                except Exception as exc:
+                    logger.warning(f'{cl.MAGENTA}Failed to parse {config} ({exc}){cl.RESET}')
 
         except json.JSONDecodeError:
             for row in content.splitlines():
@@ -148,8 +148,8 @@ class TargetsLoader:
                 if target and not target.startswith('#'):
                     try:
                         targets.append(Target.from_string(target))
-                    except Exception:
-                        logger.warning(f'{cl.MAGENTA}Failed to parse: {target}{cl.RESET}')
+                    except Exception as exc:
+                        logger.warning(f'{cl.MAGENTA}Failed to parse {target} ({exc}){cl.RESET}')
 
         return targets
 
