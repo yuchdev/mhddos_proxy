@@ -1,3 +1,5 @@
+- **22.06.2022** 
+  - Performance improvements. The `--debug` option is deprecated to avoid negative impact on performance
 - **10.06.2022** 
   - Introduced `--proxy` option for providing custom proxies directly from command args
 - **08.06.2020**
