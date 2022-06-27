@@ -121,7 +121,10 @@ async def run_udp_flood(runnable: AsyncUdpFlood) -> None:
                 num_failures = 0
 
 
-async def run_ddos(args, process_index: int, conn_stats: shared_memory.ShareableList):
+async def run_ddos(
+    args, threads, conn_stats: shared_memory.ShareableList,
+    process_index: int, num_copies: int
+):
     local_config, config = await load_system_configs()
     if config is None:
         config = local_config
@@ -137,19 +140,6 @@ async def run_ddos(args, process_index: int, conn_stats: shared_memory.Shareable
         args.scheduler_initial_capacity,
         args.scheduler_fork_scale
     )
-
-    # we are going to fetch proxies even in case we have only UDP
-    # targets because the list of targets might change at any point in time
-    threads = args.threads or DEFAULT_THREADS
-    max_conns = fix_ulimits()
-    if max_conns is not None:
-        max_conns -= LIMITS_PADDING  # keep some for other needs
-        if max_conns < threads:
-            logger.warning(
-                f"{cl.MAGENTA}{t('The number of threads has been reduced to')} {max_conns} "
-                f"{t('due to the limitations of your system')}{cl.RESET}"
-            )
-            threads = max_conns
 
     logger.info(f"{cl.GREEN}{t('Launching the attack...')}{cl.RESET}")
     # Give user some time to read the output
@@ -312,7 +302,7 @@ async def run_ddos(args, process_index: int, conn_stats: shared_memory.Shareable
         it, cycle_start = 0, time.perf_counter()
         refresh_rate = 5
 
-        print_status(threads, use_my_ip, False)
+        print_status(threads * num_copies, use_my_ip, False)
         while True:
             await asyncio.sleep(refresh_rate)
             num_connections = sum(list(conn_stats))
@@ -326,7 +316,7 @@ async def run_ddos(args, process_index: int, conn_stats: shared_memory.Shareable
                 passed = time.perf_counter() - cycle_start
                 overtime = bool(passed > 2 * refresh_rate)
                 print_banner(args)
-                print_status(threads, use_my_ip, overtime)
+                print_status(threads * num_copies, use_my_ip, overtime)
 
             it, cycle_start = it + 1, time.perf_counter()
 
@@ -404,14 +394,19 @@ def _main_signal_handler(ps, *args):
             p.terminate()
 
 
-def _worker_process(args, lang: str, process_index: int, conn_stats: shared_memory.ShareableList):
+def _worker_process(
+    args, threads, lang: str,
+    conn_stats: shared_memory.ShareableList,
+    process_index: int, num_copies: int
+):
     try:
         if IS_DOCKER:
             random.seed()
         set_language(lang)  # set language again for the subprocess
+        fix_ulimits()
         setup_worker_logging(process_index)
         loop = setup_event_loop()
-        loop.run_until_complete(run_ddos(args, process_index, conn_stats))
+        loop.run_until_complete(run_ddos(args, threads, conn_stats, process_index, num_copies))
     except KeyboardInterrupt:
         with suppress(Exception):
             conn_stats.shm.close()
@@ -439,15 +434,23 @@ def main():
             f"{cl.MAGENTA}{t('The number of copies is automatically reduced to')} {max_copies}{cl.RESET}"
         )
 
+    total_threads = (args.threads or DEFAULT_THREADS) * num_copies
     port_range_size = detect_port_range_size()
-    max_ports = port_range_size - LIMITS_PADDING
-    if num_copies * (args.threads or DEFAULT_THREADS) > max_ports:
-        args.threads = int(max_ports / num_copies)
+    max_threads = port_range_size - LIMITS_PADDING
+    max_conns = fix_ulimits()
+    if max_conns is not None:
+        max_threads = min(max_threads, max_conns - LIMITS_PADDING)
+
+    if total_threads > max_threads:
+        total_threads = max_threads
         if args.threads:
+            print()
             logger.warning(
-                f"{cl.MAGENTA}{t('The number of threads has been reduced to')} {args.threads} "
+                f"{cl.MAGENTA}{t('The total number of threads has been reduced to')} {total_threads} "
                 f"{t('due to the limitations of your system')}{cl.RESET}"
             )
+
+    threads = int(total_threads / num_copies)
 
     print_banner(args)
 
@@ -473,7 +476,7 @@ def main():
         for index in range(num_copies):
             p = mp.Process(
                 target=_worker_process,
-                args=(args, lang, index, conn_stats),
+                args=(args, threads, lang, conn_stats, index, num_copies),
                 daemon=True,
             )
             processes.append(p)

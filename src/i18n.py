@@ -50,8 +50,8 @@ TRANSLATIONS = {
     'A new version is available, update is recommended': {
         'ua': 'Доступна нова версія, рекомендуємо оновити'
     },
-    'The number of threads has been reduced to': {
-        'ua': 'Кількість потоків зменшено до'
+    'The total number of threads has been reduced to': {
+        'ua': 'Загальну кількість потоків зменшено до'
     },
     'due to the limitations of your system': {
         'ua': 'через обмеження вашої системи'
