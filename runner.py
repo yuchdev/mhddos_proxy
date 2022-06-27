@@ -4,6 +4,7 @@ except:raise
 # @formatter:on
 import asyncio
 import multiprocessing as mp
+from multiprocessing import shared_memory
 import os
 import random
 import signal
@@ -119,7 +120,7 @@ async def run_udp_flood(runnable: AsyncUdpFlood) -> None:
                 num_failures = 0
 
 
-async def run_ddos(args):
+async def run_ddos(args, process_index: int, cross_stats: shared_memory.ShareableList):
     local_config, config = await load_system_configs()
     if config is None:
         config = local_config
@@ -193,7 +194,8 @@ async def run_ddos(args):
     tcp_task_group: Optional[GeminoCurseTaskSet] = None
 
     async def install_targets(targets):
-        print()
+        if process_index == 0:
+            print()
         nonlocal tcp_task_group
 
         # cancel running flooders
@@ -265,11 +267,13 @@ async def run_ddos(args):
                 f"{cl.YELLOW} {t('Port')}:{cl.BLUE} %s,"
                 f"{cl.YELLOW} {t('Method')}:{cl.BLUE} %s{cl.RESET}" % flooder.desc
             )
-        print()
+        if process_index == 0:
+            print()
 
     targets_loader = TargetsLoader(args.targets, args.targets_config, config, it_army=args.itarmy)
     try:
-        print()
+        if process_index == 0:
+            print()
         initial_targets = await targets_loader.reload()
     except Exception as exc:
         logger.error(f"{cl.RED}{t('Targets loading failed')} {exc}{cl.RESET}")
@@ -291,6 +295,19 @@ async def run_ddos(args):
     await install_targets(initial_targets)
 
     tasks = []
+   
+    async def cross_stats_collector():
+        stats_collection_rate = 1.0
+        while True:
+            try:
+                await asyncio.sleep(stats_collection_rate)
+                cross_stats[process_index] = len(connections)
+            except asyncio.CancelledError:
+                raise
+            except:
+                pass
+   
+    tasks.append(loop.create_task(cross_stats_collector()))
 
     async def stats_printer():
         net_stats = NetStats()
@@ -300,10 +317,11 @@ async def run_ddos(args):
         print_status(threads, use_my_ip, False)
         while True:
             await asyncio.sleep(refresh_rate)
+            num_connections = sum(list(cross_stats))
             show_statistic(
                 net_stats,
                 tcp_task_group.capacity if tcp_task_group is not None else None,
-                len(connections),
+                num_connections,
             )
             if it >= 20:
                 it = 0
@@ -315,7 +333,8 @@ async def run_ddos(args):
             it, cycle_start = it + 1, time.perf_counter()
 
     # setup coroutine to print stats
-    tasks.append(loop.create_task(stats_printer()))
+    if process_index == 0:
+        tasks.append(loop.create_task(stats_printer()))
 
     async def reload_targets():
         period = 15 * 60
@@ -387,15 +406,21 @@ def _main_signal_handler(ps, *args):
             p.terminate()
 
 
-def _worker_process(args, lang: str, process_index: Optional[Tuple[int, int]]):
+def _worker_process(args, lang: str, process_index: Tuple[int, int], cross_stats: str):
+    cross_stats_mem = None
     try:
         if IS_DOCKER:
             random.seed()
         set_language(lang)  # set language again for the subprocess
         setup_worker_logger(process_index)
+        process_index, _ = process_index
+        cross_stats_mem = shared_memory.ShareableList(name=cross_stats)
         loop = setup_event_loop()
-        loop.run_until_complete(run_ddos(args))
+        loop.run_until_complete(run_ddos(args, process_index, cross_stats_mem))
     except KeyboardInterrupt:
+        if cross_stats_mem is not None:
+            with suppress(Exception):
+                cross_stats_mem.shm.close()
         sys.exit()
 
 
@@ -449,9 +474,14 @@ def main():
 
     processes = []
     mp.set_start_method("spawn")
+    cross_stats = shared_memory.ShareableList([0]*num_copies)
     for ind in range(num_copies):
-        pos = (ind + 1, num_copies) if num_copies > 1 else None
-        p = mp.Process(target=_worker_process, args=(args, lang, pos), daemon=True)
+        pos = (ind, num_copies)
+        p = mp.Process(
+            target=_worker_process,
+            args=(args, lang, pos, cross_stats.shm.name),
+            daemon=True
+        )
         processes.append(p)
 
     signal.signal(signal.SIGINT, partial(_main_signal_handler, processes, logger))
@@ -462,6 +492,9 @@ def main():
 
     for p in processes:
         p.join()
+
+    cross_stats.shm.close()
+    cross_stats.shm.unlink()
 
 
 if __name__ == '__main__':

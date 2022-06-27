@@ -31,14 +31,10 @@ logger.setLevel('INFO')
 asyncio_logger.addFilter(RemoveUselessWarnings())
 
 
-def setup_worker_logger(process_index: Optional[Tuple[int, int]]) -> None:
-    if process_index is None:
-        return
+def setup_worker_logger(process_index: Tuple[int, int]) -> None:
     ind, total = process_index
-    formatter = logging.Formatter(
-        f"[{ind}/{total}] {LOGGER_MSG_FORMAT}", datefmt=LOGGER_DATE_FORMAT)
-    with suppress(Exception):
-        logger.parent.handlers[0].setFormatter(formatter)
+    if ind > 0:
+        logger.setLevel(logging.ERROR)
 
 
 ROOT_DIR = Path(__file__).parent.parent
