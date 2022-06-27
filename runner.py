@@ -434,7 +434,8 @@ def main():
             f"{cl.MAGENTA}{t('The number of copies is automatically reduced to')} {max_copies}{cl.RESET}"
         )
 
-    total_threads = (args.threads or DEFAULT_THREADS) * num_copies
+    threads = args.threads or DEFAULT_THREADS
+    total_threads = threads * num_copies
     port_range_size = detect_port_range_size()
     max_threads = port_range_size - LIMITS_PADDING
     max_conns = fix_ulimits()
@@ -442,15 +443,13 @@ def main():
         max_threads = min(max_threads, max_conns - LIMITS_PADDING)
 
     if total_threads > max_threads:
-        total_threads = max_threads
+        threads = int(max_threads / num_copies)
         if args.threads:
             print()
             logger.warning(
-                f"{cl.MAGENTA}{t('The total number of threads has been reduced to')} {total_threads} "
+                f"{cl.MAGENTA}{t('The total number of threads has been reduced to')} {threads * num_copies} "
                 f"{t('due to the limitations of your system')}{cl.RESET}"
             )
-
-    threads = int(total_threads / num_copies)
 
     print_banner(args)
 
