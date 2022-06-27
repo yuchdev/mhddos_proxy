@@ -464,7 +464,7 @@ def main():
         if not python_bin.endswith('.exe'):  # windows is not supported
             new_command = f'./runner.sh {python_bin} ' + ' '.join(sys.argv[1:])
             logger.warning(
-                f"{cl.CYAN}{t('Try running with automatic updates: ')}{new_command}{cl.RESET}"
+                f"{cl.CYAN}{t('Try running with automatic updates')}: {new_command}{cl.RESET}"
             )
             print()
 

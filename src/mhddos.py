@@ -25,7 +25,7 @@ from .core import Methods
 from .proto import DatagramFloodIO, FloodIO, FloodOp, FloodSpec, FloodSpecType, TrexIO
 from .proxies import ProxySet
 from .targets import Target
-from .utils import GOSSolver, Tools, Templater
+from .utils import GOSSolver, Templater, Tools
 from .vendor.useragents import USERAGENTS
 
 
@@ -173,7 +173,7 @@ class AsyncTcpFlood(FloodBase):
         request = (
             f"{req_type} {path_qs} HTTP/1.1\r\n"
             + headers
-            + '\r\n'
+            + '\r\n\r\n'
         )
         if body:
             request += body
@@ -251,12 +251,12 @@ class AsyncTcpFlood(FloodBase):
             include_default_headers = get_opt('include_default_headers', True)
 
             headers = CaseInsensitiveDict(self.default_headers() if include_default_headers else {})
+            render_headers = False
             if raw_headers:
-                if isinstance(raw_headers, dict):
-                    render_headers = False
-                    headers.update(raw_headers)
-                else:
+                if isinstance(raw_headers, str):
                     render_headers = True
+                else:
+                    headers.update(raw_headers)
 
             cache = self._target.cache
 
