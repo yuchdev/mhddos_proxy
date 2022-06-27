@@ -66,7 +66,7 @@ class Templater:
     _template_cache = {}
 
     _render_max_threshold = 256
-    _render_cache: Dict[int, List[str]] = defaultdict(list)
+    _render_cache: Dict[str, List[str]] = defaultdict(list)
 
     _context = {
         "int": random.randint,
@@ -76,20 +76,18 @@ class Templater:
     }
 
     @classmethod
-    def render(cls, raw):
+    def render(cls, raw: str):
         if '{{' not in raw:
             return raw
 
-        tmpl_hash = hash(raw)
-
-        options = cls._render_cache[tmpl_hash]
+        options = cls._render_cache[raw]
         if len(options) >= cls._render_max_threshold:
             return random.choice(options)
 
-        template = cls._template_cache.get(tmpl_hash)
+        template = cls._template_cache.get(raw)
         if template is None:
             template = JINJA.from_string(raw)
-            cls._template_cache[tmpl_hash] = template
+            cls._template_cache[raw] = template
 
         rendered = template.render(cls._context)
         options.append(rendered)
