@@ -75,6 +75,9 @@ class Templater:
 
     @classmethod
     def render(cls, raw):
+        if '{{' not in raw:
+            return raw
+
         tmpl_hash = hash(raw)
 
         options = cls._render_cache[tmpl_hash]

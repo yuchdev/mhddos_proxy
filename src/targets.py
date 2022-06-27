@@ -33,7 +33,8 @@ class Target:
         self.options = options or {}
         self.addr = self.option("ip", addr)
 
-        self.hash = hash((self.url, self.method, tuple(self.options.items()), self.addr))
+        options_str = json.dumps(self.options, sort_keys=True)
+        self.hash = hash((self.url, self.method, options_str, self.addr))
 
     def __eq__(self, other):
         return self.hash == other.hash
