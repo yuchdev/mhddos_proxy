@@ -6,7 +6,7 @@ from _md5 import md5
 from collections import defaultdict
 from socket import inet_ntoa
 from string import ascii_letters, digits
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Optional, Tuple
 from zlib import crc32
 
 from jinja2 import Environment
@@ -62,12 +62,7 @@ class Tools:
 
 
 class Templater:
-
-    _template_cache = {}
-
-    _render_max_threshold = 256
-    _render_cache: Dict[str, List[str]] = defaultdict(list)
-
+    _render_max_mem = 32768  # 32 kb
     _context = {
         "int": random.randint,
         "str": Tools.rand_str,
@@ -76,26 +71,28 @@ class Templater:
     }
 
     @classmethod
-    def render(cls, raw: str):
+    def render(cls, raw: str, cache: dict):
         if '{{' not in raw:
             return raw
 
-        options = cls._render_cache[raw]
-        if len(options) >= cls._render_max_threshold:
-            return random.choice(options)
+        render_cache = cache.setdefault('rendered', defaultdict(list))
+        render_max_threshold = cls._render_max_mem // len(raw)
+        already_rendered = render_cache[raw]
+        if len(already_rendered) >= render_max_threshold:
+            return random.choice(already_rendered)
 
-        template = cls._template_cache.get(raw)
+        template_cache = cache.setdefault('template', {})
+        template = template_cache.get(raw)
         if template is None:
             template = JINJA.from_string(raw)
-            cls._template_cache[raw] = template
+            template_cache[raw] = template
 
         rendered = template.render(cls._context)
-        options.append(rendered)
+        already_rendered.append(rendered)
         return rendered
 
 
 class GOSSolver:
-
     DEFAULT_A = 1800
     MAX_RPC = 100
     OWN_IP_KEY = "__OWN__"

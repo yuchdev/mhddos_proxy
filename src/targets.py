@@ -16,7 +16,7 @@ Options = Dict[str, str]
 
 
 class Target:
-    __slots__ = ['url', 'method', 'options', 'addr', 'hash']
+    __slots__ = ['url', 'method', 'options', 'addr', 'hash', 'cache']
 
     def __init__(
         self,
@@ -35,6 +35,8 @@ class Target:
 
         options_str = json.dumps(self.options, sort_keys=True)
         self.hash = hash((self.url, self.method, options_str, self.addr))
+
+        self.cache = {}  # In case you want to cache something per-target, like templates
 
     def __eq__(self, other):
         return self.hash == other.hash

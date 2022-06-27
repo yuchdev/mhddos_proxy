@@ -258,18 +258,20 @@ class AsyncTcpFlood(FloodBase):
                 else:
                     render_headers = True
 
+            cache = self._target.cache
+
             def payload():
                 path_qs = None
                 if raw_path_qs:
-                    path_qs = Templater.render(raw_path_qs)
+                    path_qs = Templater.render(raw_path_qs, cache)
 
                 if render_headers:
-                    parsed = json.loads(Templater.render(raw_headers))
+                    parsed = json.loads(Templater.render(raw_headers, cache))
                     headers.update(parsed)
 
                 body = None
                 if raw_body:
-                    body = Templater.render(raw_body)
+                    body = Templater.render(raw_body, cache)
                     headers['Content-Length'] = str(len(body))
 
                 return self.build_request(
