@@ -1,4 +1,5 @@
 # @formatter:off
+from contextlib import suppress
 try: import colorama; colorama.init()
 except:raise
 # @formatter:on
@@ -16,7 +17,7 @@ from typing import List, Optional, Set, Tuple, Union
 from src.cli import init_argparse
 from src.core import (
     cl, COPIES_AUTO, CPU_COUNT, DEFAULT_THREADS, LIMITS_PADDING, logger, MAX_COPIES_AUTO, SCHEDULER_MAX_INIT_FRACTION,
-    SCHEDULER_MIN_INIT_FRACTION, setup_worker_logger, UDP_FAILURE_BUDGET_FACTOR, UDP_FAILURE_DELAY_SECONDS,
+    SCHEDULER_MIN_INIT_FRACTION, setup_worker_logging, UDP_FAILURE_BUDGET_FACTOR, UDP_FAILURE_DELAY_SECONDS,
     USE_ONLY_MY_IP,
 )
 from src.i18n import DEFAULT_LANGUAGE, set_language, translate as t
@@ -120,7 +121,7 @@ async def run_udp_flood(runnable: AsyncUdpFlood) -> None:
                 num_failures = 0
 
 
-async def run_ddos(args, process_index: int, cross_stats: shared_memory.ShareableList):
+async def run_ddos(args, process_index: int, conn_stats: shared_memory.ShareableList):
     local_config, config = await load_system_configs()
     if config is None:
         config = local_config
@@ -194,8 +195,7 @@ async def run_ddos(args, process_index: int, cross_stats: shared_memory.Shareabl
     tcp_task_group: Optional[GeminoCurseTaskSet] = None
 
     async def install_targets(targets):
-        if process_index == 0:
-            print()
+        print()
         nonlocal tcp_task_group
 
         # cancel running flooders
@@ -267,13 +267,11 @@ async def run_ddos(args, process_index: int, cross_stats: shared_memory.Shareabl
                 f"{cl.YELLOW} {t('Port')}:{cl.BLUE} %s,"
                 f"{cl.YELLOW} {t('Method')}:{cl.BLUE} %s{cl.RESET}" % flooder.desc
             )
-        if process_index == 0:
-            print()
+        print()
 
     targets_loader = TargetsLoader(args.targets, args.targets_config, config, it_army=args.itarmy)
     try:
-        if process_index == 0:
-            print()
+        print()
         initial_targets = await targets_loader.reload()
     except Exception as exc:
         logger.error(f"{cl.RED}{t('Targets loading failed')} {exc}{cl.RESET}")
@@ -295,19 +293,19 @@ async def run_ddos(args, process_index: int, cross_stats: shared_memory.Shareabl
     await install_targets(initial_targets)
 
     tasks = []
-   
-    async def cross_stats_collector():
+
+    async def conn_stats_collector():
         stats_collection_rate = 1.0
         while True:
             try:
                 await asyncio.sleep(stats_collection_rate)
-                cross_stats[process_index] = len(connections)
+                conn_stats[process_index] = len(connections)
             except asyncio.CancelledError:
                 raise
-            except:
+            except Exception:
                 pass
-   
-    tasks.append(loop.create_task(cross_stats_collector()))
+
+    tasks.append(loop.create_task(conn_stats_collector()))
 
     async def stats_printer():
         net_stats = NetStats()
@@ -317,7 +315,7 @@ async def run_ddos(args, process_index: int, cross_stats: shared_memory.Shareabl
         print_status(threads, use_my_ip, False)
         while True:
             await asyncio.sleep(refresh_rate)
-            num_connections = sum(list(cross_stats))
+            num_connections = sum(list(conn_stats))
             show_statistic(
                 net_stats,
                 tcp_task_group.capacity if tcp_task_group is not None else None,
@@ -406,21 +404,17 @@ def _main_signal_handler(ps, *args):
             p.terminate()
 
 
-def _worker_process(args, lang: str, process_index: Tuple[int, int], cross_stats: str):
-    cross_stats_mem = None
+def _worker_process(args, lang: str, process_index: int, conn_stats: shared_memory.ShareableList):
     try:
         if IS_DOCKER:
             random.seed()
         set_language(lang)  # set language again for the subprocess
-        setup_worker_logger(process_index)
-        process_index, _ = process_index
-        cross_stats_mem = shared_memory.ShareableList(name=cross_stats)
+        setup_worker_logging(process_index)
         loop = setup_event_loop()
-        loop.run_until_complete(run_ddos(args, process_index, cross_stats_mem))
+        loop.run_until_complete(run_ddos(args, process_index, conn_stats))
     except KeyboardInterrupt:
-        if cross_stats_mem is not None:
-            with suppress(Exception):
-                cross_stats_mem.shm.close()
+        with suppress(Exception):
+            conn_stats.shm.close()
         sys.exit()
 
 
@@ -474,27 +468,27 @@ def main():
 
     processes = []
     mp.set_start_method("spawn")
-    cross_stats = shared_memory.ShareableList([0]*num_copies)
-    for ind in range(num_copies):
-        pos = (ind, num_copies)
-        p = mp.Process(
-            target=_worker_process,
-            args=(args, lang, pos, cross_stats.shm.name),
-            daemon=True
-        )
-        processes.append(p)
+    conn_stats = shared_memory.ShareableList([0] * num_copies)
+    try:
+        for index in range(num_copies):
+            p = mp.Process(
+                target=_worker_process,
+                args=(args, lang, index, conn_stats),
+                daemon=True,
+            )
+            processes.append(p)
 
-    signal.signal(signal.SIGINT, partial(_main_signal_handler, processes, logger))
-    signal.signal(signal.SIGTERM, partial(_main_signal_handler, processes, logger))
+        signal.signal(signal.SIGINT, partial(_main_signal_handler, processes, logger))
+        signal.signal(signal.SIGTERM, partial(_main_signal_handler, processes, logger))
 
-    for p in processes:
-        p.start()
+        for p in processes:
+            p.start()
 
-    for p in processes:
-        p.join()
-
-    cross_stats.shm.close()
-    cross_stats.shm.unlink()
+        for p in processes:
+            p.join()
+    finally:
+        conn_stats.shm.close()
+        conn_stats.shm.unlink()
 
 
 if __name__ == '__main__':

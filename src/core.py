@@ -1,10 +1,11 @@
 import logging
+import os
+import sys
 import warnings
 from asyncio.log import logger as asyncio_logger
-from contextlib import suppress
 from multiprocessing import cpu_count
 from pathlib import Path
-from typing import Optional, Set, Tuple
+from typing import Set
 
 from colorama import Fore
 
@@ -31,10 +32,10 @@ logger.setLevel('INFO')
 asyncio_logger.addFilter(RemoveUselessWarnings())
 
 
-def setup_worker_logger(process_index: Tuple[int, int]) -> None:
-    ind, total = process_index
-    if ind > 0:
+def setup_worker_logging(process_index: int) -> None:
+    if process_index > 0:
         logger.setLevel(logging.ERROR)
+        sys.stdout = open(os.devnull, 'w')
 
 
 ROOT_DIR = Path(__file__).parent.parent
