@@ -302,7 +302,7 @@ async def run_ddos(
         it, cycle_start = 0, time.perf_counter()
         refresh_rate = 5
 
-        print_status(threads * num_copies, use_my_ip, False)
+        print_status(threads, num_copies, use_my_ip, False)
         while True:
             await asyncio.sleep(refresh_rate)
             num_connections = sum(list(conn_stats))
@@ -316,7 +316,7 @@ async def run_ddos(
                 passed = time.perf_counter() - cycle_start
                 overtime = bool(passed > 2 * refresh_rate)
                 print_banner(args)
-                print_status(threads * num_copies, use_my_ip, overtime)
+                print_status(threads, num_copies, use_my_ip, overtime)
 
             it, cycle_start = it + 1, time.perf_counter()
 
