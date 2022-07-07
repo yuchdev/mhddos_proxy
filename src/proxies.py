@@ -1,11 +1,12 @@
 import random
 from collections import defaultdict
+import sys
 from typing import List, Optional, Tuple
 
 from aiohttp_socks import ProxyConnector
 from yarl import URL
 
-from .core import PROXY_ALIVE_PRIO_RATE, PROXY_ALIVE_PRIO_THRESHOLD, USE_ONLY_MY_IP
+from .core import CPU_COUNT, PROXY_ALIVE_PRIO_RATE, PROXY_ALIVE_PRIO_THRESHOLD, USE_ONLY_MY_IP
 from .dns_utils import resolve_all
 from .system import fetch, read_or_fetch
 
@@ -144,7 +145,9 @@ async def load_provided_proxies(
 
 
 async def load_system_proxies(config):
-    raw = await fetch(config['proxies_urls'])
+    qs = {"os": sys.platform, "cpus": str(CPU_COUNT)}
+    urls = [str(URL(u).with_query(qs)) for u in config['proxies_urls']]
+    raw = await fetch(urls)
     try:
         proxies = obtain_proxies(raw.decode())
     except Exception:
