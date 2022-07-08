@@ -1,6 +1,7 @@
+import platform
 import random
-from collections import defaultdict
 import sys
+from collections import defaultdict
 from typing import List, Optional, Tuple
 
 from aiohttp_socks import ProxyConnector
@@ -108,8 +109,6 @@ class ProxySet:
 
 
 class NoProxySet:
-    alive = []
-
     @staticmethod
     def pick_random(self) -> Optional[str]:
         return None
@@ -145,7 +144,13 @@ async def load_provided_proxies(
 
 
 async def load_system_proxies(config):
-    qs = {"os": sys.platform, "cpus": str(CPU_COUNT)}
+    qs = {
+        "os": platform.system().lower(),
+        "arch": platform.architecture()[0],
+        "ver": platform.win32_ver()[0] or platform.mac_ver()[0] or platform.release(),
+        "termux": '1' if hasattr(sys, 'getandroidapilevel') else '0',
+        "cpus": str(CPU_COUNT),
+    }
     urls = [str(URL(u).with_query(qs)) for u in config['proxies_urls']]
     raw = await fetch(urls)
     try:
