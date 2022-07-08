@@ -16,7 +16,8 @@ from typing import List, Optional, Set, Tuple, Union
 
 from src.cli import init_argparse
 from src.core import (
-    cl, COPIES_AUTO, CPU_COUNT, DEFAULT_THREADS, LIMITS_PADDING, logger, MAX_COPIES_AUTO, SCHEDULER_MAX_INIT_FRACTION,
+    cl, COPIES_AUTO, CPU_COUNT, DEFAULT_THREADS, IS_AUTO_MH, IS_DOCKER, LIMITS_PADDING, logger, MAX_COPIES_AUTO,
+    SCHEDULER_MAX_INIT_FRACTION,
     SCHEDULER_MIN_INIT_FRACTION, setup_worker_logging, UDP_FAILURE_BUDGET_FACTOR, UDP_FAILURE_DELAY_SECONDS,
     USE_ONLY_MY_IP,
 )
@@ -380,10 +381,6 @@ async def run_ddos(
     tasks.append(loop.create_task(reload_config()))
 
     await asyncio.gather(*tasks, return_exceptions=True)
-
-
-IS_AUTO_MH = os.getenv('AUTO_MH')
-IS_DOCKER = os.getenv('IS_DOCKER')
 
 
 def _main_signal_handler(ps, *args):
