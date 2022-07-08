@@ -11,7 +11,7 @@ jobs:
       - name: Delete 'mhddos_proxy' containers older than a week
         uses: snok/container-retention-policy@v1
         with:
-          image-names: python-dev, js-dev
+          image-names: mhddos_proxy
           cut-off: A week ago UTC
           account-type: personal
           keep-at-least: 1
