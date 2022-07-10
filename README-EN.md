@@ -34,10 +34,6 @@ Requires [Python](https://www.python.org/downloads/) and [Git](https://git-scm.c
     cd mhddos_proxy
     python3 -m pip install -r requirements.txt
 
-#### C) Docker
-
-Install and start Docker: https://docs.docker.com/desktop/#download-and-install
-
 ### 2. 🕹 Running
 
 #### Python with automatic updates (if it doesn't work, try `python` or `python3.10` instead of `python3`)
@@ -51,10 +47,6 @@ For [**Termux for Android**](https://telegra.ph/mhddos-proxy-for-Android-with-Te
 #### Python (manual updates required) (if it doesn't work, try `python` or `python3.10` instead of `python3`)
 
     python3 runner.py --itarmy
-
-#### Docker (for Linux, add sudo in front of the command)
-
-    docker run -it --rm --pull always ghcr.io/porthole-ascend-cinnamon/mhddos_proxy --itarmy
 
 ### 3. 🛠 Configuration and options
 
@@ -90,7 +82,6 @@ positional arguments:
 - [Create a botnet of 30+ free and standalone Linux servers](https://auto-ddos.notion.site/dd91326ed30140208383ffedd0f13e5c)
 - [Scripts with automatic install](https://t.me/ddos_separ/1126)
 - [Analysis of mhddos_proxy](https://telegra.ph/Anal%D1%96z-zasobu-mhddos-proxy-04-01)
-- [Example of running via docker on OpenWRT](https://youtu.be/MlL6fuDcWlI)
 - [VPN](https://auto-ddos.notion.site/VPN-5e45e0aadccc449e83fea45d56385b54)
 - [Setup with Telegram notifications](https://github.com/sadviq99/mhddos_proxy-setup)
 
@@ -127,13 +118,13 @@ and for the private `socks4` proxy format can be one of the following:
     socks4://114.231.123.38:3065:username:password
     socks4://username:password@114.231.123.38:3065
 
-**URL of the remote file for Python and Docker**
+**URL of the remote file**
 
     --proxies https://pastebin.com/raw/UkFWzLOt
 
 where https://pastebin.com/raw/UkFWzLOt is your web page with a list of proxies (each proxy should be on a new line)  
 
-**Path for the local file for Python**  
+**Path for the local file**  
   
 Put the file in the folder with `runner.py` and add the following option to the command (replace `proxies.txt` with the name of your file)
 

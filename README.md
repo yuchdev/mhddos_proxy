@@ -35,10 +35,6 @@
     cd mhddos_proxy
     python3 -m pip install -r requirements.txt
 
-#### C) Docker
-
-Встановіть і запустіть Docker: https://docs.docker.com/desktop/#download-and-install
-
 ### 2. 🕹 Запуск
 
 #### Python з автоматичним оновленням (якщо не працює - спробуйте `python` або `python3.10` замість `python3`)
@@ -52,10 +48,6 @@
 #### Python (потребує оновлення вручну) (якщо не працює - спробуйте `python` або `python3.10` замість `python3`)
 
     python3 runner.py --itarmy
-
-#### Docker (для Linux додавайте sudo на початку команди)
-
-    docker run -it --rm --pull always ghcr.io/porthole-ascend-cinnamon/mhddos_proxy --itarmy
 
 ### 3. 🛠 Налаштування та параметри
 
@@ -91,7 +83,6 @@ positional arguments:
 - [Створення ботнету з 20+ безкоштовних серверів](https://auto-ddos.notion.site/dd91326ed30140208383ffedd0f13e5c)
 - [Cкрипти з автоматичним встановленням](https://t.me/ddos_separ/1126)
 - [Аналіз засобу mhddos_proxy](https://telegra.ph/Anal%D1%96z-zasobu-mhddos-proxy-04-01)
-- [Приклад запуску через docker на OpenWRT](https://youtu.be/MlL6fuDcWlI)
 - [VPN](https://auto-ddos.notion.site/VPN-5e45e0aadccc449e83fea45d56385b54)
 - [Налаштування з нотифікаціями у Телеграм](https://github.com/sadviq99/mhddos_proxy-setup)
 
@@ -128,13 +119,13 @@ positional arguments:
     socks4://114.231.123.38:3065:username:password
     socks4://username:password@114.231.123.38:3065
   
-**URL - Віддалений файл для Python та Docker**
+**URL - Віддалений файл**
 
     --proxies https://pastebin.com/raw/UkFWzLOt
 
 де https://pastebin.com/raw/UkFWzLOt - ваша веб-сторінка зі списком проксі (кожен проксі з нового рядка)  
   
-**path - Шлях до локального файлу, для Python**
+**path - Шлях до локального файлу**
   
 Покладіть файл у папку з `runner.py` і додайте до команди наступний параметр (замініть `proxies.txt` на ім'я свого файлу)
 
