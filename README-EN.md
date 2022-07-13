@@ -2,9 +2,10 @@
 
 ### ⚠️ Attention
 From now on, for easy installation and protection against unauthorized use, mhddos_proxy will be distributed as an executable file.  
-[Follow the link](https://github.com/porthole-ascend-cinnamon/mhddos_proxy_releases) to get the instructions and download.  
+[Follow the link to get the instructions and download](https://github.com/porthole-ascend-cinnamon/mhddos_proxy_releases)    
 All updates and access to the full proxy database will be available only in the new version.  
 The public version (this repository) remains available, but will not receive new updates, except the critical.  
+Additional explanations in the official IT Army channel: https://t.me/itarmyofukraine2022/479  
 This step is necessary for our Victory. Glory to Ukraine!  
 
 ### Use flag `--lang en` to enable English translation
