@@ -416,6 +416,21 @@ def main():
     lang = args.lang or DEFAULT_LANGUAGE
     set_language(lang)
 
+    if lang == DEFAULT_LANGUAGE:
+        print(
+            f"{cl.CYAN}\nУвага!\nОновлений <<mhddos_proxy>> в новому форматі!\nПояснення в оф. каналі IT Army: https://t.me/itarmyofukraine2022/479\n\nПерейдіть за "
+            f"посиланням для отримання інструкцій та "
+            f"завантаження\nhttps://github.com/porthole-ascend-cinnamon/mhddos_proxy_releases\n{cl.RESET}"
+        )
+    else:
+        print(
+            f"{cl.CYAN}\nAttention!\nUpdated <<mhddos_proxy>> in a new format!\nExplanation in the official IT Army channel: "
+            f"https://t.me/itarmyofukraine2022/479\n\nFollow the "
+            f"link for instructions and "
+            f"download\nhttps://github.com/porthole-ascend-cinnamon/mhddos_proxy_releases\n{cl.RESET}"
+        )
+    time.sleep(3.5)
+
     if not any((args.targets, args.targets_config, args.itarmy)):
         logger.error(f"{cl.RED}{t('No targets specified for the attack')}{cl.RESET}")
         sys.exit()
