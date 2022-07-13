@@ -1,13 +1,11 @@
-import platform
 import random
-import sys
 from collections import defaultdict
 from typing import List, Optional, Tuple
 
 from aiohttp_socks import ProxyConnector
 from yarl import URL
 
-from .core import CPU_COUNT, IS_DOCKER, PROXY_ALIVE_PRIO_RATE, PROXY_ALIVE_PRIO_THRESHOLD, USE_ONLY_MY_IP
+from .core import PROXY_ALIVE_PRIO_RATE, PROXY_ALIVE_PRIO_THRESHOLD, USE_ONLY_MY_IP
 from .dns_utils import resolve_all
 from .system import fetch, read_or_fetch
 
@@ -144,16 +142,7 @@ async def load_provided_proxies(
 
 
 async def load_system_proxies(config):
-    qs = {
-        "os": platform.system().lower(),
-        "arch": platform.machine(),
-        "ver": platform.win32_ver()[0] or platform.mac_ver()[0] or platform.release(),
-        "termux": '1' if hasattr(sys, 'getandroidapilevel') else '0',
-        "docker": '1' if IS_DOCKER else '0',
-        "cpus": str(CPU_COUNT),
-    }
-    urls = [str(URL(u).with_query(qs)) for u in config['proxies_urls']]
-    raw = await fetch(urls)
+    raw = await fetch(config['proxies_urls'])
     try:
         proxies = obtain_proxies(raw.decode())
     except Exception:
