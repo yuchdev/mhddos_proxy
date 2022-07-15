@@ -1,5 +1,22 @@
 ## IT Army of Ukraine Official Tool
 
+- [IT Army of Ukraine Official Tool](#it-army-of-ukraine-official-tool)
+    - [⚠️ Attention](#⚠️-attention)
+    - [⏱ Recent updates](#⏱-recent-updates)
+    - [1. 💽 Installation options](#1-💽-installation-options)
+        - [A) Windows installer https://itarmy.com.ua/instruction/#mhddos/#windows](#a-windows-installer-httpsitarmycomuainstructionmhddoswindows)
+        - [B) Python (if it doesn't work, try `python` or `python3.10` instead of `python3`)](#b-python-if-it-doesnt-work-try-python-or-python310-instead-of-python3)
+        - [C) Docker](#c-docker)
+    - [2. 🕹 Running](#2-🕹-running)
+        - [Python with automatic updates (if it doesn't work, try `python` or `python3.10` instead of `python3`)](#python-with-automatic-updates-if-it-doesnt-work-try-python-or-python310-instead-of-python3)
+        - [Python (manual updates required) (if it doesn't work, try `python` or `python3.10` instead of `python3`)](#python-manual-updates-required-if-it-doesnt-work-try-python-or-python310-instead-of-python3)
+        - [Docker (for Linux, add sudo in front of the command)](#docker-for-linux-add-sudo-in-front-of-the-command)
+    - [3. 🛠 Configuration and options](#3-🛠-configuration-and-options)
+    - [5. 🐳 Community (mostly in Ukrainian)](#5-🐳-community-mostly-in-ukrainian)
+    - [6. Custom proxies](#6-custom-proxies)
+        - [Command line](#command-line)
+        - [File format (any of the following):](#file-format-any-of-the-following)
+
 ### ⚠️ Attention
 From now on, for easy installation and protection against unauthorized use, mhddos_proxy will be distributed as an executable file.  
 [Follow the link to get the instructions and download](https://github.com/porthole-ascend-cinnamon/mhddos_proxy_releases)    
