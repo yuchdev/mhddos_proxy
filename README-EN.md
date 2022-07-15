@@ -12,8 +12,8 @@
         - [Python (manual updates required) (if it doesn't work, try `python` or `python3.10` instead of `python3`)](#python-manual-updates-required-if-it-doesnt-work-try-python-or-python310-instead-of-python3)
         - [Docker (for Linux, add sudo in front of the command)](#docker-for-linux-add-sudo-in-front-of-the-command)
     - [3. 🛠 Configuration and options](#3-🛠-configuration-and-options)
-    - [5. 🐳 Community (mostly in Ukrainian)](#5-🐳-community-mostly-in-ukrainian)
-    - [6. Custom proxies](#6-custom-proxies)
+    - [4. 🐳 Community (mostly in Ukrainian)](#4-🐳-community-mostly-in-ukrainian)
+    - [5. Custom proxies](#5-custom-proxies)
         - [Command line](#command-line)
         - [File format (any of the following):](#file-format-any-of-the-following)
 
@@ -102,7 +102,7 @@ positional arguments:
    targets               List of targets, separated by space
 ```
 
-### 5. 🐳 Community (mostly in Ukrainian)
+### 4. 🐳 Community (mostly in Ukrainian)
 - [Detailed (unofficial) installation instructions](docs/installation.md)
 - [Create a botnet of 30+ free and standalone Linux servers](https://auto-ddos.notion.site/dd91326ed30140208383ffedd0f13e5c)
 - [Scripts with automatic install](https://t.me/ddos_separ/1126)
@@ -111,7 +111,7 @@ positional arguments:
 - [VPN](https://auto-ddos.notion.site/VPN-5e45e0aadccc449e83fea45d56385b54)
 - [Setup with Telegram notifications](https://github.com/sadviq99/mhddos_proxy-setup)
 
-### 6. Custom proxies
+### 5. Custom proxies
 
 #### Command line
 
