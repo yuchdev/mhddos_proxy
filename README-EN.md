@@ -58,7 +58,22 @@ For [**Termux for Android**](https://telegra.ph/mhddos-proxy-for-Android-with-Te
 
 #### Special considerations while running application under macOS
 
+Running application under macOS, you may face system restriction, that looks like that
+```
+The total number of threads has been reduced to 206 due to the limitations of your system
+```
 
+In order to increase the number of allowed file handles, and number of threads, 
+you should use the following commands from the root directory of a project:
+```
+sudo sysctl -w kern.maxfiles=65536
+sudo sysctl -w kern.maxfilesperproc=65536
+cp doc/limit.maxfiles.plist /Library/LaunchDaemons
+sudo chown root:wheel /Library/LaunchDaemons/limit.maxfiles.plist
+sudo launchctl load -w /Library/LaunchDaemons/limit.maxfiles.plist
+launchctl limit maxfiles
+```
+and restart the system. After that, limitations will be removed.
 
 ### 3. 🛠 Configuration and options
 
