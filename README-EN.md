@@ -85,7 +85,33 @@ positional arguments:
    targets               List of targets, separated by space
 ```
 
-### 5. 🐳 Community (mostly in Ukrainian)
+#### Application config file
+
+For some users application configuration file is more comfortable to handle options.
+
+Application config is usually located in the user home directory, full name `$HOME/.mhddos.json`. 
+If present, the config overrides command-line defaults, but itself is overwritten by command-line params.
+If does not exist, it does not affect application whatsoever.
+
+For example, if our app config looks like
+```json
+{
+  "itarmy": true,
+  "lang": "UA",
+  "threads": 2000
+}
+```
+but if we call the runner with the keys 
+```
+python3 runner.py --itarmy --table --http-methods GET STRESS --threads 4000
+```
+command-line param `--threads` overrides config, and we start with 4000 threads.
+
+For easy creation of the application config file, you can use `--save-config` option. 
+If the user adds it in the command line (usually in the first run), the config file `$HOME/.mhddos.json` 
+would be created with exactly the same parameters user launched the application with.
+
+### 4. 🐳 Community (mostly in Ukrainian)
 - [Detailed (unofficial) installation instructions](docs/installation.md)
 - [Create a botnet of 30+ free and standalone Linux servers](https://auto-ddos.notion.site/dd91326ed30140208383ffedd0f13e5c)
 - [Scripts with automatic install](https://t.me/ddos_separ/1126)
@@ -94,7 +120,7 @@ positional arguments:
 - [VPN](https://auto-ddos.notion.site/VPN-5e45e0aadccc449e83fea45d56385b54)
 - [Setup with Telegram notifications](https://github.com/sadviq99/mhddos_proxy-setup)
 
-### 6. Custom proxies
+### 5. Custom proxies
 
 #### Command line
 
