@@ -56,6 +56,10 @@ For [**Termux for Android**](https://telegra.ph/mhddos-proxy-for-Android-with-Te
 
     docker run -it --rm --pull always ghcr.io/porthole-ascend-cinnamon/mhddos_proxy:old --itarmy
 
+#### Special considerations while running application under macOS
+
+
+
 ### 3. 🛠 Configuration and options
 
 All options can be combined and specified in any order
