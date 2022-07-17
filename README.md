@@ -65,13 +65,14 @@
 ```
 
 Щоб збільшити кількість дозволених відкритих файлів та потоків програми, 
-вам потрібно виконати наступні команди з кореневого каталогу проекту
+вам потрібно виконати наступні команди з кореневого каталогу проекту 
+(усі команди виконувати під `sudo`)
 ```
-sudo sysctl -w kern.maxfiles=65536
-sudo sysctl -w kern.maxfilesperproc=65536
+sysctl -w kern.maxfiles=65536
+sysctl -w kern.maxfilesperproc=65536
 cp doc/limit.maxfiles.plist /Library/LaunchDaemons
-sudo chown root:wheel /Library/LaunchDaemons/limit.maxfiles.plist
-sudo launchctl load -w /Library/LaunchDaemons/limit.maxfiles.plist
+chown root:wheel /Library/LaunchDaemons/limit.maxfiles.plist
+launchctl load -w /Library/LaunchDaemons/limit.maxfiles.plist
 launchctl limit maxfiles
 ```
 та перезапустити систему. Після цього всі обмеження мають бути зняті.

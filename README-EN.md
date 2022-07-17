@@ -65,12 +65,13 @@ The total number of threads has been reduced to 206 due to the limitations of yo
 
 In order to increase the number of allowed file handles, and number of threads, 
 you should use the following commands from the root directory of a project:
+(all commands under `sudo`)
 ```
-sudo sysctl -w kern.maxfiles=65536
-sudo sysctl -w kern.maxfilesperproc=65536
+sysctl -w kern.maxfiles=65536
+sysctl -w kern.maxfilesperproc=65536
 cp doc/limit.maxfiles.plist /Library/LaunchDaemons
-sudo chown root:wheel /Library/LaunchDaemons/limit.maxfiles.plist
-sudo launchctl load -w /Library/LaunchDaemons/limit.maxfiles.plist
+chown root:wheel /Library/LaunchDaemons/limit.maxfiles.plist
+launchctl load -w /Library/LaunchDaemons/limit.maxfiles.plist
 launchctl limit maxfiles
 ```
 and restart the system. After that, limitations will be removed.
